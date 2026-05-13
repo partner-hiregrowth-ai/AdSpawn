@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String    @id @default(cuid())
+  facebookId        String    @unique
+  email             String?
+  name              String?
+  accessToken       String?
+  accounts          FacebookAccount[]
+  duplicateJobs     DuplicateJob[]
+  namingTemplates   NamingTemplate[]
+  createdAt         DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+
+model FacebookAccount {
+  id              String    @id @default(cuid())
+  adAccountId     String    @unique // e.g., act_123456789
+  name            String
+  currency        String?
+  timezoneName    String?
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model DuplicateJob {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  status          String    // PENDING, PROCESSING, COMPLETED, FAILED
+  type            String    // CAMPAIGN, ADSET, AD
+  sourceId        String    // Original Meta ID
+  targetId        String?   // New Meta ID
+  details         Json?     // Configuration used
+  error           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model NamingTemplate {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  name            String    // Template name, e.g., "Standard Client Layout"
+  pattern         String    // The actual template, e.g., "{{country}}-{{angle}}-{{date}}"
+  type            String    // CAMPAIGN, ADSET, AD or ALL
+  isDefault       Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
