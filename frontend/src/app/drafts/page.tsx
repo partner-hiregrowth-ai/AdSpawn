@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { draftApi } from "@/services/api";
-import { Edit2, Trash2, Send, Layers, Loader2 } from "lucide-react";
+import { Edit2, Trash2, Send, Layers, Loader2, X } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -16,6 +16,7 @@ export default function DraftsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkPublishing, setIsBulkPublishing] = useState(false);
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [publishProgress, setPublishProgress] = useState<{ current: number; total: number } | null>(null);
   const [showPublished, setShowPublished] = useState(false);
 
@@ -63,6 +64,24 @@ export default function DraftsPage() {
       setSelectedIds(new Set());
     } else {
       setSelectedIds(new Set(publishable.map((d) => d.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) return;
+    if (!confirm(`Delete ${ids.length} draft${ids.length > 1 ? "s" : ""}? This cannot be undone.`)) return;
+
+    setIsBulkDeleting(true);
+    try {
+      const response = await draftApi.bulkDeleteDrafts(ids);
+      toast.success(`${response.data.deleted} draft${response.data.deleted !== 1 ? "s" : ""} deleted`);
+      setSelectedIds(new Set());
+      fetchDrafts();
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || "Bulk delete failed");
+    } finally {
+      setIsBulkDeleting(false);
     }
   };
 
@@ -116,6 +135,7 @@ export default function DraftsPage() {
   const visibleDrafts = showPublished ? drafts : drafts.filter((d) => d.status !== "PUBLISHED");
   const publishableDrafts = visibleDrafts.filter((d) => d.status !== "PUBLISHING" && d.status !== "PUBLISHED");
   const allSelected = publishableDrafts.length > 0 && selectedIds.size === publishableDrafts.length;
+  const isBusy = isBulkPublishing || isBulkDeleting;
 
   return (
     <DashboardLayout>
@@ -141,28 +161,43 @@ export default function DraftsPage() {
                 variant="outline"
                 size="sm"
                 onClick={toggleSelectAll}
-                disabled={isBulkPublishing}
+                disabled={isBusy}
               >
                 {allSelected ? "Deselect All" : "Select All"}
               </Button>
             )}
             {selectedIds.size > 0 && (
-              <Button
-                className="gap-2 bg-blue-600 hover:bg-blue-700"
-                onClick={handleBulkPublish}
-                disabled={isBulkPublishing}
-              >
-                {isBulkPublishing ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Send className="w-4 h-4" />
-                )}
-                {isBulkPublishing
-                  ? publishProgress
-                    ? `Publishing ${publishProgress.current}/${publishProgress.total}...`
-                    : "Publishing..."
-                  : `Publish Selected (${selectedIds.size})`}
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  className="gap-2 border-red-500/50 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+                  onClick={handleBulkDelete}
+                  disabled={isBusy}
+                >
+                  {isBulkDeleting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <X className="w-4 h-4" />
+                  )}
+                  {isBulkDeleting ? "Deleting..." : `Delete (${selectedIds.size})`}
+                </Button>
+                <Button
+                  className="gap-2 bg-blue-600 hover:bg-blue-700"
+                  onClick={handleBulkPublish}
+                  disabled={isBusy}
+                >
+                  {isBulkPublishing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                  {isBulkPublishing
+                    ? publishProgress
+                      ? `Publishing ${publishProgress.current}/${publishProgress.total}...`
+                      : "Publishing..."
+                    : `Publish Selected (${selectedIds.size})`}
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -202,7 +237,7 @@ export default function DraftsPage() {
                           <Checkbox
                             checked={isSelected}
                             onCheckedChange={() => toggleSelect(draft.id)}
-                            disabled={isBulkPublishing}
+                            disabled={isBusy}
                             className="mt-1 shrink-0"
                           />
                         )}
@@ -224,7 +259,7 @@ export default function DraftsPage() {
                         Updated {new Date(draft.updatedAt).toLocaleDateString()}
                       </div>
                       <div className="flex gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => handleDelete(draft.id)} disabled={isBulkPublishing}>
+                        <Button variant="ghost" size="icon" onClick={() => handleDelete(draft.id)} disabled={isBusy}>
                           <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-500" />
                         </Button>
                         <Link href={`/drafts/${draft.id}`}>

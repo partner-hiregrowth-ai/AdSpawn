@@ -187,4 +187,29 @@ export class DraftController {
       res.status(500).json({ error: error.message });
     }
   }
+
+  static async bulkDeleteDrafts(req: Request, res: Response) {
+    try {
+      const { campaignIds } = req.body as { campaignIds: string[] };
+      const { userId } = req as AuthRequest;
+
+      if (!Array.isArray(campaignIds) || campaignIds.length === 0) {
+        return res.status(400).json({ error: 'campaignIds must be a non-empty array' });
+      }
+
+      // Only delete campaigns that belong to this user and are not currently PUBLISHING
+      const deleted = await prisma.draftCampaign.deleteMany({
+        where: {
+          id: { in: campaignIds },
+          userId,
+          status: { not: 'PUBLISHING' },
+        },
+      });
+
+      res.json({ deleted: deleted.count });
+    } catch (error: any) {
+      console.error(`[DraftController] Error in bulkDeleteDrafts:`, error);
+      res.status(500).json({ error: error.message });
+    }
+  }
 }

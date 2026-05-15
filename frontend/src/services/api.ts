@@ -52,7 +52,7 @@ export const duplicationApi = {
   }) => api.post('/duplicate/bulk', data),
   previewConversion: (data: { type: string, id: string, targetObjective: string, newName?: string }) => 
     api.post('/duplicate/preview-conversion', data),
-  convertObjective: (data: { items: Array<{ id: string, type: string, name: string }>, targetObjective: string, newName?: string, adAccountId: string }) => 
+  convertObjective: (data: { items: Array<{ id: string, type: string, name: string }>, targetObjective: string, newName?: string, adAccountId: string, saveAsDraft?: boolean }) =>
     api.post('/duplicate/convert-objective', data),
 };
 
@@ -74,6 +74,7 @@ export const draftApi = {
   validateDraft: (id: string) => api.post(`/drafts/campaigns/${id}/validate`),
   publishDraft: (id: string) => api.post(`/drafts/campaigns/${id}/publish`),
   bulkPublishDrafts: (campaignIds: string[]) => api.post('/drafts/campaigns/bulk-publish', { campaignIds }),
+  bulkDeleteDrafts: (campaignIds: string[]) => api.post('/drafts/campaigns/bulk-delete', { campaignIds }),
 };
 
 export default api;
