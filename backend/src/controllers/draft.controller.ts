@@ -16,22 +16,13 @@ export class DraftController {
   static async duplicateToDraft(req: Request, res: Response) {
     try {
       const { campaignId } = req.body;
-      const { userId } = req as AuthRequest;
-      
-      console.log(`[DraftController] duplicateToDraft START for userId: ${userId}, campaignId: ${campaignId}`);
-      
-      const user = await prisma.user.findUnique({ where: { id: userId } });
-      if (!user || !user.accessToken) {
-        console.error(`[DraftController] User not found or missing access token for ID: ${userId}`);
-        return res.status(401).json({ error: 'Unauthorized: Missing Facebook access token' });
-      }
+      const authReq = req as AuthRequest;
 
-      const draft = await DraftService.duplicateCampaignToDraft(campaignId, userId!, user.accessToken);
-      console.log(`[DraftController] duplicateToDraft SUCCESS for userId: ${userId}`);
+      const draft = await DraftService.duplicateCampaignToDraft(campaignId, authReq.userId!, authReq.userAccessToken!);
       res.json(draft);
     } catch (error: any) {
       console.error(`[DraftController] Error in duplicateToDraft:`, error);
-      res.status(500).json({ error: error.message, stack: error.stack });
+      res.status(500).json({ error: error.message });
     }
   }
 
@@ -125,14 +116,9 @@ export class DraftController {
   static async publishDraft(req: Request, res: Response) {
     try {
       const id = req.params.id as string;
-      const { userId } = req as AuthRequest;
+      const authReq = req as AuthRequest;
 
-      const user = await prisma.user.findUnique({ where: { id: userId } });
-      if (!user || !user.accessToken) {
-        return res.status(401).json({ error: 'Unauthorized: Missing Facebook access token' });
-      }
-
-      const result = await DraftPublishService.publishCampaign(id, user.accessToken);
+      const result = await DraftPublishService.publishCampaign(id, authReq.userAccessToken!);
       res.json(result);
     } catch (error: any) {
       console.error(`[DraftController] Error in publishDraft:`, error);
@@ -146,24 +132,18 @@ export class DraftController {
   static async bulkPublishDrafts(req: Request, res: Response) {
     try {
       const { campaignIds } = req.body as { campaignIds: string[] };
-      const { userId } = req as AuthRequest;
+      const authReq = req as AuthRequest;
 
       if (!Array.isArray(campaignIds) || campaignIds.length === 0) {
         return res.status(400).json({ error: 'campaignIds must be a non-empty array' });
       }
 
-      const user = await prisma.user.findUnique({ where: { id: userId } });
-      if (!user || !user.accessToken) {
-        return res.status(401).json({ error: 'Unauthorized: Missing Facebook access token' });
-      }
-
       const results: { id: string; success: boolean; metaCampaignId?: string; error?: string }[] = [];
       for (const id of campaignIds) {
         try {
-          const result = await DraftPublishService.publishCampaign(id, user.accessToken);
+          const result = await DraftPublishService.publishCampaign(id, authReq.userAccessToken!);
           results.push({ id, success: true, metaCampaignId: result.metaCampaignId });
         } catch (error: any) {
-          // Stop the entire batch if the token is expired — no point trying the rest
           if (isFacebookAuthError(error.message)) {
             return res.status(401).json({ error: error.message, code: 'TOKEN_EXPIRED' });
           }

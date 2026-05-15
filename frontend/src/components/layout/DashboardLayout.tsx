@@ -13,10 +13,9 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
 
   useEffect(() => {
     setMounted(true);
-    // In a real app, check for token here
     const token = localStorage.getItem("auth_token");
     if (!token && !user) {
-      // router.push("/login"); // Commented for development
+      // router.push("/login");
     }
   }, [user, router]);
 
@@ -27,7 +26,7 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
       <Navbar />
       <div className="flex">
         <Sidebar />
-        <main className="flex-1 p-8 overflow-auto h-[calc(100vh-64px)]">
+        <main className="flex-1 p-6 lg:p-8 overflow-auto h-[calc(100vh-56px)]">
           {children}
         </main>
       </div>

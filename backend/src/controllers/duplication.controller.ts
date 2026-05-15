@@ -23,10 +23,7 @@ export const deleteHistoryItem = async (req: AuthRequest, res: Response) => {
   const id = req.params.id as string;
   try {
     await prisma.duplicateJob.deleteMany({
-      where: {
-        id,
-        userId: req.userId
-      },
+      where: { id, userId: req.userId },
     });
     res.json({ success: true });
   } catch (error) {
@@ -36,9 +33,6 @@ export const deleteHistoryItem = async (req: AuthRequest, res: Response) => {
 
 export const cleanupHistory = async (req: AuthRequest, res: Response) => {
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.userId } });
-    if (!user || !user.accessToken) return res.status(401).json({ message: 'Unauthorized' });
-
     const jobs = await prisma.duplicateJob.findMany({
       where: {
         userId: req.userId,
@@ -47,16 +41,23 @@ export const cleanupHistory = async (req: AuthRequest, res: Response) => {
       },
     });
 
-    const fbService = new FacebookService(user.accessToken);
-    let deletedCount = 0;
+    const fbService = new FacebookService(req.userAccessToken!);
 
-    for (const job of jobs) {
-      if (job.targetId) {
-        const exists = await fbService.checkExistence(job.targetId);
-        if (!exists) {
-          await prisma.duplicateJob.delete({ where: { id: job.id } });
-          deletedCount++;
-        }
+    const BATCH = 10;
+    let deletedCount = 0;
+    for (let i = 0; i < jobs.length; i += BATCH) {
+      const batch = jobs.slice(i, i + BATCH);
+      const results = await Promise.all(
+        batch.map(async (job) => {
+          if (!job.targetId) return false;
+          const exists = await fbService.checkExistence(job.targetId);
+          return exists ? null : job.id;
+        })
+      );
+      const toDelete = results.filter((id): id is string => id !== null && id !== false);
+      if (toDelete.length > 0) {
+        await prisma.duplicateJob.deleteMany({ where: { id: { in: toDelete } } });
+        deletedCount += toDelete.length;
       }
     }
 
@@ -69,25 +70,14 @@ export const cleanupHistory = async (req: AuthRequest, res: Response) => {
 
 export const previewConversion = async (req: AuthRequest, res: Response) => {
   const { type, id, targetObjective, newName } = req.body;
-  console.log(`[DEBUG] previewConversion started:`, { type, id, targetObjective, newName });
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.userId } });
-    if (!user || !user.accessToken) {
-      console.error(`[DEBUG] User not found or no access token for ID: ${req.userId}`);
-      return res.status(401).json({ message: 'Unauthorized' });
-    }
-
-    const fbService = new FacebookService(user.accessToken);
+    const fbService = new FacebookService(req.userAccessToken!);
     const conversionService = new ObjectiveConversionService(fbService);
-
-    console.log(`[DEBUG] Calling conversionService.getPreview...`);
     const preview = await conversionService.getPreview(type, id, targetObjective, newName);
-    console.log(`[DEBUG] getPreview successful. Returning data.`);
     res.json(preview);
   } catch (error: any) {
     const errorData = error.response?.data || error.message;
-    console.error('[DEBUG] previewConversion Error:', errorData);
-    if (error.stack) console.error(error.stack);
+    console.error('previewConversion Error:', errorData);
     res.status(500).json({ message: 'Failed to preview conversion', error: errorData });
   }
 };
@@ -95,22 +85,12 @@ export const previewConversion = async (req: AuthRequest, res: Response) => {
 export const convertObjective = async (req: AuthRequest, res: Response) => {
   const { items, targetObjective, newName, adAccountId, saveAsDraft } = req.body;
   const publishNow = saveAsDraft === false;
-  console.log(`[DEBUG] convertObjective started (Bulk):`, { itemCount: items?.length, targetObjective, adAccountId, publishNow });
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.userId } });
-    if (!user || !user.accessToken) {
-      console.error(`[DEBUG] User not found or no access token for ID: ${req.userId}`);
-      return res.status(401).json({ message: 'Unauthorized' });
-    }
-
-    const fbService = new FacebookService(user.accessToken);
-    const conversionService = new ObjectiveConversionService(fbService);
     const results = [];
 
     for (const item of items) {
       if (item.type !== 'CAMPAIGN') continue;
 
-      console.log(`[DEBUG] Starting deep campaign conversion for: ${item.id}`);
       const finalName = items.length === 1 ? newName : `${item.name} - Converted`;
 
       const draftCampaign = await DraftService.convertCampaignToDraft(
@@ -118,23 +98,21 @@ export const convertObjective = async (req: AuthRequest, res: Response) => {
         targetObjective,
         finalName,
         adAccountId,
-        user.id,
-        user.accessToken
+        req.userId!,
+        req.userAccessToken!
       );
 
       if (publishNow) {
-        console.log(`[DEBUG] publishNow=true — publishing draft ${draftCampaign.id} immediately`);
         try {
-          await DraftPublishService.publishCampaign(draftCampaign.id, user.accessToken);
+          await DraftPublishService.publishCampaign(draftCampaign.id, req.userAccessToken!);
         } catch (publishError: any) {
-          console.error(`[DEBUG] Immediate publish failed for draft ${draftCampaign.id}:`, publishError.message);
-          // Draft is saved; user can retry from Drafts page
+          console.error(`Immediate publish failed for draft ${draftCampaign.id}:`, publishError.message);
         }
       }
 
       await prisma.duplicateJob.create({
         data: {
-          userId: user.id,
+          userId: req.userId!,
           status: 'COMPLETED',
           type: 'CAMPAIGN',
           sourceId: item.id,
@@ -148,29 +126,20 @@ export const convertObjective = async (req: AuthRequest, res: Response) => {
     res.json({ success: true, results });
   } catch (error: any) {
     const errorData = error.response?.data || error.message;
-    console.error('[DEBUG] convertObjective Error:', errorData);
-    if (error.stack) console.error(error.stack);
+    console.error('convertObjective Error:', errorData);
     res.status(500).json({ message: 'Failed to convert objective', error: errorData });
   }
 };
 
 export const duplicateItems = async (req: AuthRequest, res: Response) => {
   const { items, adAccountId, options } = req.body;
-  // items: Array<{ id: string, type: 'CAMPAIGN' | 'ADSET' | 'AD', name: string }>
-  // options: { numCopies: number, renamePattern: string, deep: boolean, customBudget?: string, context?: any }
 
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.userId } });
-    if (!user || !user.accessToken) {
-      return res.status(401).json({ message: 'User not authorized' });
-    }
-
-    const fbService = new FacebookService(user.accessToken);
+    const fbService = new FacebookService(req.userAccessToken!);
     const results = [];
 
     for (const item of items) {
       for (let i = 0; i < (options.numCopies || 1); i++) {
-        // Advanced Naming Engine Integration
         const namingContext = {
           ...options.context,
           campaign_name: item.type === 'CAMPAIGN' ? item.name : undefined,
@@ -185,16 +154,12 @@ export const duplicateItems = async (req: AuthRequest, res: Response) => {
 
         let result;
 
-        // Convert custom budget to cents/satang (e.g., 20 -> 2000)
         let customBudget = undefined;
         if (options.customBudget) {
           let budgetValue = parseFloat(options.customBudget);
-
           if (budgetValue > 0 && budgetValue < 40) {
-            console.log(`[Backend] Budget ${budgetValue} THB is too low. Bumping to safety minimum of 40 THB.`);
             budgetValue = 40;
           }
-
           customBudget = (budgetValue * 100).toString();
         }
 
@@ -205,12 +170,10 @@ export const duplicateItems = async (req: AuthRequest, res: Response) => {
             result = await fbService.duplicateCampaign(item.id, newName, adAccountId, customBudget);
           }
         } else if (item.type === 'ADSET') {
-          console.log(`[DuplicationController] Fetching campaign_id for ad set: ${item.id}`);
           const originalResponse = await fbService.get(`/${item.id}`, { fields: 'campaign_id,campaign{id}' });
           const campaignId = originalResponse.data.campaign_id || originalResponse.data.campaign?.id;
 
           if (!campaignId) {
-            console.error(`[DuplicationController] Failed to find campaign_id for ad set: ${item.id}`, originalResponse.data);
             throw new Error(`Could not find parent campaign for ad set ${item.id}`);
           }
 
@@ -227,7 +190,7 @@ export const duplicateItems = async (req: AuthRequest, res: Response) => {
         if (result) {
           await prisma.duplicateJob.create({
             data: {
-              userId: user.id,
+              userId: req.userId!,
               status: 'COMPLETED',
               type: item.type,
               sourceId: item.id,
@@ -244,12 +207,10 @@ export const duplicateItems = async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     const errorDetail = error.response?.data || error.message || error;
     console.error('[DuplicationController] Bulk Duplicate Error:', errorDetail);
-    if (error.stack) console.error(error.stack);
 
     res.status(500).json({
       message: 'Failed to duplicate items',
       error: errorDetail,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 };
@@ -257,14 +218,12 @@ export const duplicateItems = async (req: AuthRequest, res: Response) => {
 export const duplicateCampaign = async (req: AuthRequest, res: Response) => {
   const { campaignId, newName, adAccountId } = req.body;
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.userId } });
-    const fbService = new FacebookService(user!.accessToken!);
-
+    const fbService = new FacebookService(req.userAccessToken!);
     const result = await fbService.duplicateCampaign(campaignId, newName, adAccountId);
 
     await prisma.duplicateJob.create({
       data: {
-        userId: user!.id,
+        userId: req.userId!,
         status: 'COMPLETED',
         type: 'CAMPAIGN',
         sourceId: campaignId,
@@ -282,14 +241,12 @@ export const duplicateCampaign = async (req: AuthRequest, res: Response) => {
 export const duplicateAdSet = async (req: AuthRequest, res: Response) => {
   const { adSetId, newName, campaignId, adAccountId } = req.body;
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.userId } });
-    const fbService = new FacebookService(user!.accessToken!);
-
+    const fbService = new FacebookService(req.userAccessToken!);
     const result = await fbService.duplicateAdSet(adSetId, newName, campaignId, adAccountId);
 
     await prisma.duplicateJob.create({
       data: {
-        userId: user!.id,
+        userId: req.userId!,
         status: 'COMPLETED',
         type: 'ADSET',
         sourceId: adSetId,
@@ -307,14 +264,12 @@ export const duplicateAdSet = async (req: AuthRequest, res: Response) => {
 export const duplicateAd = async (req: AuthRequest, res: Response) => {
   const { adId, newName, adSetId, adAccountId } = req.body;
   try {
-    const user = await prisma.user.findUnique({ where: { id: req.userId } });
-    const fbService = new FacebookService(user!.accessToken!);
-
+    const fbService = new FacebookService(req.userAccessToken!);
     const result = await fbService.duplicateAd(adId, newName, adSetId, adAccountId);
 
     await prisma.duplicateJob.create({
       data: {
-        userId: user!.id,
+        userId: req.userId!,
         status: 'COMPLETED',
         type: 'AD',
         sourceId: adId,

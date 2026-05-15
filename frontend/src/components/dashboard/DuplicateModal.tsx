@@ -81,9 +81,7 @@ export const DuplicateModal = ({ isOpen, onClose, selectedItems, adAccountId, on
 
     setDraftLoading(true);
     try {
-      for (const item of selectedItems) {
-        await draftApi.duplicateToDraft(item.id);
-      }
+      await Promise.all(selectedItems.map(item => draftApi.duplicateToDraft(item.id)));
       toast.success("Saved to Internal Drafts!");
       onClose();
     } catch (error) {

@@ -5,13 +5,11 @@ const FB_BASE_URL = `https://graph.facebook.com/${FB_API_VERSION}`;
 
 export class FacebookService {
   private accessToken: string;
+  public readonly client: ReturnType<typeof axios.create>;
 
   constructor(accessToken: string) {
     this.accessToken = accessToken;
-  }
-
-  public get client() {
-    return axios.create({
+    this.client = axios.create({
       baseURL: FB_BASE_URL,
       params: {
         access_token: this.accessToken,
@@ -289,45 +287,61 @@ export class FacebookService {
   }
 
   async duplicateAdSetDeep(adSetId: string, newName: string, campaignId: string, adAccountId: string, customBudget?: string) {
-    // 1. Duplicate the Ad Set itself
-    const newAdSet = await this.duplicateAdSet(adSetId, newName, campaignId, adAccountId, customBudget);
-    
-    // 2. Fetch and duplicate all ads within this ad set
-    try {
-      const ads = await this.getAds(adSetId);
-      for (const ad of ads) {
-        await this.duplicateAd(ad.id, `${ad.name} - Copy`, newAdSet.id, adAccountId);
+    const [newAdSet, ads] = await Promise.all([
+      this.duplicateAdSet(adSetId, newName, campaignId, adAccountId, customBudget),
+      this.getAds(adSetId),
+    ]);
+
+    if (ads.length > 0) {
+      const BATCH = 5;
+      for (let i = 0; i < ads.length; i += BATCH) {
+        const batch = ads.slice(i, i + BATCH);
+        await Promise.all(
+          batch.map(ad =>
+            this.duplicateAd(ad.id, `${ad.name} - Copy`, newAdSet.id, adAccountId)
+              .catch(err => console.warn(`[FacebookService] Failed to dup ad ${ad.id}:`, err.message))
+          )
+        );
       }
-    } catch (error) {
-      console.warn(`[FacebookService] Failed to duplicate ads for ad set ${adSetId}:`, error);
-      // We still return the new ad set even if ads fail
     }
 
     return newAdSet;
   }
 
   async duplicateCampaignDeep(campaignId: string, campaignName: string, adAccountId: string, customBudget?: string) {
-    // 1. Fetch original campaign to check if it's CBO
-    const original = await this.client.get(`/${campaignId}`, {
-      params: { fields: 'bid_strategy,daily_budget,lifetime_budget' }
-    });
+    const [original, adSets] = await Promise.all([
+      this.client.get(`/${campaignId}`, {
+        params: { fields: 'bid_strategy,daily_budget,lifetime_budget' }
+      }),
+      this.getAdSets(campaignId),
+    ]);
+
     const isCBO = !!(original.data.bid_strategy || original.data.daily_budget || original.data.lifetime_budget);
-    
-    // 2. Duplicate Campaign
     const newCampaign = await this.duplicateCampaign(campaignId, campaignName, adAccountId, customBudget);
-    
-    // 3. Fetch Ad Sets
-    const adSets = await this.getAdSets(campaignId);
-    
-    for (const adSet of adSets) {
-      // 4. Duplicate Ad Set (Pass isCBO flag to prevent budget conflict)
-      const newAdSet = await this.duplicateAdSet(adSet.id, `${adSet.name} - Copy`, newCampaign.id, adAccountId, customBudget, isCBO);
-      
-      // 5. Duplicate Ads
-      const ads = await this.getAds(adSet.id);
-      for (const ad of ads) {
-        await this.duplicateAd(ad.id, `${ad.name} - Copy`, newAdSet.id, adAccountId);
-      }
+
+    const BATCH = 3;
+    for (let i = 0; i < adSets.length; i += BATCH) {
+      const batch = adSets.slice(i, i + BATCH);
+      await Promise.all(
+        batch.map(async (adSet) => {
+          const [newAdSet, ads] = await Promise.all([
+            this.duplicateAdSet(adSet.id, `${adSet.name} - Copy`, newCampaign.id, adAccountId, customBudget, isCBO),
+            this.getAds(adSet.id),
+          ]);
+          if (ads.length > 0) {
+            const AD_BATCH = 5;
+            for (let j = 0; j < ads.length; j += AD_BATCH) {
+              const adBatch = ads.slice(j, j + AD_BATCH);
+              await Promise.all(
+                adBatch.map(ad =>
+                  this.duplicateAd(ad.id, `${ad.name} - Copy`, newAdSet.id, adAccountId)
+                    .catch(err => console.warn(`[FacebookService] Failed to dup ad ${ad.id}:`, err.message))
+                )
+              );
+            }
+          }
+        })
+      );
     }
 
     return newCampaign;
