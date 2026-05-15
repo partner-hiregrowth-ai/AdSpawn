@@ -74,6 +74,7 @@ export const draftApi = {
   validateDraft: (id: string) => api.post(`/drafts/campaigns/${id}/validate`),
   publishDraft: (id: string) => api.post(`/drafts/campaigns/${id}/publish`),
   bulkPublishDrafts: (campaignIds: string[]) => api.post('/drafts/campaigns/bulk-publish', { campaignIds }),
+  bulkUpdateCampaigns: (campaignIds: string[], updates: any) => api.post('/drafts/campaigns/bulk-update', { campaignIds, updates }),
   bulkDeleteDrafts: (campaignIds: string[]) => api.post('/drafts/campaigns/bulk-delete', { campaignIds }),
 };
 

@@ -168,6 +168,44 @@ export class DraftController {
     }
   }
 
+  static async bulkUpdateCampaigns(req: Request, res: Response) {
+    try {
+      const { campaignIds, updates } = req.body as {
+        campaignIds: string[];
+        updates: { objective?: string; data?: Record<string, any> };
+      };
+      const { userId } = req as AuthRequest;
+
+      if (!Array.isArray(campaignIds) || campaignIds.length === 0) {
+        return res.status(400).json({ error: 'campaignIds must be a non-empty array' });
+      }
+
+      let updatedCount = 0;
+      for (const id of campaignIds) {
+        const current = await prisma.draftCampaign.findFirst({
+          where: { id, userId, status: { not: 'PUBLISHING' } },
+        });
+        if (!current) continue;
+
+        const updatePayload: any = { status: 'DRAFT' };
+        if (updates.objective !== undefined) {
+          updatePayload.objective = updates.objective;
+        }
+        if (updates.data) {
+          updatePayload.data = { ...(current.data as any), ...updates.data };
+        }
+
+        await prisma.draftCampaign.update({ where: { id }, data: updatePayload });
+        updatedCount++;
+      }
+
+      res.json({ updated: updatedCount });
+    } catch (error: any) {
+      console.error(`[DraftController] Error in bulkUpdateCampaigns:`, error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+
   static async bulkDeleteDrafts(req: Request, res: Response) {
     try {
       const { campaignIds } = req.body as { campaignIds: string[] };
