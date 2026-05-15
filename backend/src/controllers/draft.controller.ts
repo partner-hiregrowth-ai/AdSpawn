@@ -8,6 +8,10 @@ import { DraftPublishService } from '../services/draft/DraftPublishService';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { prisma } from '../prisma';
 
+function isFacebookAuthError(message: string): boolean {
+  return message?.includes('OAuthException') || message?.includes('access token') || message?.includes('Session has expired');
+}
+
 export class DraftController {
   static async duplicateToDraft(req: Request, res: Response) {
     try {
@@ -122,16 +126,54 @@ export class DraftController {
     try {
       const id = req.params.id as string;
       const { userId } = req as AuthRequest;
-      
+
       const user = await prisma.user.findUnique({ where: { id: userId } });
       if (!user || !user.accessToken) {
         return res.status(401).json({ error: 'Unauthorized: Missing Facebook access token' });
       }
-      
+
       const result = await DraftPublishService.publishCampaign(id, user.accessToken);
       res.json(result);
     } catch (error: any) {
       console.error(`[DraftController] Error in publishDraft:`, error);
+      if (isFacebookAuthError(error.message)) {
+        return res.status(401).json({ error: error.message, code: 'TOKEN_EXPIRED' });
+      }
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  static async bulkPublishDrafts(req: Request, res: Response) {
+    try {
+      const { campaignIds } = req.body as { campaignIds: string[] };
+      const { userId } = req as AuthRequest;
+
+      if (!Array.isArray(campaignIds) || campaignIds.length === 0) {
+        return res.status(400).json({ error: 'campaignIds must be a non-empty array' });
+      }
+
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (!user || !user.accessToken) {
+        return res.status(401).json({ error: 'Unauthorized: Missing Facebook access token' });
+      }
+
+      const results: { id: string; success: boolean; metaCampaignId?: string; error?: string }[] = [];
+      for (const id of campaignIds) {
+        try {
+          const result = await DraftPublishService.publishCampaign(id, user.accessToken);
+          results.push({ id, success: true, metaCampaignId: result.metaCampaignId });
+        } catch (error: any) {
+          // Stop the entire batch if the token is expired — no point trying the rest
+          if (isFacebookAuthError(error.message)) {
+            return res.status(401).json({ error: error.message, code: 'TOKEN_EXPIRED' });
+          }
+          results.push({ id, success: false, error: error.message });
+        }
+      }
+
+      res.json({ results });
+    } catch (error: any) {
+      console.error(`[DraftController] Error in bulkPublishDrafts:`, error);
       res.status(500).json({ error: error.message });
     }
   }

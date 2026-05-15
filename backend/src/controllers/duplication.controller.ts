@@ -5,6 +5,7 @@ import { FacebookService } from '../services/facebook.service';
 import { NamingEngine } from '../utils/namingEngine';
 import { ObjectiveConversionService } from '../services/objectiveConversion.service';
 import { DraftService } from '../services/draft/DraftService';
+import { DraftPublishService } from '../services/draft/DraftPublishService';
 
 export const getHistory = async (req: AuthRequest, res: Response) => {
   try {
@@ -92,8 +93,9 @@ export const previewConversion = async (req: AuthRequest, res: Response) => {
 };
 
 export const convertObjective = async (req: AuthRequest, res: Response) => {
-  const { items, targetObjective, newName, adAccountId } = req.body;
-  console.log(`[DEBUG] convertObjective started (Bulk):`, { itemCount: items?.length, targetObjective, adAccountId });
+  const { items, targetObjective, newName, adAccountId, saveAsDraft } = req.body;
+  const publishNow = saveAsDraft === false;
+  console.log(`[DEBUG] convertObjective started (Bulk):`, { itemCount: items?.length, targetObjective, adAccountId, publishNow });
   try {
     const user = await prisma.user.findUnique({ where: { id: req.userId } });
     if (!user || !user.accessToken) {
@@ -109,7 +111,6 @@ export const convertObjective = async (req: AuthRequest, res: Response) => {
       if (item.type !== 'CAMPAIGN') continue;
 
       console.log(`[DEBUG] Starting deep campaign conversion for: ${item.id}`);
-      // Use the provided newName if it's single item, otherwise use default
       const finalName = items.length === 1 ? newName : `${item.name} - Converted`;
 
       const draftCampaign = await DraftService.convertCampaignToDraft(
@@ -121,6 +122,16 @@ export const convertObjective = async (req: AuthRequest, res: Response) => {
         user.accessToken
       );
 
+      if (publishNow) {
+        console.log(`[DEBUG] publishNow=true — publishing draft ${draftCampaign.id} immediately`);
+        try {
+          await DraftPublishService.publishCampaign(draftCampaign.id, user.accessToken);
+        } catch (publishError: any) {
+          console.error(`[DEBUG] Immediate publish failed for draft ${draftCampaign.id}:`, publishError.message);
+          // Draft is saved; user can retry from Drafts page
+        }
+      }
+
       await prisma.duplicateJob.create({
         data: {
           userId: user.id,
@@ -128,7 +139,7 @@ export const convertObjective = async (req: AuthRequest, res: Response) => {
           type: 'CAMPAIGN',
           sourceId: item.id,
           targetId: draftCampaign.id,
-          details: { newName: finalName, targetObjective, adAccountId, isConversion: true, savedAsDraft: true },
+          details: { newName: finalName, targetObjective, adAccountId, isConversion: true, savedAsDraft: !publishNow },
         },
       });
       results.push(draftCampaign);

@@ -41,9 +41,7 @@ export class DraftCampaignService {
   }
 
   static async update(id: string, updateData: any) {
-    // Omitting relational fields like adSets and user to prevent Prisma errors
-    const { adSets, user, ...cleanData } = updateData;
-    
+    const { id: _id, adSets, user, createdAt, updatedAt, userId, _count, ...cleanData } = updateData;
     return prisma.draftCampaign.update({
       where: { id },
       data: cleanData,

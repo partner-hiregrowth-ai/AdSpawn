@@ -15,6 +15,7 @@ router.delete('/campaigns/:id', DraftController.deleteCampaign);
 router.patch('/adsets/:id', DraftController.updateAdSet);
 router.patch('/ads/:id', DraftController.updateAd);
 
+router.post('/campaigns/bulk-publish', DraftController.bulkPublishDrafts);
 router.post('/campaigns/:id/validate', DraftController.validateDraft);
 router.post('/campaigns/:id/publish', DraftController.publishDraft);
 

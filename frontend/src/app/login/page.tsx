@@ -7,16 +7,24 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { authApi } from "@/services/api";
 import { useAppStore } from "@/store/useAppStore";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { setUser } = useAppStore();
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [showDevMode, setShowDevMode] = useState(false);
   const [devToken, setDevToken] = useState("");
+
+  useEffect(() => {
+    if (searchParams.get('reason') === 'token_expired') {
+      toast.error("Your Facebook session expired. Please log in again.");
+    }
+  }, [searchParams]);
 
   const handleFacebookLogin = () => {
     const appId = process.env.NEXT_PUBLIC_FB_APP_ID;

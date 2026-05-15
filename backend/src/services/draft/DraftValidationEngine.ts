@@ -23,7 +23,7 @@ export class DraftValidationEngine {
     return errors;
   }
 
-  static async validateAdSet(adSet: DraftAdSet): Promise<ValidationError[]> {
+  static async validateAdSet(adSet: DraftAdSet, campaignObjective?: string): Promise<ValidationError[]> {
     const errors: ValidationError[] = [];
     const data = adSet.data as any;
 
@@ -41,6 +41,22 @@ export class DraftValidationEngine {
 
     if (!data.targeting) {
       errors.push({ field: 'targeting', message: 'Targeting is required', severity: 'error' });
+    }
+
+    // promoted_object requirements per objective
+    if (campaignObjective === 'OUTCOME_SALES' || campaignObjective === 'OUTCOME_APP_PROMOTION') {
+      if (!data.promoted_object) {
+        const required = campaignObjective === 'OUTCOME_SALES' ? 'pixel_id' : 'application_id';
+        errors.push({
+          field: 'promoted_object',
+          message: `promoted_object with ${required} is required for ${campaignObjective}`,
+          severity: 'error',
+        });
+      } else if (campaignObjective === 'OUTCOME_SALES' && !data.promoted_object.pixel_id) {
+        errors.push({ field: 'promoted_object.pixel_id', message: 'pixel_id is required for OUTCOME_SALES', severity: 'error' });
+      } else if (campaignObjective === 'OUTCOME_APP_PROMOTION' && !data.promoted_object.application_id) {
+        errors.push({ field: 'promoted_object.application_id', message: 'application_id is required for OUTCOME_APP_PROMOTION', severity: 'error' });
+      }
     }
 
     return errors;
@@ -74,8 +90,9 @@ export class DraftValidationEngine {
     let isValid = campaignErrors.every(e => e.severity !== 'error');
 
     if (campaign.adSets) {
+      const campaignObjective = (campaign.data as any)?.objective || campaign.objective;
       for (const adSet of campaign.adSets) {
-        const errors = await this.validateAdSet(adSet);
+        const errors = await this.validateAdSet(adSet, campaignObjective);
         adSetErrors[adSet.id] = errors;
         if (errors.some(e => e.severity === 'error')) isValid = false;
 

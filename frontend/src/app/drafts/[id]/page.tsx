@@ -143,7 +143,7 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
               <ShieldCheck className={`w-4 h-4 ${isValidating ? 'animate-spin' : ''}`} />
               Validate
             </Button>
-            <Button className="gap-2 bg-blue-600 hover:bg-blue-700" onClick={handlePublish} disabled={isPublishing || (draft.status !== 'READY' && draft.status !== 'FAILED')}>
+            <Button className="gap-2 bg-blue-600 hover:bg-blue-700" onClick={handlePublish} disabled={isPublishing || draft.status === 'PUBLISHING' || draft.status === 'PUBLISHED'}>
               <Send className="w-4 h-4" />
               {isPublishing ? 'Publishing...' : 'Publish to Meta'}
             </Button>

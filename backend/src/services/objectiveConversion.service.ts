@@ -247,8 +247,9 @@ export class ObjectiveConversionService {
       if (engagementPageId) payload.promoted_object = { page_id: String(engagementPageId) };
     }
 
-    // attribution_spec: safe to include for WEBSITE destination
-    if (data.attribution_spec && payload.destination_type !== 'ON_AD') {
+    // attribution_spec only valid for TRAFFIC/SALES/LEADS — other objectives (ENGAGEMENT, AWARENESS, APP_PROMOTION) reject it
+    const ATTRIBUTION_SPEC_OBJECTIVES = new Set(['OUTCOME_SALES', 'OUTCOME_LEADS', 'OUTCOME_TRAFFIC']);
+    if (data.attribution_spec && ATTRIBUTION_SPEC_OBJECTIVES.has(targetObjective) && payload.destination_type !== 'ON_AD') {
       payload.attribution_spec = data.attribution_spec;
     }
 
@@ -341,6 +342,11 @@ export class ObjectiveConversionService {
     // 2. Create new campaign
     const campaignPayload = this.transformCampaign(originalCampaign.data, targetObjective, newName);
     const isNewCampaignCBO = !!(campaignPayload.daily_budget || campaignPayload.lifetime_budget);
+
+    // Meta requires this field explicitly on non-CBO campaigns
+    if (!isNewCampaignCBO) {
+      campaignPayload.is_adset_budget_sharing_enabled = false;
+    }
 
     console.log(`[ObjectiveConversionService] Creating campaign:`, JSON.stringify(campaignPayload));
     const newCampaign = (

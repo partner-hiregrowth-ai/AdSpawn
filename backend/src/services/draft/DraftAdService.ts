@@ -29,8 +29,7 @@ export class DraftAdService {
   }
 
   static async update(id: string, updateData: any) {
-    const { adSet, user, ...cleanData } = updateData;
-    
+    const { id: _id, adSet, user, createdAt, updatedAt, userId, draftAdSetId, _count, ...cleanData } = updateData;
     return prisma.draftAd.update({
       where: { id },
       data: cleanData,

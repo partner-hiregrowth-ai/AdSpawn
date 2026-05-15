@@ -14,6 +14,18 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const data = error.response?.data;
+    if (error.response?.status === 401 && data?.code === 'TOKEN_EXPIRED') {
+      localStorage.removeItem('token');
+      window.location.href = '/login?reason=token_expired';
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const authApi = {
   loginWithFacebook: (accessToken: string) => api.post('/auth/facebook', { accessToken }),
 };
@@ -61,6 +73,7 @@ export const draftApi = {
   updateAd: (id: string, data: any) => api.patch(`/drafts/ads/${id}`, data),
   validateDraft: (id: string) => api.post(`/drafts/campaigns/${id}/validate`),
   publishDraft: (id: string) => api.post(`/drafts/campaigns/${id}/publish`),
+  bulkPublishDrafts: (campaignIds: string[]) => api.post('/drafts/campaigns/bulk-publish', { campaignIds }),
 };
 
 export default api;
