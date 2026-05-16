@@ -47,7 +47,33 @@ export class DraftPublishService {
 
       let metaCampaignId: string;
       if (campaign.metaId) {
+        // Campaign exists on Meta from a prior attempt — sync mutable fields
         metaCampaignId = campaign.metaId;
+        const updatePayload: any = {
+          name: campaign.name,
+          status: 'PAUSED',
+          special_ad_categories: campaignData.special_ad_categories || [],
+        };
+        if (isCBO) {
+          if (campaignData.daily_budget && campaignData.lifetime_budget) {
+            updatePayload.daily_budget = String(campaignData.daily_budget);
+          } else if (campaignData.daily_budget) {
+            updatePayload.daily_budget = String(campaignData.daily_budget);
+          } else if (campaignData.lifetime_budget) {
+            updatePayload.lifetime_budget = String(campaignData.lifetime_budget);
+          }
+          if (campaignData.bid_strategy && !BID_CAP_STRATEGIES.has(campaignData.bid_strategy)) {
+            updatePayload.bid_strategy = campaignData.bid_strategy;
+          } else {
+            updatePayload.bid_strategy = 'LOWEST_COST_WITHOUT_CAP';
+          }
+        }
+        try {
+          console.log(`[DraftPublishService] Updating existing Meta campaign ${metaCampaignId}:`, JSON.stringify(updatePayload));
+          await fbService.client.post(`/${metaCampaignId}`, updatePayload);
+        } catch (error: any) {
+          console.error(`[DraftPublishService] Failed to update Meta campaign ${metaCampaignId}:`, error.response?.data?.error || error.message);
+        }
       } else {
         const campaignPayload: any = {
           name: campaign.name,
@@ -57,18 +83,27 @@ export class DraftPublishService {
         };
 
         if (isCBO) {
-          if (campaignData.daily_budget) campaignPayload.daily_budget = String(campaignData.daily_budget);
-          if (campaignData.lifetime_budget) campaignPayload.lifetime_budget = String(campaignData.lifetime_budget);
+          // Meta requires exactly one — prefer daily_budget when both exist
+          if (campaignData.daily_budget && campaignData.lifetime_budget) {
+            campaignPayload.daily_budget = String(campaignData.daily_budget);
+          } else if (campaignData.daily_budget) {
+            campaignPayload.daily_budget = String(campaignData.daily_budget);
+          } else if (campaignData.lifetime_budget) {
+            campaignPayload.lifetime_budget = String(campaignData.lifetime_budget);
+          }
+          // Cap-type strategies require bid_amount we may not have — fall back to safest option
           if (campaignData.bid_strategy && !BID_CAP_STRATEGIES.has(campaignData.bid_strategy)) {
             campaignPayload.bid_strategy = campaignData.bid_strategy;
+          } else {
+            campaignPayload.bid_strategy = 'LOWEST_COST_WITHOUT_CAP';
           }
-          // If bid_strategy is a cap type and we have no bid_amount, omit it — Meta defaults to LOWEST_COST_WITHOUT_CAP
         } else {
           // Meta requires this field explicitly on non-CBO campaigns
           campaignPayload.is_adset_budget_sharing_enabled = false;
         }
 
         try {
+          console.log(`[DraftPublishService] Publishing campaign ${campaignId} payload:`, JSON.stringify(campaignPayload));
           const fbCampaign = await fbService.client.post(
             `/${campaignAccountId}/campaigns`,
             campaignPayload
@@ -101,8 +136,22 @@ export class DraftPublishService {
         } else {
           const adSetData = adSet.data as any;
           const campaignObjective: string = campaignData.objective || campaign.objective || '';
-          // attribution_spec is only valid for TRAFFIC/SALES/LEADS; other objectives reject it
           const ATTRIBUTION_SPEC_OBJECTIVES = new Set(['OUTCOME_SALES', 'OUTCOME_LEADS', 'OUTCOME_TRAFFIC']);
+          const VALID_DESTINATION_TYPES = new Set([
+            'WEBSITE', 'APP', 'MESSENGER', 'APPLINKS_AUTOMATIC', 'FACEBOOK',
+            'INSTAGRAM_DIRECT', 'WHATSAPP', 'SHOP_AUTOMATIC', 'ON_AD', 'ON_POST',
+            'ON_EVENT', 'ON_VIDEO', 'ON_PAGE',
+          ]);
+
+          // Clean promoted_object: strip read-only fields Meta returns but rejects on create
+          let cleanPromotedObject: any = undefined;
+          if (adSetData.promoted_object) {
+            const { smart_pse_enabled, ...writableFields } = adSetData.promoted_object;
+            if (Object.keys(writableFields).length > 0) {
+              cleanPromotedObject = writableFields;
+            }
+          }
+
           const adSetPayload: any = {
             name: adSet.name,
             campaign_id: metaCampaignId,
@@ -110,31 +159,38 @@ export class DraftPublishService {
             billing_event: adSetData.billing_event || 'IMPRESSIONS',
             optimization_goal: adSetData.optimization_goal,
             targeting: adSetData.targeting || { geo_locations: { countries: ['TH'] } },
-            ...(adSetData.promoted_object && { promoted_object: adSetData.promoted_object }),
-            ...(adSetData.destination_type && { destination_type: adSetData.destination_type }),
+            ...(cleanPromotedObject && { promoted_object: cleanPromotedObject }),
+            ...(adSetData.destination_type && VALID_DESTINATION_TYPES.has(adSetData.destination_type) && { destination_type: adSetData.destination_type }),
             ...(adSetData.attribution_spec && ATTRIBUTION_SPEC_OBJECTIVES.has(campaignObjective) && { attribution_spec: adSetData.attribution_spec }),
           };
 
-          // Send bid_strategy + bid_amount as a complete pair.
-          // BID_CAP/COST_CAP strategies require bid_amount — only include them when both are present.
-          // Strategies that don't require bid_amount (LOWEST_COST_WITHOUT_CAP) are safe to include alone.
-          const adSetBidStrategy: string | undefined = adSetData.bid_strategy;
-          const adSetBidAmount: number | string | undefined = adSetData.bid_amount;
-          if (adSetBidStrategy && BID_CAP_STRATEGIES.has(adSetBidStrategy)) {
-            if (adSetBidAmount) {
-              adSetPayload.bid_strategy = adSetBidStrategy;
-              adSetPayload.bid_amount = String(adSetBidAmount);
+          // Under CBO the campaign owns bid strategy — ad sets must not send bid fields
+          if (!isCBO) {
+            const adSetBidStrategy: string | undefined = adSetData.bid_strategy;
+            const adSetBidAmount: number | string | undefined = adSetData.bid_amount;
+            if (adSetBidStrategy && BID_CAP_STRATEGIES.has(adSetBidStrategy)) {
+              if (adSetBidAmount) {
+                adSetPayload.bid_strategy = adSetBidStrategy;
+                adSetPayload.bid_amount = String(adSetBidAmount);
+              }
+            } else {
+              if (adSetBidStrategy) adSetPayload.bid_strategy = adSetBidStrategy;
+              if (adSetBidAmount) adSetPayload.bid_amount = String(adSetBidAmount);
             }
-            // Missing bid_amount → omit both, Meta defaults to LOWEST_COST_WITHOUT_CAP
-          } else {
-            if (adSetBidStrategy) adSetPayload.bid_strategy = adSetBidStrategy;
-            if (adSetBidAmount) adSetPayload.bid_amount = String(adSetBidAmount);
           }
 
           // CBO campaigns manage budget at campaign level — ad sets must not have their own budgets
           if (!isCBO) {
-            if (adSetData.daily_budget) adSetPayload.daily_budget = String(adSetData.daily_budget);
-            if (adSetData.lifetime_budget) adSetPayload.lifetime_budget = String(adSetData.lifetime_budget);
+            const adSetDailyBudget = Number(adSetData.daily_budget) || 0;
+            const adSetLifetimeBudget = Number(adSetData.lifetime_budget) || 0;
+            // Only send one; prefer daily when both are non-zero
+            if (adSetDailyBudget > 0 && adSetLifetimeBudget > 0) {
+              adSetPayload.daily_budget = String(adSetDailyBudget);
+            } else if (adSetDailyBudget > 0) {
+              adSetPayload.daily_budget = String(adSetDailyBudget);
+            } else if (adSetLifetimeBudget > 0) {
+              adSetPayload.lifetime_budget = String(adSetLifetimeBudget);
+            }
             if (adSetData.start_time) adSetPayload.start_time = adSetData.start_time;
             if (adSetData.end_time) adSetPayload.end_time = adSetData.end_time;
           }
@@ -147,7 +203,8 @@ export class DraftPublishService {
             const errData = error.response?.data?.error;
             console.error(`Failed to publish ad set ${adSet.id} to Facebook:`, JSON.stringify(errData) || error.message);
 
-            if (errData?.error_subcode === 2490487) {
+            const bidErrorSubcodes = new Set([2490487, 1815857]);
+            if (bidErrorSubcodes.has(errData?.error_subcode)) {
               // Bid strategy/amount conflict — strip all bid fields and retry.
               // This handles two cases:
               //   1. The ad set's stored bid data is incompatible with the objective.
@@ -163,14 +220,16 @@ export class DraftPublishService {
                 const fbAdSetRetry = await fbService.client.post(`/${adSetAccountId}/adsets`, bidlessPayload);
                 metaAdSetId = fbAdSetRetry.data.id;
               } catch (retryError: any) {
-                // Retry also failed — the parent campaign on Meta is in a bad state.
-                // Reset campaign metaId so the next publish call recreates the campaign with corrected settings.
-                console.error(`[DraftPublishService] Ad set retry failed. Resetting campaign metaId for next attempt.`);
+                const retryErrData = retryError.response?.data?.error;
+                const retryDetail = retryErrData
+                  ? `${retryErrData.message} (code ${retryErrData.code}/${retryErrData.error_subcode ?? 'no subcode'})${retryErrData.error_user_msg ? ': ' + retryErrData.error_user_msg : ''}`
+                  : retryError.message;
+                console.error(`[DraftPublishService] Ad set retry failed:`, JSON.stringify(retryErrData) || retryError.message);
                 await prisma.draftCampaign.update({
                   where: { id: campaignId },
                   data: { metaId: null },
                 });
-                throw new Error(`Facebook API Error (AdSet ${adSet.id}): ${retryError.response?.data?.error?.message || retryError.message} (campaign metaId reset — retry publish)`);
+                throw new Error(`Facebook API Error (AdSet ${adSet.id}): ${retryDetail} (campaign metaId reset — retry publish)`);
               }
             } else {
               const detail = errData
