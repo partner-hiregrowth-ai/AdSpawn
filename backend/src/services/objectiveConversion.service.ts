@@ -208,7 +208,9 @@ export class ObjectiveConversionService {
     // Destination type
     // For OUTCOME_LEADS: use WEBSITE instead of ON_AD to avoid needing a lead form ID
     // ON_AD (Instant Forms) requires an existing leadgen_form_id which we can't create on the fly
-    if (targetObjective === 'OUTCOME_LEADS') {
+    if (targetObjective === 'OUTCOME_AWARENESS') {
+      // AWARENESS only supports UNDEFINED (Default) — do not send destination_type
+    } else if (targetObjective === 'OUTCOME_LEADS') {
       payload.destination_type = 'WEBSITE';
     } else if (targetObjective === 'OUTCOME_TRAFFIC') {
       payload.destination_type = 'WEBSITE';
