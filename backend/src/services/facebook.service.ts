@@ -22,6 +22,10 @@ export class FacebookService {
     return this.client.get(path, { params });
   }
 
+  async delete(id: string) {
+    return this.client.delete(`/${id}`);
+  }
+
   async getAdAccounts() {
     const response = await this.client.get('/me/adaccounts', {
       params: {

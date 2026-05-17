@@ -56,3 +56,26 @@ export const updateObjectName = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ message: 'Failed to update name', error: error.response?.data });
   }
 };
+
+export const bulkDeleteCampaigns = async (req: AuthRequest, res: Response) => {
+  const { ids } = req.body as { ids: string[] };
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ message: 'ids must be a non-empty array' });
+  }
+  try {
+    const fbService = new FacebookService(req.userAccessToken!);
+    const results: { id: string; success: boolean; error?: string }[] = [];
+    for (const id of ids) {
+      try {
+        await fbService.delete(id);
+        results.push({ id, success: true });
+      } catch (error: any) {
+        const msg = error.response?.data?.error?.message || error.message;
+        results.push({ id, success: false, error: msg });
+      }
+    }
+    res.json({ results, deleted: results.filter(r => r.success).length });
+  } catch (error: any) {
+    res.status(500).json({ message: 'Bulk delete failed', error: error.message });
+  }
+};

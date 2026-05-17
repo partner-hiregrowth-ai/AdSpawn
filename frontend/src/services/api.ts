@@ -36,6 +36,7 @@ export const adAccountApi = {
   getAdSets: (campaignId: string) => api.get(`/adaccounts/campaigns/${campaignId}/adsets`),
   getAds: (adSetId: string) => api.get(`/adaccounts/adsets/${adSetId}/ads`),
   updateName: (id: string, newName: string) => api.patch('/adaccounts/update-name', { id, newName }),
+  bulkDelete: (ids: string[]) => api.post('/adaccounts/bulk-delete', { ids }),
 };
 
 export const duplicationApi = {

@@ -13,7 +13,7 @@ import {
   ChevronRight, ChevronDown, Megaphone, Layers, Image as ImageIcon,
   Copy, Search, Loader2, RefreshCw, Edit2, Check, X, FolderTree,
   Globe, Target, Coins, Zap, AlertTriangle, Info, ArrowRightLeft,
-  PanelRightClose, PanelRightOpen,
+  PanelRightClose, PanelRightOpen, Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -89,6 +89,7 @@ export default function ExplorerPage() {
   const [duplicating, setDuplicating] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [converting, setConverting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const selectedItemsList = useMemo(() => Array.from(selectedItems.values()), [selectedItems]);
   const hasCampaigns = selectedItemsList.some((item) => item.type === "CAMPAIGN");
@@ -291,7 +292,25 @@ export default function ExplorerPage() {
     finally { setConverting(false); }
   };
 
-  const isBusy = duplicating || savingDraft || optimizing || converting;
+  const handleBulkDelete = async () => {
+    const campaignIds = selectedItemsList.filter(i => i.type === 'CAMPAIGN').map(i => i.id);
+    if (campaignIds.length === 0) {
+      toast.error("Select campaigns to delete");
+      return;
+    }
+    if (!confirm(`Delete ${campaignIds.length} campaign${campaignIds.length > 1 ? 's' : ''} from Meta? This cannot be undone.`)) return;
+    setDeleting(true);
+    try {
+      const response = await adAccountApi.bulkDelete(campaignIds);
+      toast.success(`${response.data.deleted} campaign${response.data.deleted !== 1 ? 's' : ''} deleted`);
+      setSelectedItems(new Map());
+      setPanelOpen(false);
+      fetchCampaigns();
+    } catch (err: any) { toast.error(err.response?.data?.message || "Delete failed"); }
+    finally { setDeleting(false); }
+  };
+
+  const isBusy = duplicating || savingDraft || optimizing || converting || deleting;
 
   // ─── Inline editor ───
 
@@ -757,6 +776,18 @@ export default function ExplorerPage() {
                     </button>
                   </div>
                 </div>
+
+                {/* Delete button */}
+                {selectedItemsList.some(i => i.type === 'CAMPAIGN') && (
+                  <div className="px-4 pt-2">
+                    <Button variant="outline" size="sm"
+                      className="w-full border-red-800/50 text-red-400 hover:bg-red-600/10 hover:text-red-300 gap-2 h-8 text-xs"
+                      onClick={handleBulkDelete} disabled={isBusy}>
+                      {deleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                      Delete {selectedItemsList.filter(i => i.type === 'CAMPAIGN').length} from Meta
+                    </Button>
+                  </div>
+                )}
 
                 {/* Panel body */}
                 <div className="flex-1 overflow-y-auto p-4">
