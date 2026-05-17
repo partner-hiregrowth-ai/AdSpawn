@@ -156,10 +156,12 @@ export class DraftService {
         }
       }
 
-      // Inject pixel_id into adSetData for conversion if needed
+      // For OUTCOME_SALES: promoted_object needs pixel_id + custom_event_type
       if (pixelId && NEEDS_PIXEL.has(targetObjective)) {
-        if (!adSetData.promoted_object) adSetData.promoted_object = {};
-        adSetData.promoted_object.pixel_id = pixelId;
+        adSetData.promoted_object = {
+          pixel_id: pixelId,
+          custom_event_type: 'PURCHASE',
+        };
       }
 
       const transformedAdSet = conversionService.transformAdSet(

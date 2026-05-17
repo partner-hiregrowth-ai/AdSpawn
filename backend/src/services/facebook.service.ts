@@ -44,19 +44,39 @@ export class FacebookService {
   }
 
   async getPixelId(adAccountId: string): Promise<string | null> {
+    // Try ad account level first
     try {
       const response = await this.client.get(`/${adAccountId}/adspixels`, {
-        params: { fields: 'id', limit: 1 }
+        params: { fields: 'id,name', limit: 5 }
       });
       const pixelId = response.data.data?.[0]?.id || null;
-      if (!pixelId) {
-        console.warn(`[FacebookService] No pixels found for ${adAccountId}`);
-      }
-      return pixelId;
+      if (pixelId) return pixelId;
     } catch (error: any) {
-      console.warn(`[FacebookService] Failed to fetch pixels for ${adAccountId}:`, error.response?.data?.error?.message || error.message);
-      return null;
+      console.warn(`[FacebookService] Failed to fetch pixels from ad account:`, error.response?.data?.error?.message || error.message);
     }
+
+    // Fallback: try business level
+    try {
+      const accountInfo = await this.client.get(`/${adAccountId}`, {
+        params: { fields: 'business' }
+      });
+      const businessId = accountInfo.data.business?.id;
+      if (businessId) {
+        const bizPixels = await this.client.get(`/${businessId}/adspixels`, {
+          params: { fields: 'id,name', limit: 5 }
+        });
+        const pixelId = bizPixels.data.data?.[0]?.id || null;
+        if (pixelId) {
+          console.log(`[FacebookService] Found pixel_id ${pixelId} from business ${businessId}`);
+          return pixelId;
+        }
+      }
+    } catch (error: any) {
+      console.warn(`[FacebookService] Failed to fetch pixels from business:`, error.response?.data?.error?.message || error.message);
+    }
+
+    console.warn(`[FacebookService] No pixels found for ${adAccountId} (ad account or business level)`);
+    return null;
   }
 
   async getCampaigns(adAccountId: string) {
