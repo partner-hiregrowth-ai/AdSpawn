@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "5450bfc129e82547",
+        "id": "77a2cc47f7d5f68b",
         "type": "tabs",
         "children": [
           {
-            "id": "0db8353787c9a3b2",
+            "id": "8e70b0b743e1c594",
             "type": "leaf",
             "state": {
               "type": "graph",
@@ -176,19 +176,20 @@
       "bases:Create new base": false
     }
   },
-  "active": "0db8353787c9a3b2",
+  "active": "8e70b0b743e1c594",
   "lastOpenFiles": [
+    "frontend/src/app/explorer/page.tsx.tmp.26304.d205c75b3f0d",
+    "frontend/src/app/explorer/page.tsx.tmp.26304.d61c3a9962e9",
+    "frontend/src/app/explorer/page.tsx.tmp.26304.23508a3b408b",
+    "frontend/src/app/explorer/page.tsx.tmp.26304.001600c65f40",
+    "frontend/src/app/explorer/page.tsx.tmp.26304.ecdc6659baac",
+    "frontend/src/app/explorer/page.tsx.tmp.26304.eb7150f57501",
+    "frontend/src/app/explorer/page.tsx.tmp.26304.a2e9000dc6ed",
+    "frontend/src/app/explorer/page.tsx.tmp.26304.3f6a3c806058",
+    "frontend/src/app/explorer/page.tsx.tmp.26304.8637fe091f38",
+    "frontend/node_modules/next/dist/docs/01-app/04-glossary.md",
     "frontend/src/app/explorer/page.tsx.tmp.26304.8f998d2c2124",
     "frontend/src/app/explorer/page.tsx.tmp.26304.2f2ef3dc36e3",
-    "frontend/src/app/explorer/page.tsx.tmp.26304.aa5fca6ce8af",
-    "frontend/src/app/explorer/page.tsx.tmp.26304.55920590fd33",
-    "frontend/src/app/explorer/page.tsx.tmp.26304.a2065687ee90",
-    "frontend/src/app/explorer/page.tsx.tmp.26304.29c134aac0dd",
-    "frontend/src/app/explorer/page.tsx.tmp.26304.f0d12a4d2ba2",
-    "frontend/src/app/explorer/page.tsx.tmp.26304.a80accedf4df",
-    "frontend/src/app/explorer/page.tsx.tmp.26304.ab258c25ba32",
-    "frontend/src/app/layout.tsx.tmp.26304.ea44948a06ac",
-    "frontend/src/components/layout/Navbar.tsx.tmp.26304.c2d38fc9d1c2",
     "backend/node_modules/@types/chai/README.md",
     "backend/node_modules/vitest/node_modules/picomatch/README.md",
     "backend/node_modules/vitest/README.md",
@@ -213,7 +214,6 @@
     "backend/node_modules/obug/README.md",
     "backend/node_modules/magicast/README.md",
     "backend/node_modules/siginfo/README.md",
-    "backend/node_modules/stackback/README.md",
-    "backend/node_modules/rolldown/README.md"
+    "backend/node_modules/stackback/README.md"
   ]
 }

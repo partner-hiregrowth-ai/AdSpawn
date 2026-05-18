@@ -13,8 +13,9 @@ import {
   ChevronRight, ChevronDown, Megaphone, Layers, Image as ImageIcon,
   Copy, Search, Loader2, RefreshCw, Edit2, Check, X, FolderTree,
   Globe, Target, Coins, Zap, AlertTriangle, Info, ArrowRightLeft,
-  PanelRightClose, PanelRightOpen, Trash2,
+  PanelRightClose, PanelRightOpen, Trash2, Braces,
 } from "lucide-react";
+import { format } from "date-fns";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { NamingTemplateEditor } from "@/components/dashboard/NamingTemplateEditor";
@@ -46,6 +47,24 @@ const StatusBadge = memo(({ status }: { status: string }) => (
 StatusBadge.displayName = 'StatusBadge';
 
 type PanelMode = 'duplicate' | 'convert';
+
+// ─── Template resolver ───
+
+function resolvePattern(pattern: string, ctx: Record<string, string | undefined>): string {
+  return pattern.replace(/\{\{(.*?)\}\}/g, (match, inner) => {
+    const [key, transform] = inner.split('|').map((s: string) => s.trim());
+    let val = ctx[key];
+    if (val === undefined) return match;
+    switch ((transform || '').toLowerCase()) {
+      case 'upper': return val.toUpperCase();
+      case 'lower': return val.toLowerCase();
+      case 'snake': return val.replace(/\s+/g, '_').toLowerCase();
+      case 'camel': return val.replace(/(?:^\w|[A-Z]|\b\w)/g, (w: string, i: number) => i === 0 ? w.toLowerCase() : w.toUpperCase()).replace(/\s+/g, '');
+      case 'pascal': return val.replace(/(?:^\w|[A-Z]|\b\w)/g, (w: string) => w.toUpperCase()).replace(/\s+/g, '');
+      default: return val;
+    }
+  });
+}
 
 // ─── Main page ───
 
@@ -195,16 +214,16 @@ export default function ExplorerPage() {
     toast.success("Explorer refreshed");
   };
 
-  const handleUpdateName = useCallback(async (id: string, type: 'CAMPAIGN' | 'ADSET' | 'AD') => {
-    if (!editValue.trim()) return;
-    const previousValue = editValue;
-    if (type === 'CAMPAIGN') setCampaigns(prev => prev.map(c => c.id === id ? { ...c, name: editValue } : c));
-    else if (type === 'ADSET') setAdSets(prev => { const n = { ...prev }; for (const k in n) n[k] = n[k].map(as => as.id === id ? { ...as, name: editValue } : as); return n; });
-    else if (type === 'AD') setAds(prev => { const n = { ...prev }; for (const k in n) n[k] = n[k].map(ad => ad.id === id ? { ...ad, name: editValue } : ad); return n; });
+  const handleUpdateName = useCallback(async (id: string, type: 'CAMPAIGN' | 'ADSET' | 'AD', resolvedName?: string) => {
+    const nameToSave = resolvedName ?? editValue;
+    if (!nameToSave.trim()) return;
+    if (type === 'CAMPAIGN') setCampaigns(prev => prev.map(c => c.id === id ? { ...c, name: nameToSave } : c));
+    else if (type === 'ADSET') setAdSets(prev => { const n = { ...prev }; for (const k in n) n[k] = n[k].map(as => as.id === id ? { ...as, name: nameToSave } : as); return n; });
+    else if (type === 'AD') setAds(prev => { const n = { ...prev }; for (const k in n) n[k] = n[k].map(ad => ad.id === id ? { ...ad, name: nameToSave } : ad); return n; });
     setEditingId(null);
     setUpdating(true);
-    try { await adAccountApi.updateName(id, editValue); toast.success("Name updated"); }
-    catch { toast.error("Failed to update name"); if (type === 'CAMPAIGN') setCampaigns(prev => prev.map(c => c.id === id ? { ...c, name: previousValue } : c)); }
+    try { await adAccountApi.updateName(id, nameToSave); toast.success("Name updated"); }
+    catch { toast.error("Failed to update name"); }
     finally { setUpdating(false); }
   }, [editValue]);
 
@@ -472,23 +491,68 @@ export default function ExplorerPage() {
 
   // ─── Inline editor ───
 
-  const InlineEditor = ({ id, type }: { id: string; type: 'CAMPAIGN' | 'ADSET' | 'AD' }) => (
-    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-      <Input
-        value={editValue}
-        onChange={(e) => setEditValue(e.target.value)}
-        className="h-7 bg-gray-950 border-gray-700 text-sm focus:border-blue-500"
-        autoFocus
-        onKeyDown={(e) => { if (e.key === 'Enter') handleUpdateName(id, type); if (e.key === 'Escape') setEditingId(null); }}
-      />
-      <Button size="icon" variant="ghost" className="h-7 w-7 text-emerald-500 hover:bg-emerald-500/10" onClick={() => handleUpdateName(id, type)} disabled={updating}>
-        {updating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-      </Button>
-      <Button size="icon" variant="ghost" className="h-7 w-7 text-gray-500 hover:bg-gray-800" onClick={() => setEditingId(null)} disabled={updating}>
-        <X className="w-3.5 h-3.5" />
-      </Button>
-    </div>
-  );
+  const VARS_BY_TYPE = {
+    CAMPAIGN: ['campaign_name', 'objective', 'date'],
+    ADSET:    ['adset_name', 'campaign_name', 'date'],
+    AD:       ['ad_name', 'adset_name', 'date'],
+  } as const;
+
+  const InlineEditor = ({
+    id, type, context = {},
+  }: {
+    id: string;
+    type: 'CAMPAIGN' | 'ADSET' | 'AD';
+    context?: Record<string, string | undefined>;
+  }) => {
+    const [templateMode, setTemplateMode] = useState(false);
+    const fullCtx = { ...context, date: format(new Date(), 'yyyy-MM-dd') };
+    const hasVars = editValue.includes('{{');
+    const resolved = hasVars ? resolvePattern(editValue, fullCtx) : editValue;
+
+    return (
+      <div className="flex flex-col gap-1" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-1.5">
+          <Input
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            className={cn("h-7 bg-gray-950 border-gray-700 text-sm focus:border-blue-500", hasVars && "font-mono")}
+            autoFocus
+            onKeyDown={(e) => { if (e.key === 'Enter') handleUpdateName(id, type, resolved); if (e.key === 'Escape') setEditingId(null); }}
+          />
+          <Button size="icon" variant="ghost"
+            className={cn("h-7 w-7 shrink-0", templateMode ? "text-blue-400 bg-blue-500/10" : "text-gray-600 hover:text-gray-300")}
+            onClick={() => setTemplateMode(m => !m)}
+            title="Template variables">
+            <Braces className="w-3.5 h-3.5" />
+          </Button>
+          <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 text-emerald-500 hover:bg-emerald-500/10"
+            onClick={() => handleUpdateName(id, type, resolved)} disabled={updating}>
+            {updating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+          </Button>
+          <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 text-gray-500 hover:bg-gray-800"
+            onClick={() => setEditingId(null)} disabled={updating}>
+            <X className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+
+        {templateMode && (
+          <div className="flex flex-wrap gap-1 pl-0.5">
+            {VARS_BY_TYPE[type].map(v => (
+              <button key={v}
+                onClick={() => setEditValue(prev => prev + `{{${v}}}`)}
+                className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 border border-blue-500/20 text-blue-400 hover:bg-blue-500/20 font-mono">
+                {`{{${v}}}`}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {hasVars && (
+          <p className="text-[11px] text-gray-500 font-mono pl-0.5 truncate">→ {resolved}</p>
+        )}
+      </div>
+    );
+  };
 
   // ─── Optimization fields display ───
 
@@ -768,7 +832,7 @@ export default function ExplorerPage() {
                   )}
                   <Select
                     value={`${sortKey}:${sortDir}`}
-                    onValueChange={(v) => { const [k, d] = v.split(':'); setSortKey(k as any); setSortDir(d as any); }}
+                    onValueChange={(v) => { if (!v) return; const parts = v.split(':'); setSortKey(parts[0] as any); setSortDir((parts[1] || 'asc') as any); }}
                   >
                     <SelectTrigger className="h-9 w-32 shrink-0 bg-blue-500/10 border-blue-500/20 text-blue-400 text-xs focus:ring-0">
                       <SelectValue />
@@ -830,7 +894,8 @@ export default function ExplorerPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             {editingId === campaign.id ? (
-                              <InlineEditor id={campaign.id} type="CAMPAIGN" />
+                              <InlineEditor id={campaign.id} type="CAMPAIGN"
+                                context={{ campaign_name: campaign.name, objective: OBJECTIVE_LABELS[campaign.objective] || campaign.objective }} />
                             ) : (
                               <div className="flex items-center gap-2">
                                 <div className="min-w-0">
@@ -882,7 +947,8 @@ export default function ExplorerPage() {
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     {editingId === adset.id ? (
-                                      <InlineEditor id={adset.id} type="ADSET" />
+                                      <InlineEditor id={adset.id} type="ADSET"
+                                        context={{ adset_name: adset.name, campaign_name: campaign.name }} />
                                     ) : (
                                       <div className="flex items-center gap-2">
                                         <p className="text-sm text-gray-300 truncate">{adset.name}</p>
@@ -923,7 +989,8 @@ export default function ExplorerPage() {
                                         </div>
                                         <div className="flex-1 min-w-0">
                                           {editingId === ad.id ? (
-                                            <InlineEditor id={ad.id} type="AD" />
+                                            <InlineEditor id={ad.id} type="AD"
+                                              context={{ ad_name: ad.name, adset_name: adset.name }} />
                                           ) : (
                                             <>
                                               <div className="flex items-center gap-2">
