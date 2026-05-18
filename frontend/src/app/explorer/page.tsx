@@ -646,7 +646,17 @@ export default function ExplorerPage() {
                               <div className="flex items-center gap-2">
                                 <div className="min-w-0">
                                   <p className="font-medium text-sm text-gray-200 truncate">{campaign.name}</p>
-                                  <p className="text-[11px] text-gray-600">{OBJECTIVE_LABELS[campaign.objective] || campaign.objective}</p>
+                                  <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                                    <span className="text-[11px] text-gray-600">{OBJECTIVE_LABELS[campaign.objective] || campaign.objective}</span>
+                                    {campaign.bid_strategy && (
+                                      <span className="text-[10px] text-gray-700 bg-gray-800/50 px-1.5 py-0.5 rounded">{campaign.bid_strategy.replace(/_/g, ' ')}</span>
+                                    )}
+                                    {(campaign.daily_budget || campaign.lifetime_budget) && (
+                                      <span className="text-[10px] text-gray-700 bg-gray-800/50 px-1.5 py-0.5 rounded font-mono">
+                                        ฿{Number(campaign.daily_budget || campaign.lifetime_budget).toLocaleString()}{campaign.daily_budget ? '/day' : ' total'}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                                 <button onClick={(e) => { e.stopPropagation(); setEditingId(campaign.id); setEditValue(campaign.name); }}
                                   className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-700/50 rounded transition-all shrink-0">
@@ -682,6 +692,7 @@ export default function ExplorerPage() {
                                     {editingId === adset.id ? (
                                       <InlineEditor id={adset.id} type="ADSET" />
                                     ) : (
+                                      <>
                                       <div className="flex items-center gap-2">
                                         <p className="text-sm text-gray-300 truncate">{adset.name}</p>
                                         <button onClick={(e) => { e.stopPropagation(); setEditingId(adset.id); setEditValue(adset.name); }}
@@ -689,6 +700,18 @@ export default function ExplorerPage() {
                                           <Edit2 className="w-2.5 h-2.5 text-gray-500" />
                                         </button>
                                       </div>
+                                      <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                                        {adset.optimization_goal && (
+                                          <span className="text-[10px] text-gray-700 bg-gray-800/50 px-1.5 py-0.5 rounded">{adset.optimization_goal.replace(/_/g, ' ')}</span>
+                                        )}
+                                        {adset.destination_type && adset.destination_type !== 'UNDEFINED' && (
+                                          <span className="text-[10px] text-gray-700">→ {adset.destination_type.replace(/_/g, ' ')}</span>
+                                        )}
+                                        {(adset.daily_budget || adset.lifetime_budget) && (
+                                          <span className="text-[10px] text-gray-700 font-mono">฿{Number(adset.daily_budget || adset.lifetime_budget).toLocaleString()}{adset.daily_budget ? '/day' : ' total'}</span>
+                                        )}
+                                      </div>
+                                      </>
                                     )}
                                   </div>
                                   <StatusBadge status={adset.status} />
@@ -714,13 +737,24 @@ export default function ExplorerPage() {
                                           {editingId === ad.id ? (
                                             <InlineEditor id={ad.id} type="AD" />
                                           ) : (
-                                            <div className="flex items-center gap-2">
-                                              <p className="text-sm text-gray-400 truncate">{ad.name}</p>
-                                              <button onClick={(e) => { e.stopPropagation(); setEditingId(ad.id); setEditValue(ad.name); }}
-                                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-700/50 rounded transition-all shrink-0">
-                                                <Edit2 className="w-2.5 h-2.5 text-gray-600" />
-                                              </button>
-                                            </div>
+                                            <>
+                                              <div className="flex items-center gap-2">
+                                                <p className="text-sm text-gray-400 truncate">{ad.name}</p>
+                                                <button onClick={(e) => { e.stopPropagation(); setEditingId(ad.id); setEditValue(ad.name); }}
+                                                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-700/50 rounded transition-all shrink-0">
+                                                  <Edit2 className="w-2.5 h-2.5 text-gray-600" />
+                                                </button>
+                                              </div>
+                                              {ad.creative?.id && (
+                                                <p
+                                                  className="text-[10px] text-gray-700 font-mono mt-0.5 cursor-pointer hover:text-blue-400 transition-colors"
+                                                  title="Click to copy creative_id"
+                                                  onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(ad.creative.id); toast.success('creative_id copied'); }}
+                                                >
+                                                  ID: {ad.creative.id}
+                                                </p>
+                                              )}
+                                            </>
                                           )}
                                         </div>
                                         <StatusBadge status={ad.status} />
