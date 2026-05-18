@@ -28,6 +28,7 @@ import {
   VALID_OPTIMIZATION_GOALS, VALID_DESTINATION_TYPES,
   type OptimizedField,
 } from "@/lib/meta-schema";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // ─── Small helpers ───
 
@@ -92,6 +93,8 @@ export default function ExplorerPage() {
   const [deleting, setDeleting] = useState(false);
   const [activating, setActivating] = useState(false);
   const [pausing, setPausing] = useState(false);
+  const [sortKey, setSortKey] = useState<'name' | 'status' | 'objective' | 'budget'>('name');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   const selectedItemsList = useMemo(() => Array.from(selectedItems.values()), [selectedItems]);
   const hasCampaigns = selectedItemsList.some((item) => item.type === "CAMPAIGN");
@@ -128,12 +131,51 @@ export default function ExplorerPage() {
     }
   }, [selectedItemsList]);
 
-  const filteredCampaigns = useMemo(() =>
-    campaigns.filter(c =>
-      c.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-      c.objective.toLowerCase().includes(debouncedSearch.toLowerCase())
-    ), [campaigns, debouncedSearch]
-  );
+  useEffect(() => {
+    if (!debouncedSearch) return;
+    const q = debouncedSearch.toLowerCase();
+    const toExpandC = new Set<string>();
+    const toExpandAS = new Set<string>();
+    for (const [cid, asList] of Object.entries(adSets)) {
+      for (const as of asList) {
+        if (as.name.toLowerCase().includes(q)) toExpandC.add(cid);
+        if ((ads[as.id] || []).some((ad: any) => ad.name.toLowerCase().includes(q))) {
+          toExpandC.add(cid);
+          toExpandAS.add(as.id);
+        }
+      }
+    }
+    if (toExpandC.size) setExpandedCampaigns(prev => new Set([...prev, ...toExpandC]));
+    if (toExpandAS.size) setExpandedAdSets(prev => new Set([...prev, ...toExpandAS]));
+  }, [debouncedSearch, adSets, ads]);
+
+
+  const filteredCampaigns = useMemo(() => {
+    const q = debouncedSearch.toLowerCase();
+    const filtered = !q ? campaigns : campaigns.filter(c =>
+      c.name.toLowerCase().includes(q) ||
+      c.objective.toLowerCase().includes(q) ||
+      (adSets[c.id] || []).some(as =>
+        as.name.toLowerCase().includes(q) ||
+        (ads[as.id] || []).some(ad => ad.name.toLowerCase().includes(q))
+      )
+    );
+    return [...filtered].sort((a, b) => {
+      let va: string | number, vb: string | number;
+      switch (sortKey) {
+        case 'status': va = a.status; vb = b.status; break;
+        case 'objective': va = a.objective; vb = b.objective; break;
+        case 'budget':
+          va = parseFloat((a as any).daily_budget || (a as any).lifetime_budget || '0');
+          vb = parseFloat((b as any).daily_budget || (b as any).lifetime_budget || '0');
+          break;
+        default: va = a.name.toLowerCase(); vb = b.name.toLowerCase();
+      }
+      if (va < vb) return sortDir === 'asc' ? -1 : 1;
+      if (va > vb) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [campaigns, adSets, ads, debouncedSearch, sortKey, sortDir]);
 
   const fetchCampaigns = async () => {
     setLoading(true);
@@ -712,29 +754,52 @@ export default function ExplorerPage() {
               "bg-gray-900/30 border border-gray-800/60 rounded-xl overflow-hidden flex flex-col transition-all",
               panelOpen ? "flex-1 min-w-0" : "w-full"
             )}>
-              <div className="p-3 border-b border-gray-800/60 flex items-center gap-3 bg-gray-900/50">
-                <div className="relative flex-1">
-                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
-                  <input type="text" placeholder="Search campaigns..."
-                    value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full bg-gray-950/50 border border-gray-800/60 rounded-lg py-2 pl-9 pr-4 text-sm focus:outline-none focus:border-blue-500/50 transition-colors placeholder:text-gray-700"
-                  />
+              <div className="p-3 border-b border-gray-800/60 flex flex-col gap-1.5 bg-gray-900/50">
+                <div className="flex items-center gap-3">
+                  <div className="relative flex-1">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
+                    <input type="text" placeholder="Search campaigns, ad sets, ads..."
+                      value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-gray-950/50 border border-gray-800/60 rounded-lg py-2 pl-9 pr-4 text-sm focus:outline-none focus:border-blue-500/50 transition-colors placeholder:text-gray-700"
+                    />
+                  </div>
+                  {searchQuery && (
+                    <Button variant="ghost" size="sm" className="text-gray-500 text-xs h-8" onClick={() => setSearchQuery("")}>Clear</Button>
+                  )}
+                  <Select
+                    value={`${sortKey}:${sortDir}`}
+                    onValueChange={(v) => { const [k, d] = v.split(':'); setSortKey(k as any); setSortDir(d as any); }}
+                  >
+                    <SelectTrigger className="h-9 w-32 shrink-0 bg-blue-500/10 border-blue-500/20 text-blue-400 text-xs focus:ring-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-900 border-gray-800">
+                      <SelectItem value="name:asc" className="text-xs text-gray-300">Name A→Z</SelectItem>
+                      <SelectItem value="name:desc" className="text-xs text-gray-300">Name Z→A</SelectItem>
+                      <SelectItem value="status:asc" className="text-xs text-gray-300">Status</SelectItem>
+                      <SelectItem value="objective:asc" className="text-xs text-gray-300">Objective</SelectItem>
+                      <SelectItem value="budget:desc" className="text-xs text-gray-300">Budget ↓</SelectItem>
+                      <SelectItem value="budget:asc" className="text-xs text-gray-300">Budget ↑</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-300 text-xs h-8 shrink-0" onClick={handleSelectAll}>
+                    Select All
+                  </Button>
+                  {selectedItems.size > 0 && (
+                    <>
+                      <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-blue-500/15 text-blue-400">
+                        {selectedItems.size} selected
+                      </span>
+                      <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-400 text-xs h-8 shrink-0" onClick={() => setSelectedItems(new Map())}>
+                        Clear
+                      </Button>
+                    </>
+                  )}
                 </div>
-                {searchQuery && (
-                  <Button variant="ghost" size="sm" className="text-gray-500 text-xs h-8" onClick={() => setSearchQuery("")}>Clear</Button>
-                )}
-                <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-300 text-xs h-8 shrink-0" onClick={handleSelectAll}>
-                  Select All
-                </Button>
-                {selectedItems.size > 0 && (
-                  <>
-                    <span className="text-[10px] font-semibold px-2 py-1 rounded-full bg-blue-500/15 text-blue-400">
-                      {selectedItems.size} selected
-                    </span>
-                    <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-400 text-xs h-8 shrink-0" onClick={() => setSelectedItems(new Map())}>
-                      Clear
-                    </Button>
-                  </>
+                {debouncedSearch && (
+                  <p className="text-[11px] text-gray-700 pl-1">
+                    Searches within expanded campaigns only — expand a campaign to include its ad sets and ads.
+                  </p>
                 )}
               </div>
 
@@ -776,6 +841,12 @@ export default function ExplorerPage() {
                                   className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-700/50 rounded transition-all shrink-0">
                                   <Edit2 className="w-3 h-3 text-gray-500" />
                                 </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(campaign.id); toast.success('ID copied'); }}
+                                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-700/50 rounded transition-all shrink-0"
+                                  title={`Copy ID: ${campaign.id}`}>
+                                  <Copy className="w-3 h-3 text-gray-500" />
+                                </button>
                               </div>
                             )}
                           </div>
@@ -788,7 +859,14 @@ export default function ExplorerPage() {
                               <div className="p-3 flex items-center gap-2 text-gray-600"><Loader2 className="w-3 h-3 animate-spin" /><span className="text-xs">Loading...</span></div>
                             ) : adSets[campaign.id].length === 0 ? (
                               <div className="p-3 text-xs text-gray-700">No ad sets</div>
-                            ) : adSets[campaign.id].map((adset) => (
+                            ) : (debouncedSearch
+                              ? adSets[campaign.id].filter(as => {
+                                  const q = debouncedSearch.toLowerCase();
+                                  return as.name.toLowerCase().includes(q) ||
+                                    (ads[as.id] || []).some((ad: any) => ad.name.toLowerCase().includes(q));
+                                })
+                              : adSets[campaign.id]
+                            ).map((adset) => (
                               <div key={adset.id}>
                                 <div className={cn(
                                   "flex items-center gap-3 px-4 py-2.5 hover:bg-gray-800/20 transition-colors group",
@@ -812,6 +890,12 @@ export default function ExplorerPage() {
                                           className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-700/50 rounded transition-all shrink-0">
                                           <Edit2 className="w-2.5 h-2.5 text-gray-500" />
                                         </button>
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(adset.id); toast.success('ID copied'); }}
+                                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-700/50 rounded transition-all shrink-0"
+                                          title={`Copy ID: ${adset.id}`}>
+                                          <Copy className="w-2.5 h-2.5 text-gray-500" />
+                                        </button>
                                       </div>
                                     )}
                                   </div>
@@ -824,7 +908,10 @@ export default function ExplorerPage() {
                                       <div className="p-2 pl-4 flex items-center gap-2 text-gray-600"><Loader2 className="w-3 h-3 animate-spin" /><span className="text-xs">Loading...</span></div>
                                     ) : ads[adset.id].length === 0 ? (
                                       <div className="p-2 pl-4 text-xs text-gray-700">No ads</div>
-                                    ) : ads[adset.id].map((ad) => (
+                                    ) : (debouncedSearch
+                                      ? ads[adset.id].filter((ad: any) => ad.name.toLowerCase().includes(debouncedSearch.toLowerCase()))
+                                      : ads[adset.id]
+                                    ).map((ad) => (
                                       <div key={ad.id} className={cn(
                                         "flex items-center gap-3 py-2 pl-4 pr-4 hover:bg-gray-800/15 transition-colors group",
                                         selectedItems.has(ad.id) && "bg-blue-500/5"
@@ -844,6 +931,12 @@ export default function ExplorerPage() {
                                                 <button onClick={(e) => { e.stopPropagation(); setEditingId(ad.id); setEditValue(ad.name); }}
                                                   className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-700/50 rounded transition-all shrink-0">
                                                   <Edit2 className="w-2.5 h-2.5 text-gray-600" />
+                                                </button>
+                                                <button
+                                                  onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(ad.id); toast.success('ID copied'); }}
+                                                  className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-700/50 rounded transition-all shrink-0"
+                                                  title={`Copy ID: ${ad.id}`}>
+                                                  <Copy className="w-2.5 h-2.5 text-gray-600" />
                                                 </button>
                                               </div>
                                               {ad.creative?.id && (

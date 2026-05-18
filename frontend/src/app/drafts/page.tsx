@@ -6,8 +6,8 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { draftApi } from "@/services/api";
-import { Edit2, Trash2, Send, Layers, Loader2, X, Pencil } from "lucide-react";
+import { draftApi, adAccountApi } from "@/services/api";
+import { Edit2, Trash2, Send, Layers, Loader2, X, Pencil, Play, Pause } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,7 @@ export default function DraftsPage() {
   const [publishProgress, setPublishProgress] = useState<{ current: number; total: number } | null>(null);
   const [showPublished, setShowPublished] = useState(false);
   const [showBulkEdit, setShowBulkEdit] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const fetchDrafts = async () => {
     try {
       setIsLoading(true);
@@ -86,6 +87,32 @@ export default function DraftsPage() {
       toast.error(error.response?.data?.error || "Bulk delete failed");
     } finally {
       setIsBulkDeleting(false);
+    }
+  };
+
+  const handleActivateDraft = async (draft: any) => {
+    if (!draft.metaId) return;
+    setTogglingId(draft.id);
+    try {
+      await adAccountApi.bulkActivate([draft.metaId]);
+      toast.success('Campaign activated on Meta');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to activate');
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
+  const handlePauseDraft = async (draft: any) => {
+    if (!draft.metaId) return;
+    setTogglingId(draft.id);
+    try {
+      await adAccountApi.bulkPause([draft.metaId]);
+      toast.success('Campaign paused on Meta');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to pause');
+    } finally {
+      setTogglingId(null);
     }
   };
 
@@ -268,7 +295,25 @@ export default function DraftsPage() {
                       <div className="text-[11px] text-gray-600">
                         {new Date(draft.updatedAt).toLocaleDateString()}
                       </div>
-                      <div className="flex gap-1">
+                      <div className="flex gap-1 items-center">
+                        {draft.status === 'PUBLISHED' && draft.metaId && (
+                          <>
+                            <Button variant="ghost" size="icon" className="h-7 w-7"
+                              onClick={() => handleActivateDraft(draft)}
+                              disabled={togglingId === draft.id}
+                              title="Activate on Meta">
+                              {togglingId === draft.id
+                                ? <Loader2 className="w-3.5 h-3.5 animate-spin text-gray-500" />
+                                : <Play className="w-3.5 h-3.5 text-emerald-600 hover:text-emerald-400" />}
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7"
+                              onClick={() => handlePauseDraft(draft)}
+                              disabled={togglingId === draft.id}
+                              title="Pause on Meta">
+                              <Pause className="w-3.5 h-3.5 text-amber-600 hover:text-amber-400" />
+                            </Button>
+                          </>
+                        )}
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(draft.id)} disabled={isBusy}>
                           <Trash2 className="w-3.5 h-3.5 text-gray-600 hover:text-red-400" />
                         </Button>

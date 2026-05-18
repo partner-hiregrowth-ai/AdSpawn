@@ -23,7 +23,6 @@ const pageTitles: Record<string, string> = {
 export const Navbar = () => {
   const { user, selectedAccount } = useAppStore();
   const pathname = usePathname();
-
   const currentPage = pageTitles[pathname] || (pathname.startsWith("/drafts/") ? "Draft Editor" : "");
 
   return (

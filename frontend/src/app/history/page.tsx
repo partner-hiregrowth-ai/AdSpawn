@@ -68,7 +68,14 @@ export default function HistoryPage() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-100">History</h2>
-            <p className="text-gray-500 mt-1 text-sm">Audit log of all duplication actions.</p>
+            <p className="text-gray-500 mt-1 text-sm">
+              Audit log of all duplication actions.
+              {!loading && history.length > 0 && (
+                <span className="ml-2 text-gray-600">
+                  Last: {formatDistanceToNow(new Date(history[0].createdAt), { addSuffix: true })}
+                </span>
+              )}
+            </p>
           </div>
           <div className="flex gap-2">
             <Button

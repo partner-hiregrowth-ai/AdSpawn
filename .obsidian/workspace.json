@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "61346fb369aa8553",
+        "id": "5450bfc129e82547",
         "type": "tabs",
         "children": [
           {
-            "id": "76cd73399d4c526e",
+            "id": "0db8353787c9a3b2",
             "type": "leaf",
             "state": {
               "type": "graph",
@@ -176,20 +176,21 @@
       "bases:Create new base": false
     }
   },
-  "active": "76cd73399d4c526e",
+  "active": "0db8353787c9a3b2",
   "lastOpenFiles": [
-    "backend/node_modules/vitest/node_modules/picomatch/lib/utils.js",
-    "backend/node_modules/vitest/node_modules/picomatch/lib/scan.js",
-    "backend/node_modules/vitest/node_modules/picomatch/lib/picomatch.js",
-    "backend/node_modules/vitest/node_modules/picomatch/lib/parse.js",
-    "backend/node_modules/vitest/node_modules/picomatch/lib/constants.js",
+    "frontend/src/app/explorer/page.tsx.tmp.26304.8f998d2c2124",
+    "frontend/src/app/explorer/page.tsx.tmp.26304.2f2ef3dc36e3",
+    "frontend/src/app/explorer/page.tsx.tmp.26304.aa5fca6ce8af",
+    "frontend/src/app/explorer/page.tsx.tmp.26304.55920590fd33",
+    "frontend/src/app/explorer/page.tsx.tmp.26304.a2065687ee90",
+    "frontend/src/app/explorer/page.tsx.tmp.26304.29c134aac0dd",
+    "frontend/src/app/explorer/page.tsx.tmp.26304.f0d12a4d2ba2",
+    "frontend/src/app/explorer/page.tsx.tmp.26304.a80accedf4df",
+    "frontend/src/app/explorer/page.tsx.tmp.26304.ab258c25ba32",
+    "frontend/src/app/layout.tsx.tmp.26304.ea44948a06ac",
+    "frontend/src/components/layout/Navbar.tsx.tmp.26304.c2d38fc9d1c2",
+    "backend/node_modules/@types/chai/README.md",
     "backend/node_modules/vitest/node_modules/picomatch/README.md",
-    "backend/node_modules/vitest/node_modules/picomatch/posix.js",
-    "backend/node_modules/vitest/node_modules/picomatch/package.json",
-    "backend/node_modules/vitest/node_modules/picomatch/LICENSE",
-    "backend/node_modules/vitest/node_modules/picomatch/lib",
-    "backend/node_modules/vitest/node_modules/picomatch/index.js",
-    "backend/node_modules/vitest/dist/workers/vmThreads.js",
     "backend/node_modules/vitest/README.md",
     "backend/node_modules/vitest/LICENSE.md",
     "backend/node_modules/assertion-error/README.md",
@@ -213,7 +214,6 @@
     "backend/node_modules/magicast/README.md",
     "backend/node_modules/siginfo/README.md",
     "backend/node_modules/stackback/README.md",
-    "backend/node_modules/rolldown/README.md",
-    "backend/node_modules/tinybench/README.md"
+    "backend/node_modules/rolldown/README.md"
   ]
 }
