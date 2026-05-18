@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "sonner";
 import {
   Select,
   SelectContent,
@@ -68,7 +69,7 @@ export function StepCampaignConfig() {
         const res = await draftApi.getFormSchema("campaign", { objective: obj });
         loaded[obj] = res.data;
       } catch {
-        // Fallback — will use basic fields
+        toast.error(`Failed to load campaign schema for ${obj}`);
       }
     }
     setSchemas(loaded);

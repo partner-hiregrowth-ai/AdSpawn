@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { toast } from "sonner";
 import {
   Select,
   SelectContent,
@@ -76,7 +77,7 @@ export function StepAdSetConfig() {
         const res = await draftApi.getFormSchema("adSet", { objective: obj, isCBO });
         loaded[obj] = res.data;
       } catch {
-        // fallback
+        toast.error(`Failed to load ad set schema for ${obj}`);
       }
     }
     setSchemas(loaded);
