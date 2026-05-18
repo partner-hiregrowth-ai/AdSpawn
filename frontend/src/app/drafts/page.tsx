@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { draftApi, adAccountApi } from "@/services/api";
-import { Edit2, Trash2, Send, Layers, Loader2, X, Pencil, Play, Pause } from "lucide-react";
+import { Edit2, Trash2, Send, Layers, Loader2, X, Pencil, Play, Pause, Search } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import Link from "next/link";
 import { toast } from "sonner";
 import { cn, extractApiError } from "@/lib/utils";
@@ -26,6 +27,10 @@ export default function DraftsPage() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<'delete' | 'bulkDelete' | 'publish' | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [sortKey, setSortKey] = useState<'date' | 'name' | 'status' | 'objective'>('date');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const fetchDrafts = async () => {
     try {
       setIsLoading(true);
@@ -42,6 +47,11 @@ export default function DraftsPage() {
   useEffect(() => {
     fetchDrafts();
   }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 200);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const handleDelete = async (id?: string) => {
     const targetId = id || deleteTargetId;
@@ -169,8 +179,33 @@ export default function DraftsPage() {
   };
 
   const publishedDrafts = drafts.filter((d) => d.status === "PUBLISHED");
-  const visibleDrafts = showPublished ? drafts : drafts.filter((d) => d.status !== "PUBLISHED");
-  const publishableDrafts = visibleDrafts.filter((d) => d.status !== "PUBLISHING" && d.status !== "PUBLISHED");
+
+  const filteredDrafts = useMemo(() => {
+    let result = showPublished ? drafts : drafts.filter((d) => d.status !== "PUBLISHED");
+
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase();
+      result = result.filter((d) =>
+        d.name.toLowerCase().includes(q) ||
+        d.objective?.toLowerCase().includes(q)
+      );
+    }
+
+    return [...result].sort((a, b) => {
+      let va: string | number, vb: string | number;
+      switch (sortKey) {
+        case 'name': va = a.name.toLowerCase(); vb = b.name.toLowerCase(); break;
+        case 'status': va = a.status; vb = b.status; break;
+        case 'objective': va = a.objective || ''; vb = b.objective || ''; break;
+        default: va = new Date(a.updatedAt).getTime(); vb = new Date(b.updatedAt).getTime();
+      }
+      if (va < vb) return sortDir === 'asc' ? -1 : 1;
+      if (va > vb) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [drafts, showPublished, debouncedSearch, sortKey, sortDir]);
+
+  const publishableDrafts = filteredDrafts.filter((d) => d.status !== "PUBLISHING" && d.status !== "PUBLISHED");
   const allSelected = publishableDrafts.length > 0 && selectedIds.size === publishableDrafts.length;
   const isBusy = isBulkPublishing || isBulkDeleting;
 
@@ -238,27 +273,69 @@ export default function DraftsPage() {
           </div>
         </div>
 
+        {/* Search & Sort */}
+        {!isLoading && drafts.length > 0 && (
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1">
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
+              <input
+                type="text"
+                placeholder="Search by name or objective..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-gray-950/50 border border-gray-800/60 rounded-lg py-2 pl-9 pr-4 text-sm focus:outline-none focus:border-blue-500/50 transition-colors placeholder:text-gray-700"
+              />
+            </div>
+            {searchQuery && (
+              <Button variant="ghost" size="sm" className="text-gray-500 text-xs h-8" onClick={() => setSearchQuery("")}>Clear</Button>
+            )}
+            <Select
+              value={`${sortKey}:${sortDir}`}
+              onValueChange={(v) => {
+                if (!v) return;
+                const [k, d] = v.split(':');
+                setSortKey(k as any);
+                setSortDir(d as any);
+              }}
+            >
+              <SelectTrigger className="h-9 w-40 shrink-0 bg-blue-500/10 border-blue-500/20 text-blue-400 text-xs focus:ring-0">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-gray-900 border-gray-800">
+                <SelectItem value="date:desc" className="text-xs text-gray-300">Newest first</SelectItem>
+                <SelectItem value="date:asc" className="text-xs text-gray-300">Oldest first</SelectItem>
+                <SelectItem value="name:asc" className="text-xs text-gray-300">Name A→Z</SelectItem>
+                <SelectItem value="name:desc" className="text-xs text-gray-300">Name Z→A</SelectItem>
+                <SelectItem value="status:asc" className="text-xs text-gray-300">Status</SelectItem>
+                <SelectItem value="objective:asc" className="text-xs text-gray-300">Objective</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
               <div key={i} className="bg-gray-900/30 border border-gray-800/40 rounded-xl animate-pulse h-44" />
             ))}
           </div>
-        ) : visibleDrafts.length === 0 ? (
+        ) : filteredDrafts.length === 0 ? (
           <div className="bg-gray-900/30 border border-gray-800/60 rounded-xl p-16 text-center">
             <Layers className="w-10 h-10 text-gray-700 mx-auto mb-3" />
             <p className="text-gray-400 font-medium">
-              {publishedDrafts.length > 0 ? "All drafts published" : "No drafts yet"}
+              {debouncedSearch ? "No matching drafts" : publishedDrafts.length > 0 ? "All drafts published" : "No drafts yet"}
             </p>
             <p className="text-gray-600 text-sm mt-1">
-              {publishedDrafts.length > 0
+              {debouncedSearch
+                ? `No drafts match "${debouncedSearch}".`
+                : publishedDrafts.length > 0
                 ? `${publishedDrafts.length} campaign${publishedDrafts.length > 1 ? "s" : ""} published to Meta.`
                 : 'Duplicated campaigns will appear here when you choose "Save as Draft".'}
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {visibleDrafts.map((draft, index) => {
+            {filteredDrafts.map((draft, index) => {
               const isPublishable = draft.status !== "PUBLISHING" && draft.status !== "PUBLISHED";
               const isSelected = selectedIds.has(draft.id);
               return (
