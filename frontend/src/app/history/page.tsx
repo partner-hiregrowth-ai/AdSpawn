@@ -125,9 +125,13 @@ export default function HistoryPage() {
                         <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-gray-800/50 text-gray-400 w-fit">
                           {job.type}
                         </span>
-                        {job.details?.isConversion && (
+                        {job.details?.isConversion ? (
                           <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 w-fit">
                             CONVERSION
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-violet-500/10 text-violet-400 w-fit">
+                            DUPLICATE
                           </span>
                         )}
                       </div>
