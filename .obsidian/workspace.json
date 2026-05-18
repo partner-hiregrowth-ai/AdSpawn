@@ -178,6 +178,10 @@
   },
   "active": "76cd73399d4c526e",
   "lastOpenFiles": [
+    "backend/src/controllers/auth.controller.ts.tmp.10092.b7a3b2164781",
+    "backend/src/controllers/auth.controller.ts.tmp.10092.c6032fa5cef4",
+    "backend/src/prisma.ts.tmp.10092.4814d409e5b1",
+    "backend/src/prisma.ts.tmp.10092.ce09f578a0bb",
     "frontend/src/app/history/page.tsx.tmp.10092.9c5db2897144",
     "frontend/node_modules/eslint-plugin-react/README.md",
     "frontend/node_modules/@eslint/eslintrc/README.md"

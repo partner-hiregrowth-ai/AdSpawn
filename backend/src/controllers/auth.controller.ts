@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { prisma } from '../prisma';
+import { prisma, withRetry } from '../prisma';
 import jwt from 'jsonwebtoken';
 import axios from 'axios';
 
@@ -36,24 +36,17 @@ export const loginWithFacebook = async (req: Request, res: Response) => {
     }
 
     // 3. Find or create user
-    let user = await prisma.user.findUnique({
-      where: { facebookId: id },
-    });
+    let user = await withRetry(() => prisma.user.findUnique({ where: { facebookId: id } }));
 
     if (!user) {
-      user = await prisma.user.create({
-        data: {
-          facebookId: id,
-          name,
-          email,
-          accessToken: tokenToStore,
-        },
-      });
+      user = await withRetry(() => prisma.user.create({
+        data: { facebookId: id, name, email, accessToken: tokenToStore },
+      }));
     } else {
-      user = await prisma.user.update({
-        where: { id: user.id },
+      user = await withRetry(() => prisma.user.update({
+        where: { id: user!.id },
         data: { accessToken: tokenToStore },
-      });
+      }));
     }
 
     // 4. Generate JWT
