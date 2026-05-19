@@ -629,6 +629,10 @@ export class DraftPublishService {
       adPayload.tracking_specs = adData.tracking_specs;
     }
 
+    if (adData.url_parameters) {
+      adPayload.url_parameters = adData.url_parameters;
+    }
+
     console.log(`[DraftPublishService] Creating ad ${ad.id}:`, JSON.stringify(adPayload));
     try {
       const fbAd = await fbService.client.post(`/${accountId}/ads`, adPayload);

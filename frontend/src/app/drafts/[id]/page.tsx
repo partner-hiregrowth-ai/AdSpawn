@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { draftApi } from "@/services/api";
 import {
@@ -76,6 +77,41 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
   const handleUpdateDataField = (field: string, value: any) => setEditData({ ...editData, data: { ...editData.data, [field]: value } });
   const handleUpdateNestedDataField = (parent: string, field: string, value: any) => {
     setEditData({ ...editData, data: { ...editData.data, [parent]: { ...(editData.data?.[parent] || {}), [field]: value } } });
+  };
+
+  const handleUpdateCreativeLinkData = (field: string, value: any) => {
+    setEditData({
+      ...editData,
+      data: {
+        ...editData.data,
+        creative: {
+          ...editData.data?.creative,
+          object_story_spec: {
+            ...editData.data?.creative?.object_story_spec,
+            link_data: { ...editData.data?.creative?.object_story_spec?.link_data, [field]: value },
+          },
+        },
+      },
+    });
+  };
+
+  const handleUpdateCreativeCTA = (ctaType: string) => {
+    setEditData({
+      ...editData,
+      data: {
+        ...editData.data,
+        creative: {
+          ...editData.data?.creative,
+          object_story_spec: {
+            ...editData.data?.creative?.object_story_spec,
+            link_data: {
+              ...editData.data?.creative?.object_story_spec?.link_data,
+              call_to_action: { type: ctaType },
+            },
+          },
+        },
+      },
+    });
   };
 
   const handleSave = async () => {
@@ -161,6 +197,14 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
       <MetaField label="Bid Strategy" value={editData.data?.bid_strategy || ""} type="enum"
         options={BID_STRATEGIES} onChange={(v) => handleUpdateDataField("bid_strategy", v)} />
 
+      <div className="flex items-center gap-2 py-1">
+        <Checkbox
+          checked={!!editData.data?.is_adset_budget_sharing_enabled}
+          onCheckedChange={(v) => handleUpdateDataField("is_adset_budget_sharing_enabled", !!v)}
+        />
+        <Label className="text-xs text-gray-400">Campaign Budget Optimization (CBO)</Label>
+      </div>
+
       {isCBO && (
         <>
           <MetaField label="Daily Budget (CBO)" value={editData.data?.daily_budget} type="number" isBudget
@@ -174,6 +218,31 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
 
       <MetaField label="Spend Cap" value={editData.data?.spend_cap} type="number" isBudget
         onChange={(v) => handleUpdateDataField("spend_cap", v)} hint="Max total spend. Set 0 to remove." />
+
+      <div className="pt-2 border-t border-gray-800/40">
+        <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider">Special Ad Categories</span>
+        <p className="text-[10px] text-gray-600 mt-0.5">Required by Meta for ads about credit, employment, housing, etc.</p>
+      </div>
+      <div className="space-y-2">
+        {['NONE', 'CREDIT', 'EMPLOYMENT', 'HOUSING', 'ISSUES_ELECTIONS_POLITICS', 'FINANCIAL_PRODUCTS_SERVICES', 'ONLINE_GAMBLING_AND_GAMING'].map((cat) => {
+          const current: string[] = editData.data?.special_ad_categories || ['NONE'];
+          const checked = current.includes(cat);
+          return (
+            <div key={cat} className="flex items-center gap-2">
+              <Checkbox
+                checked={checked}
+                onCheckedChange={(v) => {
+                  let next = v
+                    ? (cat === 'NONE' ? ['NONE'] : [...current.filter((c: string) => c !== 'NONE'), cat])
+                    : current.filter((c: string) => c !== cat);
+                  handleUpdateDataField("special_ad_categories", next.length ? next : ['NONE']);
+                }}
+              />
+              <Label className="text-xs text-gray-400">{cat.replace(/_/g, ' ')}</Label>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 
@@ -240,30 +309,127 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
           </p>
         </div>
       )}
+
+      <div className="pt-2 border-t border-gray-800/40">
+        <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider">Schedule</span>
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs text-gray-400">Start Time</Label>
+        <Input
+          type="datetime-local"
+          value={editData.data?.start_time ? editData.data.start_time.slice(0, 16) : ""}
+          onChange={(e) => handleUpdateDataField("start_time", e.target.value ? `${e.target.value}:00` : undefined)}
+          className="bg-gray-950/50 border-gray-800/40"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs text-gray-400">End Time</Label>
+        <Input
+          type="datetime-local"
+          value={editData.data?.end_time ? editData.data.end_time.slice(0, 16) : ""}
+          onChange={(e) => handleUpdateDataField("end_time", e.target.value ? `${e.target.value}:00` : undefined)}
+          className="bg-gray-950/50 border-gray-800/40"
+        />
+      </div>
+
+      {['OUTCOME_SALES', 'OUTCOME_LEADS', 'OUTCOME_APP_PROMOTION'].includes(campaignObjective) && (
+        <>
+          <div className="pt-2 border-t border-gray-800/40">
+            <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider">Attribution</span>
+          </div>
+          <MetaField
+            label="Attribution Event Type"
+            value={editData.data?.attribution_spec?.event_type || "CLICK_THROUGH"}
+            type="enum"
+            options={[{ value: "CLICK_THROUGH", label: "Click Through" }, { value: "VIEW_THROUGH", label: "View Through" }]}
+            onChange={(v) => handleUpdateNestedDataField("attribution_spec", "event_type", v)}
+          />
+          <MetaField
+            label="Attribution Window (Days)"
+            value={editData.data?.attribution_spec?.window_days || "7"}
+            type="enum"
+            options={[{ value: "1", label: "1 Day" }, { value: "7", label: "7 Days" }, { value: "28", label: "28 Days" }]}
+            onChange={(v) => handleUpdateNestedDataField("attribution_spec", "window_days", v)}
+          />
+        </>
+      )}
     </div>
   );
+
+  const CTA_OPTIONS = [
+    { value: "LEARN_MORE", label: "Learn More" },
+    { value: "SHOP_NOW", label: "Shop Now" },
+    { value: "SIGN_UP", label: "Sign Up" },
+    { value: "BOOK_TRAVEL", label: "Book Now" },
+    { value: "CONTACT_US", label: "Contact Us" },
+    { value: "DOWNLOAD", label: "Download" },
+    { value: "GET_OFFER", label: "Get Offer" },
+    { value: "GET_QUOTE", label: "Get Quote" },
+    { value: "SUBSCRIBE", label: "Subscribe" },
+    { value: "WATCH_MORE", label: "Watch More" },
+  ];
 
   const renderAdForm = () => (
     <div className="space-y-4">
       <MetaField label="Ad Name" value={editData.name || ""} onChange={(v) => handleUpdateField("name", v)} />
 
-      <div className="space-y-1.5">
-        <Label className="text-xs text-gray-400">Creative ID</Label>
-        <Input value={editData.data?.creative?.id || editData.data?.creative?.creative_id || ""}
-          className="bg-gray-950/50 border-gray-800/40 font-mono text-xs text-gray-400" disabled />
-        <p className="text-[10px] text-gray-600">
-          Creative references are copied from the source. To use a different creative, edit the ID directly in Raw JSON.
-        </p>
+      <MetaField
+        label="Status"
+        value={editData.status || "PAUSED"}
+        type="enum"
+        options={[{ value: "PAUSED", label: "Paused" }, { value: "ACTIVE", label: "Active" }]}
+        onChange={(v) => handleUpdateField("status", v)}
+      />
+
+      <div className="pt-2 border-t border-gray-800/40">
+        <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider">Ad Creative</span>
+        <p className="text-[10px] text-gray-600 mt-0.5">Creative ID takes priority on publish. Inline fields apply when no Creative ID is set.</p>
       </div>
 
-      {editData.data?.tracking_specs && (
-        <div className="space-y-1.5">
-          <Label className="text-xs text-gray-400">Tracking Specs</Label>
-          <div className="bg-gray-950/50 border border-gray-800/40 rounded-md p-3 font-mono text-[10px] text-gray-500 max-h-32 overflow-y-auto">
-            {JSON.stringify(editData.data.tracking_specs, null, 2)}
-          </div>
-        </div>
-      )}
+      <MetaField label="Creative ID"
+        value={editData.data?.creative?.creative_id || editData.data?.creative?.id || ""}
+        onChange={(v) => handleUpdateNestedDataField("creative", "creative_id", v)}
+        placeholder="Enter creative ID" hint="Reference to existing Meta creative" />
+
+      <MetaField label="Ad Body Text"
+        value={editData.data?.creative?.object_story_spec?.link_data?.message || ""}
+        onChange={(v) => handleUpdateCreativeLinkData("message", v)}
+        placeholder="Write your ad body text here..." />
+
+      <MetaField label="Headline"
+        value={editData.data?.creative?.object_story_spec?.link_data?.name || ""}
+        onChange={(v) => handleUpdateCreativeLinkData("name", v)}
+        placeholder="Enter headline" />
+
+      <MetaField label="Destination URL"
+        value={editData.data?.creative?.object_story_spec?.link_data?.link || ""}
+        onChange={(v) => handleUpdateCreativeLinkData("link", v)}
+        placeholder="https://example.com" />
+
+      <MetaField label="Call to Action" type="enum"
+        value={editData.data?.creative?.object_story_spec?.link_data?.call_to_action?.type || ""}
+        options={CTA_OPTIONS}
+        onChange={(v) => handleUpdateCreativeCTA(v)} />
+
+      <div className="pt-2 border-t border-gray-800/40">
+        <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider">Tracking</span>
+      </div>
+
+      <MetaField label="Pixel ID"
+        value={editData.data?.tracking_specs?.[0]?.fb_pixel?.[0] || ""}
+        onChange={(v) => handleUpdateDataField("tracking_specs", v ? [{ action_type: ["offsite_conversion"], fb_pixel: [v] }] : [])}
+        placeholder="Your Meta Pixel ID"
+        hint="Meta Pixel for tracking website conversion events" />
+
+      <div className="pt-2 border-t border-gray-800/40">
+        <span className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider">URL Parameters</span>
+      </div>
+
+      <MetaField label="URL Parameters"
+        value={editData.data?.url_parameters || ""}
+        onChange={(v) => handleUpdateDataField("url_parameters", v)}
+        placeholder="utm_source=facebook&utm_medium=paid&utm_campaign=brand"
+        hint="Appended to destination URLs for tracking" />
     </div>
   );
 

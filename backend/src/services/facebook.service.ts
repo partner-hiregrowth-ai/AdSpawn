@@ -164,7 +164,7 @@ export class FacebookService {
         if (isFirstPage) {
           response = await this.client.get(url, {
             params: {
-              fields: 'name,id,status,creative,tracking_specs',
+              fields: 'name,id,status,creative{id,name,object_story_spec},tracking_specs',
               limit: 100
             }
           });
@@ -185,7 +185,7 @@ export class FacebookService {
             let retryResp: any;
             if (isFirstPage) {
               retryResp = await this.client.get(`/${adSetId}/ads`, {
-                params: { fields: 'name,id,status,creative,tracking_specs', limit: 100 }
+                params: { fields: 'name,id,status,creative{id,name,object_story_spec},tracking_specs', limit: 100 }
               });
               isFirstPage = false;
             } else {
