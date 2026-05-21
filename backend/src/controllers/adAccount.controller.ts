@@ -1,8 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { FacebookService } from '../services/facebook.service';
-
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+import { sleep } from '../utils/sleep';
 
 async function withMetaRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
   const backoffs = [1000, 2000, 4000];

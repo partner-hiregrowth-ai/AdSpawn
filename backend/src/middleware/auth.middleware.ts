@@ -2,6 +2,12 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../prisma';
 
+// CSRF posture: JWTs are read from the `Authorization: Bearer …` header
+// (not from a cookie), so a cross-site form/script cannot attach the
+// credential automatically — traditional CSRF does not apply here.
+// If a cookie-based session is ever introduced, add a CSRF token check
+// (e.g. double-submit cookie or `csurf`) to every state-changing route.
+
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecret';
 
 export interface AuthRequest extends Request {

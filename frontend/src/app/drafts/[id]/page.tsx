@@ -132,7 +132,12 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
   const [isPublishing, setIsPublishing] = useState(false);
   const [isCleaning, setIsCleaning] = useState(false);
   const [validationResults, setValidationResults] = useState<any>(null);
-  const [isDirty, setIsDirty] = useState(false);
+  // In-memory edits keyed by `${type}:${id}`. Switching nodes preserves edits;
+  // they are only persisted when the user clicks Save.
+  const [editCache, setEditCache] = useState<Map<string, any>>(new Map());
+  const nodeKey = (type: string, id: string) => `${type}:${id}`;
+  const currentKey = selectedNode ? nodeKey(selectedNode.type, selectedNode.id) : null;
+  const isDirty = editCache.size > 0;
 
   const campaignObjective: string = draft?.data?.objective || draft?.objective || "";
   const isCBO = !!(draft?.data?.daily_budget || draft?.data?.lifetime_budget);
@@ -142,19 +147,24 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
       setIsLoading(true);
       const response = await draftApi.getCampaign(params.id);
       setDraft(response.data);
+      // Helper: prefer the cached (unsaved) version of a node over the server's value.
+      const restore = (key: string, serverItem: any) => {
+        const cached = editCache.get(key);
+        setEditData(cached ?? serverItem);
+      };
       if (!selectedNode) {
         setSelectedNode({ type: "CAMPAIGN", id: response.data.id });
-        setEditData(response.data);
+        restore(nodeKey("CAMPAIGN", response.data.id), response.data);
       } else {
         const d = response.data;
-        if (selectedNode.type === "CAMPAIGN") setEditData(d);
+        if (selectedNode.type === "CAMPAIGN") restore(nodeKey("CAMPAIGN", selectedNode.id), d);
         else if (selectedNode.type === "ADSET") {
           const found = d.adSets?.find((s: any) => s.id === selectedNode.id);
-          if (found) setEditData(found);
+          if (found) restore(nodeKey("ADSET", selectedNode.id), found);
         } else if (selectedNode.type === "AD") {
           for (const s of d.adSets || []) {
             const found = s.ads?.find((a: any) => a.id === selectedNode.id);
-            if (found) { setEditData(found); break; }
+            if (found) { restore(nodeKey("AD", selectedNode.id), found); break; }
           }
         }
       }
@@ -164,30 +174,46 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
 
   useEffect(() => { fetchDraft(); }, [params.id]);
 
-  const saveCurrentNode = async () => {
-    if (!isDirty || !selectedNode || !editData) return;
-    try {
-      if (selectedNode.type === "CAMPAIGN") await draftApi.updateCampaign(selectedNode.id, editData);
-      else if (selectedNode.type === "ADSET") await draftApi.updateAdSet(selectedNode.id, editData);
-      else if (selectedNode.type === "AD") await draftApi.updateAd(selectedNode.id, editData);
-      setIsDirty(false);
-    } catch { toast.error("Failed to auto-save changes"); }
-  };
+  // Warn when navigating/refreshing/closing with unsaved edits.
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      // Modern browsers display their own generic message; setting returnValue
+      // is required for the prompt to fire.
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
 
-  const handleSelectNode = async (type: "CAMPAIGN" | "ADSET" | "AD", item: any) => {
-    if (isDirty) await saveCurrentNode();
+  // Switching node now PRESERVES the previous node's edits in the cache (no auto-save).
+  // When you come back, your in-progress edits are restored.
+  const handleSelectNode = (type: "CAMPAIGN" | "ADSET" | "AD", item: any) => {
     setSelectedNode({ type, id: item.id });
-    setEditData(item);
+    const cached = editCache.get(nodeKey(type, item.id));
+    setEditData(cached ?? item);
   };
 
-  const handleUpdateField = (field: string, value: any) => { setEditData({ ...editData, [field]: value }); setIsDirty(true); };
-  const handleUpdateDataField = (field: string, value: any) => { setEditData({ ...editData, data: { ...editData.data, [field]: value } }); setIsDirty(true); };
+  // Single helper: update local view AND stash in cache so it survives node switches.
+  const commitEdit = (next: any) => {
+    setEditData(next);
+    if (!currentKey) return;
+    setEditCache((prev) => {
+      const m = new Map(prev);
+      m.set(currentKey, next);
+      return m;
+    });
+  };
+
+  const handleUpdateField = (field: string, value: any) => commitEdit({ ...editData, [field]: value });
+  const handleUpdateDataField = (field: string, value: any) => commitEdit({ ...editData, data: { ...editData.data, [field]: value } });
   const handleUpdateNestedDataField = (parent: string, field: string, value: any) => {
-    setEditData({ ...editData, data: { ...editData.data, [parent]: { ...(editData.data?.[parent] || {}), [field]: value } } }); setIsDirty(true);
+    commitEdit({ ...editData, data: { ...editData.data, [parent]: { ...(editData.data?.[parent] || {}), [field]: value } } });
   };
 
   const handleUpdateCreativeLinkData = (field: string, value: any) => {
-    setEditData({
+    commitEdit({
       ...editData,
       data: {
         ...editData.data,
@@ -200,11 +226,10 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
         },
       },
     });
-    setIsDirty(true);
   };
 
   const handleUpdateCreativeCTA = (ctaType: string) => {
-    setEditData({
+    commitEdit({
       ...editData,
       data: {
         ...editData.data,
@@ -220,24 +245,36 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
         },
       },
     });
-    setIsDirty(true);
   };
 
   const handleSave = async () => {
-    if (!selectedNode || !editData) return;
+    // Snapshot all pending edits — including the one currently visible.
+    const pending = new Map(editCache);
+    if (currentKey && editData) pending.set(currentKey, editData);
+    if (pending.size === 0) return;
+
     setIsSaving(true);
     try {
-      if (selectedNode.type === "CAMPAIGN") await draftApi.updateCampaign(selectedNode.id, editData);
-      else if (selectedNode.type === "ADSET") await draftApi.updateAdSet(selectedNode.id, editData);
-      else if (selectedNode.type === "AD") await draftApi.updateAd(selectedNode.id, editData);
-      toast.success("Changes saved");
-      setIsDirty(false);
+      for (const [key, data] of pending) {
+        const sep = key.indexOf(":");
+        const type = key.slice(0, sep);
+        const id = key.slice(sep + 1);
+        if (type === "CAMPAIGN") await draftApi.updateCampaign(id, data);
+        else if (type === "ADSET") await draftApi.updateAdSet(id, data);
+        else if (type === "AD") await draftApi.updateAd(id, data);
+      }
+      toast.success(pending.size > 1 ? `Saved ${pending.size} changes` : "Changes saved");
+      setEditCache(new Map());
       fetchDraft();
     } catch { toast.error("Failed to save changes"); }
     finally { setIsSaving(false); }
   };
 
   const handleValidate = async () => {
+    if (isDirty) {
+      toast.error("Save your changes before validating.");
+      return;
+    }
     setIsValidating(true);
     try {
       const response = await draftApi.validateDraft(params.id);
@@ -250,6 +287,10 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
   };
 
   const handlePublish = async () => {
+    if (isDirty) {
+      toast.error("Save your changes before publishing.");
+      return;
+    }
     if (!confirm("Publish to Meta? This will create real campaigns, ad sets, and ads (all PAUSED).")) return;
     setIsPublishing(true);
     try {
@@ -502,7 +543,7 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
 
   const handleSetCreativeType = (type: string) => {
     const oss = editData.data?.creative?.object_story_spec || {};
-    setEditData({
+    commitEdit({
       ...editData,
       data: {
         ...editData.data,
@@ -513,11 +554,10 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
         },
       },
     });
-    setIsDirty(true);
   };
 
   const handleUpdateCreativeVideoData = (field: string, value: any) => {
-    setEditData({
+    commitEdit({
       ...editData,
       data: {
         ...editData.data,
@@ -530,11 +570,10 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
         },
       },
     });
-    setIsDirty(true);
   };
 
   const handleUpdateCreativePhotoData = (field: string, value: any) => {
-    setEditData({
+    commitEdit({
       ...editData,
       data: {
         ...editData.data,
@@ -547,7 +586,6 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
         },
       },
     });
-    setIsDirty(true);
   };
 
   const handleUpdateVideoCTA = (field: string, value: any) => {
@@ -566,7 +604,7 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
   const handleUpdateCarouselCard = (index: number, field: string, value: any) => {
     const cards = [...(editData.data?.creative?.object_story_spec?.link_data?.child_attachments || [])];
     cards[index] = { ...(cards[index] || {}), [field]: value };
-    setEditData({
+    commitEdit({
       ...editData,
       data: {
         ...editData.data,
@@ -579,14 +617,13 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
         },
       },
     });
-    setIsDirty(true);
   };
 
   const handleAddCarouselCard = () => {
     const cards = [...(editData.data?.creative?.object_story_spec?.link_data?.child_attachments || [])];
     if (cards.length >= 10) return;
     cards.push({ link: "", name: "", description: "", image_hash: "" });
-    setEditData({
+    commitEdit({
       ...editData,
       data: {
         ...editData.data,
@@ -599,14 +636,13 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
         },
       },
     });
-    setIsDirty(true);
   };
 
   const handleRemoveCarouselCard = (index: number) => {
     const cards = [...(editData.data?.creative?.object_story_spec?.link_data?.child_attachments || [])];
     if (cards.length <= 2) return;
     cards.splice(index, 1);
-    setEditData({
+    commitEdit({
       ...editData,
       data: {
         ...editData.data,
@@ -619,7 +655,6 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
         },
       },
     });
-    setIsDirty(true);
   };
 
   const creativeType = getCreativeType();
@@ -656,7 +691,7 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
       <MetaField label="Page ID"
         value={editData.data?.creative?.object_story_spec?.page_id || ""}
         onChange={(v) => {
-          setEditData({
+          commitEdit({
             ...editData,
             data: {
               ...editData.data,
@@ -666,7 +701,6 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
               },
             },
           });
-          setIsDirty(true);
         }}
         placeholder="Facebook Page ID"
         hint="Required for inline creatives. Auto-resolved from ad set if empty." />
@@ -695,7 +729,7 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
             onChange={(v) => handleUpdateCreativeLinkData("image_hash", v)}
             placeholder="Enter image hash from Meta ad account" />
           <UploadButton type="image" adAccountId={adAccountId}
-            onUploaded={(v) => { handleUpdateCreativeLinkData("image_hash", v); setIsDirty(true); }} />
+            onUploaded={(v) => { handleUpdateCreativeLinkData("image_hash", v); }} />
           <MetaField label="Call to Action" type="enum"
             value={editData.data?.creative?.object_story_spec?.link_data?.call_to_action?.type || ""}
             options={CTA_OPTIONS}
@@ -711,7 +745,7 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
             onChange={(v) => handleUpdateCreativeVideoData("video_id", v)}
             placeholder="Enter video ID from Meta" />
           <UploadButton type="video" adAccountId={adAccountId}
-            onUploaded={(v) => { handleUpdateCreativeVideoData("video_id", v); setIsDirty(true); }} />
+            onUploaded={(v) => { handleUpdateCreativeVideoData("video_id", v); }} />
           <MetaField label="Post Text"
             value={editData.data?.creative?.object_story_spec?.video_data?.message || ""}
             onChange={(v) => handleUpdateCreativeVideoData("message", v)}
@@ -726,7 +760,7 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
             placeholder="Thumbnail image hash (optional)"
             hint="If omitted, Meta auto-generates one." />
           <UploadButton type="image" adAccountId={adAccountId}
-            onUploaded={(v) => { handleUpdateCreativeVideoData("image_hash", v); setIsDirty(true); }} />
+            onUploaded={(v) => { handleUpdateCreativeVideoData("image_hash", v); }} />
           <MetaField label="Call to Action" type="enum"
             value={editData.data?.creative?.object_story_spec?.video_data?.call_to_action?.type || ""}
             options={CTA_OPTIONS}
@@ -747,7 +781,7 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
             onChange={(v) => handleUpdateCreativePhotoData("image_hash", v)}
             placeholder="Image hash from Meta ad account" />
           <UploadButton type="image" adAccountId={adAccountId}
-            onUploaded={(v) => { handleUpdateCreativePhotoData("image_hash", v); setIsDirty(true); }} />
+            onUploaded={(v) => { handleUpdateCreativePhotoData("image_hash", v); }} />
           <MetaField label="Post Text"
             value={editData.data?.creative?.object_story_spec?.photo_data?.message || ""}
             onChange={(v) => handleUpdateCreativePhotoData("message", v)}
@@ -821,7 +855,7 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
                 onChange={(v) => handleUpdateCarouselCard(i, "image_hash", v)}
                 placeholder="Image hash for this card" />
               <UploadButton type="image" adAccountId={adAccountId}
-                onUploaded={(v) => { handleUpdateCarouselCard(i, "image_hash", v); setIsDirty(true); }} />
+                onUploaded={(v) => { handleUpdateCarouselCard(i, "image_hash", v); }} />
             </div>
           ))}
         </>
@@ -994,7 +1028,7 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
                         buyingType: editData.data?.buying_type || "AUCTION",
                         isCBO,
                       }}
-                      onChange={(values) => { setEditData({ ...editData, data: values }); setIsDirty(true); }}
+                      onChange={(values) => commitEdit({ ...editData, data: values })}
                     />
                   </TabsContent>
 

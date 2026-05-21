@@ -15,12 +15,15 @@ import { duplicationApi } from "@/services/api";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
 
 export default function HistoryPage() {
   const [history, setHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [cleaning, setCleaning] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchHistory();
@@ -37,15 +40,21 @@ export default function HistoryPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const confirmDelete = async () => {
+    if (!pendingDeleteId) return;
+    const id = pendingDeleteId;
     const prev = history;
+    setDeleting(true);
     setHistory(h => h.filter(item => item.id !== id));
     try {
       await duplicationApi.deleteHistory(id);
       toast.success("History item deleted");
+      setPendingDeleteId(null);
     } catch (error) {
       toast.error("Failed to delete history item");
       setHistory(prev);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -175,9 +184,10 @@ export default function HistoryPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <button
-                        onClick={() => handleDelete(job.id)}
+                        onClick={() => setPendingDeleteId(job.id)}
                         className="p-1.5 text-gray-600 hover:text-red-400 transition-colors rounded-md hover:bg-red-500/10"
                         title="Delete"
+                        aria-label="Delete history item"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -190,6 +200,16 @@ export default function HistoryPage() {
           )}
         </div>
       </div>
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open) => { if (!open) setPendingDeleteId(null); }}
+        title="Delete history item?"
+        description="This removes the local audit entry. The campaign or ad set on Facebook is not affected."
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={confirmDelete}
+        isLoading={deleting}
+      />
     </DashboardLayout>
   );
 }

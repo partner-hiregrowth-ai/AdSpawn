@@ -1,8 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { prisma } from '../prisma';
-
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+import { sleep } from '../utils/sleep';
 import { FacebookService } from '../services/facebook.service';
 import { NamingEngine } from '../utils/namingEngine';
 import { ObjectiveConversionService } from '../services/objectiveConversion.service';
@@ -62,8 +61,10 @@ export const cleanupHistory = async (req: AuthRequest, res: Response) => {
       if (!exists) toDelete.push(job.id);
     }
     if (toDelete.length > 0) {
-      await prisma.duplicateJob.deleteMany({ where: { id: { in: toDelete } } });
-      deletedCount = toDelete.length;
+      const result = await prisma.duplicateJob.deleteMany({
+        where: { id: { in: toDelete }, userId: req.userId },
+      });
+      deletedCount = result.count;
     }
 
     res.json({ success: true, deletedCount });

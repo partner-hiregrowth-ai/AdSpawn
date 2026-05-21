@@ -42,26 +42,35 @@ export const getTokenStatus = async (req: AuthRequest, res: Response) => {
 };
 
 export const getStats = async (req: AuthRequest, res: Response) => {
+  // Each count is independent — one DB hiccup shouldn't blank the whole dashboard.
+  const [draftRes, publishedRes, jobRes] = await Promise.allSettled([
+    prisma.draftCampaign.count({ where: { userId: req.userId, status: { not: 'PUBLISHED' } } }),
+    prisma.draftCampaign.count({ where: { userId: req.userId, status: 'PUBLISHED' } }),
+    prisma.duplicateJob.count({ where: { userId: req.userId } }),
+  ]);
+
+  const pick = (r: PromiseSettledResult<number>): number | null =>
+    r.status === 'fulfilled' ? r.value : null;
+
+  if (draftRes.status === 'rejected') console.error('[getStats] draft count failed:', draftRes.reason);
+  if (publishedRes.status === 'rejected') console.error('[getStats] published count failed:', publishedRes.reason);
+  if (jobRes.status === 'rejected') console.error('[getStats] job count failed:', jobRes.reason);
+
+  let accountCount: number | null = 0;
   try {
-    const [draftCount, publishedCount, jobCount] = await Promise.all([
-      prisma.draftCampaign.count({ where: { userId: req.userId, status: { not: 'PUBLISHED' } } }),
-      prisma.draftCampaign.count({ where: { userId: req.userId, status: 'PUBLISHED' } }),
-      prisma.duplicateJob.count({ where: { userId: req.userId } }),
-    ]);
-
-    let accountCount = 0;
-    try {
-      const fbService = new FacebookService(req.userAccessToken!);
-      const accounts = await fbService.getAdAccounts();
-      accountCount = accounts.length;
-    } catch {
-      // Token may be invalid — just show 0
-    }
-
-    res.json({ draftCount, publishedCount, jobCount, accountCount });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch stats' });
+    const fbService = new FacebookService(req.userAccessToken!);
+    const accounts = await fbService.getAdAccounts();
+    accountCount = accounts.length;
+  } catch {
+    accountCount = null;
   }
+
+  res.json({
+    draftCount: pick(draftRes),
+    publishedCount: pick(publishedRes),
+    jobCount: pick(jobRes),
+    accountCount,
+  });
 };
 
 export const deleteAccount = async (req: AuthRequest, res: Response) => {

@@ -84,7 +84,11 @@ function CampaignNode({ campaign, index, objective }: { campaign: any; index: nu
   return (
     <div className="ml-2">
       <div className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-gray-800/50">
-        <button onClick={() => store.toggleExpand(campaign.id)} className="text-gray-500">
+        <button
+          onClick={() => store.toggleExpand(campaign.id)}
+          className="text-gray-500"
+          aria-label={expanded ? "Collapse campaign" : "Expand campaign"}
+        >
           {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
         </button>
         <FolderTree className={`w-3.5 h-3.5 ${color}`} />
@@ -99,6 +103,7 @@ function CampaignNode({ campaign, index, objective }: { campaign: any; index: nu
           onClick={() => store.addAdSet(campaign.id)}
           className="text-gray-600 hover:text-gray-400 p-0.5"
           title="Add Ad Set"
+          aria-label="Add ad set"
         >
           <Plus className="w-3 h-3" />
         </button>
@@ -117,6 +122,7 @@ function CampaignNode({ campaign, index, objective }: { campaign: any; index: nu
                   onClick={() => store.addAd(campaign.id, adSet.id)}
                   className="text-gray-600 hover:text-gray-400 p-0.5"
                   title="Add Ad"
+                  aria-label="Add ad"
                 >
                   <Plus className="w-2.5 h-2.5" />
                 </button>
@@ -124,6 +130,7 @@ function CampaignNode({ campaign, index, objective }: { campaign: any; index: nu
                   onClick={() => store.removeAdSet(campaign.id, adSet.id)}
                   className="text-red-500/30 hover:text-red-400 p-0.5"
                   title="Remove"
+                  aria-label="Remove ad set"
                 >
                   <Trash2 className="w-2.5 h-2.5" />
                 </button>
@@ -137,6 +144,7 @@ function CampaignNode({ campaign, index, objective }: { campaign: any; index: nu
                     <button
                       onClick={() => store.removeAd(campaign.id, adSet.id, ad.id)}
                       className="text-red-500/20 hover:text-red-400 p-0.5"
+                      aria-label="Remove ad"
                     >
                       <Trash2 className="w-2.5 h-2.5" />
                     </button>

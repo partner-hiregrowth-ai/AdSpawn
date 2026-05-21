@@ -1,11 +1,10 @@
 import axios from 'axios';
 import FormData from 'form-data';
 import { READ_ONLY_FIELDS } from './draft/MetaFieldRegistry';
+import { sleep } from '../utils/sleep';
 
 const FB_API_VERSION = 'v21.0';
 const FB_BASE_URL = `https://graph.facebook.com/${FB_API_VERSION}`;
-
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 export class FacebookService {
   private accessToken: string;

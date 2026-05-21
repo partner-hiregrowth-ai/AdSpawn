@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DraftStatus } from '@prisma/client';
 
-vi.mock('../../src/prisma', () => ({
-  prisma: {
+vi.mock('../../src/prisma', () => {
+  const prismaMock: any = {
     draftCampaign: {
       create: vi.fn(),
       findUnique: vi.fn(),
@@ -20,8 +20,11 @@ vi.mock('../../src/prisma', () => ({
       findUnique: vi.fn(),
       update: vi.fn(),
     },
-  },
-}));
+  };
+  // generateFromTemplate wraps writes in $transaction — pass the same mock as tx.
+  prismaMock.$transaction = vi.fn((cb: any) => cb(prismaMock));
+  return { prisma: prismaMock };
+});
 
 import { prisma } from '../../src/prisma';
 import { WideCreationService, WideCreationTemplate } from '../../src/services/draft/WideCreationService';

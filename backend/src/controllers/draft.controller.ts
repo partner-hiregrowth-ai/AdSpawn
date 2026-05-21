@@ -37,7 +37,7 @@ export class DraftController {
       res.json(drafts);
     } catch (error: any) {
       console.error(`[DraftController] Error in listCampaigns:`, error);
-      res.status(500).json({ error: error.message, stack: error.stack });
+      res.status(500).json({ error: error.message });
     }
   }
 

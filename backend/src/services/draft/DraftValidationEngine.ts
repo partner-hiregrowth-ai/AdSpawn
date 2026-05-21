@@ -303,6 +303,16 @@ export class DraftValidationEngine {
       }
     }
 
+    // Marketplace position requires Facebook News Feed (Meta error 100/1815698).
+    const fbPositions: string[] = targeting.facebook_positions || [];
+    if (fbPositions.includes('marketplace') && !fbPositions.includes('feed')) {
+      errors.push({
+        field: 'targeting.facebook_positions',
+        message: 'Facebook Marketplace placement also requires Facebook News Feed. Add "feed" or remove "marketplace".',
+        severity: 'error',
+      });
+    }
+
     // Missing geo targeting
     if (data.targeting && typeof data.targeting === 'object') {
       const geo = data.targeting.geo_locations;

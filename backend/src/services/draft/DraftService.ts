@@ -2,8 +2,7 @@ import { prisma } from '../../prisma';
 import { FacebookService } from '../facebook.service';
 import { DraftStatus } from '@prisma/client';
 import { ObjectiveConversionService } from '../objectiveConversion.service';
-
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+import { sleep } from '../../utils/sleep';
 
 export class DraftService {
   static async duplicateCampaignToDraft(campaignId: string, userId: string, accessToken: string) {

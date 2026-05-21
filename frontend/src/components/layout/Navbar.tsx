@@ -77,7 +77,10 @@ export const Navbar = () => {
           <DropdownMenuSeparator className="bg-gray-800" />
           <DropdownMenuItem
             onClick={() => {
-              useAppStore.getState().setUser(null);
+              const store = useAppStore.getState();
+              store.setUser(null);
+              store.setSelectedAccount(null);
+              store.setAdAccounts([]);
               localStorage.removeItem("token");
               window.location.href = "/login";
             }}

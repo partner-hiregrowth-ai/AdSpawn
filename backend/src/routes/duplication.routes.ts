@@ -14,6 +14,9 @@ import {
   validateOptimization,
 } from '../controllers/duplication.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
+import { validateBody } from '../middleware/validate.middleware';
+import { bulkLimiter } from '../middleware/rateLimit.middleware';
+import { bulkDuplicateSchema, convertObjectiveSchema } from '../schemas/duplication.schemas';
 
 const router = Router();
 
@@ -25,11 +28,11 @@ router.delete('/history/:id', deleteHistoryItem);
 router.post('/campaign', duplicateCampaign);
 router.post('/adset', duplicateAdSet);
 router.post('/ad', duplicateAd);
-router.post('/bulk', duplicateItems);
+router.post('/bulk', bulkLimiter, validateBody(bulkDuplicateSchema), duplicateItems);
 
 // Objective Conversion Routes
 router.post('/preview-conversion', previewConversion);
-router.post('/convert-objective', convertObjective);
+router.post('/convert-objective', validateBody(convertObjectiveSchema), convertObjective);
 
 // Optimization Routes
 router.post('/optimize-duplicate', optimizeDuplicate);

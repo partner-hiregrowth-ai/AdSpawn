@@ -1,9 +1,9 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { WideCreationService, WideCreationTemplate } from '../services/draft/WideCreationService';
 import { AuthRequest } from '../middleware/auth.middleware';
 
 export class WideCreationController {
-  static async validate(req: Request, res: Response) {
+  static async validate(req: AuthRequest, res: Response) {
     try {
       const template = req.body as WideCreationTemplate;
       const result = WideCreationService.validateTemplate(template);
@@ -14,10 +14,9 @@ export class WideCreationController {
     }
   }
 
-  static async generate(req: Request, res: Response) {
+  static async generate(req: AuthRequest, res: Response) {
     try {
       const template = req.body as WideCreationTemplate;
-      const authReq = req as AuthRequest;
 
       // Structural checks only (adAccountId, campaigns exist, valid objectives)
       if (!template.adAccountId) {
@@ -27,13 +26,29 @@ export class WideCreationController {
         return res.status(400).json({ error: 'At least one campaign is required' });
       }
 
+      // Cap total entities to keep the transaction inside its 30s window.
+      const totalEntities = template.campaigns.reduce((sum, c) => {
+        const adSets = c.adSets ?? Array.from({ length: c.adSetCount || 1 });
+        const adsPerSet = (adSets as any[]).reduce(
+          (s, as) => s + ((as.ads?.length) ?? as.adCount ?? 1),
+          0,
+        );
+        return sum + 1 + adSets.length + adsPerSet;
+      }, 0);
+      const MAX_ENTITIES = 500;
+      if (totalEntities > MAX_ENTITIES) {
+        return res.status(413).json({
+          error: `Template would generate ${totalEntities} entities (max ${MAX_ENTITIES}). Reduce campaign/ad-set/ad counts.`,
+        });
+      }
+
       // Full validation before generating
       const validation = WideCreationService.validateTemplate(template);
       if (!validation.valid) {
         return res.status(400).json({ error: 'Validation failed', errors: validation.errors });
       }
 
-      const result = await WideCreationService.generateFromTemplate(template, authReq.userId!);
+      const result = await WideCreationService.generateFromTemplate(template, req.userId!);
       res.json(result);
     } catch (error: any) {
       console.error(`[WideCreation] Error in generate:`, error);
@@ -41,7 +56,7 @@ export class WideCreationController {
     }
   }
 
-  static async bulkApplyFields(req: Request, res: Response) {
+  static async bulkApplyFields(req: AuthRequest, res: Response) {
     try {
       const { entityIds, entityType, fieldUpdates, cascadeToChildren } = req.body as {
         entityIds: string[];
@@ -58,7 +73,7 @@ export class WideCreationController {
       }
 
       const result = await WideCreationService.bulkApplyFields(
-        entityIds, entityType, fieldUpdates, cascadeToChildren,
+        entityIds, entityType, fieldUpdates, cascadeToChildren, req.userId,
       );
       res.json(result);
     } catch (error: any) {
@@ -67,7 +82,7 @@ export class WideCreationController {
     }
   }
 
-  static async getTree(req: Request, res: Response) {
+  static async getTree(req: AuthRequest, res: Response) {
     try {
       const { campaignIds } = req.body as { campaignIds: string[] };
 
@@ -75,7 +90,7 @@ export class WideCreationController {
         return res.status(400).json({ error: 'campaignIds must be a non-empty array' });
       }
 
-      const tree = await WideCreationService.getTreeStructure(campaignIds);
+      const tree = await WideCreationService.getTreeStructure(campaignIds, req.userId);
       res.json(tree);
     } catch (error: any) {
       console.error(`[WideCreation] Error in getTree:`, error);

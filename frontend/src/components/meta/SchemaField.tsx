@@ -712,7 +712,11 @@ function ObjectField({
   context: FieldRenderContext;
   path: string;
 }) {
-  const [expanded, setExpanded] = useState(true);
+  // Depth = number of dots in the path. Keep the top two levels open by default;
+  // collapse deeper sections unless the user already has values in them.
+  const depth = path ? path.split(".").length - 1 : 0;
+  const hasContent = value && typeof value === "object" && Object.keys(value).length > 0;
+  const [expanded, setExpanded] = useState(depth < 2 || hasContent);
   const objectValue = value || {};
 
   if (!field.objectSchema || field.objectSchema.length === 0) {
