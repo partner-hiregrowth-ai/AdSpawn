@@ -1,6 +1,6 @@
-# CloneZone — User Documentation
+# AdSpawn — User Documentation
 
-CloneZone is a Meta Ads management tool for duplicating, converting, and scaling ad structures across campaigns, ad sets, and ads.
+AdSpawn is a Meta Ads management tool for duplicating, converting, and scaling ad structures across campaigns, ad sets, and ads.
 
 ---
 
@@ -212,7 +212,7 @@ This can happen if the rate limit was hit during a Save as Draft operation. Dele
 
 ### "Budget Conflict" when duplicating
 
-Occurs when duplicating an ad set into a CBO (Campaign Budget Optimisation) campaign with budget fields. CloneZone automatically retries without budget fields in this case — no action needed.
+Occurs when duplicating an ad set into a CBO (Campaign Budget Optimisation) campaign with budget fields. AdSpawn automatically retries without budget fields in this case — no action needed.
 
 ### Conversion requires a Page ID / Pixel ID
 
@@ -225,4 +225,4 @@ These must be set in the draft editor (Full Schema tab → Ad Set → promoted_o
 
 ### Published campaign is not visible in Meta
 
-All objects created by CloneZone are set to **PAUSED** status. Go to Meta Ads Manager and activate them manually, or use the **Activate** button in the Explorer or Drafts list.
+All objects created by AdSpawn are set to **PAUSED** status. Go to Meta Ads Manager and activate them manually, or use the **Activate** button in the Explorer or Drafts list.

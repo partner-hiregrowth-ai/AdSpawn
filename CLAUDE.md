@@ -1,4 +1,4 @@
-# CloneZone - Project Context
+# AdSpawn - Project Context
 
 ## Architecture
 

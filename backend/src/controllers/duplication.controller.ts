@@ -137,13 +137,15 @@ export const convertObjective = async (req: AuthRequest, res: Response) => {
 
 export const duplicateItems = async (req: AuthRequest, res: Response) => {
   const { items, adAccountId, options } = req.body;
+  const numCopies = Number(options?.numCopies) || 1;
 
-  try {
-    const fbService = new FacebookService(req.userAccessToken!);
-    const results = [];
+  const fbService = new FacebookService(req.userAccessToken!);
+  const results: any[] = [];
+  const failures: { itemId: string; iteration: number; error: string }[] = [];
 
-    for (const item of items) {
-      for (let i = 0; i < (options.numCopies || 1); i++) {
+  for (const item of items) {
+    for (let i = 0; i < numCopies; i++) {
+      try {
         const namingContext = {
           ...options.context,
           campaign_name: item.type === 'CAMPAIGN' ? item.name : undefined,
@@ -151,41 +153,30 @@ export const duplicateItems = async (req: AuthRequest, res: Response) => {
           ad_name: item.type === 'AD' ? item.name : undefined,
           iteration_number: i + 1,
           budget: options.customBudget ? parseFloat(options.customBudget) : undefined,
-          date: new Date()
+          date: new Date(),
         };
 
         const newName = NamingEngine.parse(options.renamePattern, namingContext);
 
-        let result;
-
         let customBudget = undefined;
         if (options.customBudget) {
           let budgetValue = parseFloat(options.customBudget);
-          if (budgetValue > 0 && budgetValue < 40) {
-            budgetValue = 40;
-          }
+          if (budgetValue > 0 && budgetValue < 40) budgetValue = 40;
           customBudget = (budgetValue * 100).toString();
         }
 
+        let result;
         if (item.type === 'CAMPAIGN') {
-          if (options.deep) {
-            result = await fbService.duplicateCampaignDeep(item.id, newName, adAccountId, customBudget);
-          } else {
-            result = await fbService.duplicateCampaign(item.id, newName, adAccountId, customBudget);
-          }
+          result = options.deep
+            ? await fbService.duplicateCampaignDeep(item.id, newName, adAccountId, customBudget)
+            : await fbService.duplicateCampaign(item.id, newName, adAccountId, customBudget);
         } else if (item.type === 'ADSET') {
           const originalResponse = await fbService.get(`/${item.id}`, { fields: 'campaign_id,campaign{id}' });
           const campaignId = originalResponse.data.campaign_id || originalResponse.data.campaign?.id;
-
-          if (!campaignId) {
-            throw new Error(`Could not find parent campaign for ad set ${item.id}`);
-          }
-
-          if (options.deep) {
-            result = await fbService.duplicateAdSetDeep(item.id, newName, campaignId, adAccountId, customBudget);
-          } else {
-            result = await fbService.duplicateAdSet(item.id, newName, campaignId, adAccountId, customBudget);
-          }
+          if (!campaignId) throw new Error(`Could not find parent campaign for ad set ${item.id}`);
+          result = options.deep
+            ? await fbService.duplicateAdSetDeep(item.id, newName, campaignId, adAccountId, customBudget)
+            : await fbService.duplicateAdSet(item.id, newName, campaignId, adAccountId, customBudget);
         } else if (item.type === 'AD') {
           const original = await fbService.get(`/${item.id}`, { fields: 'adset_id' });
           result = await fbService.duplicateAd(item.id, newName, original.data.adset_id, adAccountId);
@@ -199,19 +190,41 @@ export const duplicateItems = async (req: AuthRequest, res: Response) => {
               type: item.type,
               sourceId: item.id,
               targetId: result.id,
-              details: { newName, adAccountId, options },
+              details: { newName, adAccountId, options, iteration: i + 1 },
             },
           });
           results.push(result);
         }
+
+        // Small inter-iteration pacing so Meta doesn't rate-limit a tight loop.
+        if (i < numCopies - 1) await sleep(300);
+      } catch (err: any) {
+        const errMsg = extractMetaError(err, `Copy ${i + 1} failed`);
+        console.error(`[DuplicationController] Copy ${i + 1}/${numCopies} of ${item.type} ${item.id} failed:`, errMsg);
+        failures.push({ itemId: item.id, iteration: i + 1, error: errMsg });
+        await prisma.duplicateJob.create({
+          data: {
+            userId: req.userId!,
+            status: 'FAILED',
+            type: item.type,
+            sourceId: item.id,
+            targetId: null,
+            details: { error: errMsg, adAccountId, options, iteration: i + 1 },
+          },
+        });
       }
     }
-
-    res.json({ success: true, results });
-  } catch (error: any) {
-    console.error('[DuplicationController] Bulk Duplicate Error:', error.response?.data || error.message);
-    res.status(500).json({ message: extractMetaError(error, 'Failed to duplicate items') });
   }
+
+  const requested = items.length * numCopies;
+  res.json({
+    success: failures.length === 0,
+    requested,
+    created: results.length,
+    failed: failures.length,
+    results,
+    failures,
+  });
 };
 
 export const duplicateCampaign = async (req: AuthRequest, res: Response) => {

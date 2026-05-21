@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { toast } from "sonner";
 import { draftApi } from "@/services/api";
-import { cn } from "@/lib/utils";
+import { cn, extractApiError } from "@/lib/utils";
 import { MetaField } from "@/components/meta/MetaField";
 import { FieldActionBadge } from "@/components/meta/FieldActionBadge";
 import { ValidationBanner } from "@/components/meta/ValidationBanner";
@@ -106,7 +106,7 @@ export function BulkEditPanel({
         setEditValues(initial);
       })
       .catch((err) => {
-        toast.error("Failed to compute edit schema");
+        toast.error(extractApiError(err, "Couldn't compute what fields can be edited together. The selected items may have incompatible types."));
         console.error(err);
       })
       .finally(() => setLoadingSchema(false));

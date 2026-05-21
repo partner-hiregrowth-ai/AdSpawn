@@ -39,7 +39,7 @@ export const Navbar = () => {
         </button>
 
         <h1 className="text-lg font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent shrink-0">
-          CloneZone
+          AdSpawn
         </h1>
         {currentPage && (
           <>

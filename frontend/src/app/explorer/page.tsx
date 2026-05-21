@@ -40,7 +40,7 @@ export default function ExplorerPage() {
   const [panelMode, setPanelMode] = useState<PanelMode>('duplicate');
 
   // Duplicate settings
-  const [renamePattern, setRenamePattern] = useState("{{campaign_name}}{{adset_name}}{{ad_name}} - Copy");
+  const [renamePattern, setRenamePattern] = useState("{{campaign_name}}{{adset_name}}{{ad_name}} - Copy {{iteration_number}}");
   const [numCopies, setNumCopies] = useState(1);
 
   const [country, setCountry] = useState("TH");
@@ -193,7 +193,7 @@ export default function ExplorerPage() {
     setEditingId(null);
     setUpdating(true);
     try { await adAccountApi.updateName(id, resolvedName); toast.success("Name updated"); }
-    catch { toast.error("Failed to update name"); }
+    catch (err: any) { toast.error(extractApiError(err, "Couldn't rename. The name may be invalid or the item no longer exists.")); }
     finally { setUpdating(false); }
   }, []);
 
@@ -264,19 +264,25 @@ export default function ExplorerPage() {
 
   const handleDuplicate = async () => {
     const targetAccId = destAccountId || selectedAccount?.id;
-    if (!targetAccId) { toast.error("No destination account selected"); return; }
+    if (!targetAccId) { toast.error("No destination account selected. Pick one above."); return; }
     setDuplicating(true);
     try {
-      await duplicationApi.duplicateBulk({
+      const resp = await duplicationApi.duplicateBulk({
         items: selectedItemsList, adAccountId: targetAccId,
         options: { numCopies, renamePattern, deep, context: { country, angle } },
       });
-      toast.success(`Duplicated ${selectedItemsList.length * numCopies} items!`);
+      const { requested, created, failed, failures } = resp.data || {};
+      if (failed && failed > 0) {
+        const firstErr = failures?.[0]?.error || "unknown error";
+        toast.error(`Created ${created}/${requested} copies. ${failed} failed — first error: ${firstErr}`);
+      } else {
+        toast.success(`Created ${created} cop${created === 1 ? "y" : "ies"} on Meta (paused).`);
+      }
       setSelectedItems(new Map());
       setPanelOpen(false);
       resetOptimization();
       fetchCampaigns();
-    } catch (err: any) { toast.error(extractApiError(err, "Failed to duplicate")); }
+    } catch (err: any) { toast.error(extractApiError(err, "Couldn't start the duplicate job. Check your Facebook connection and try again.")); }
     finally { setDuplicating(false); }
   };
 
@@ -285,20 +291,34 @@ export default function ExplorerPage() {
     setSavingDraft(true);
     try {
       const results = await Promise.allSettled(
-        selectedItemsList.map(item => draftApi.duplicateToDraft(item.id))
+        selectedItemsList.map(item => draftApi.duplicateToDraft(item.id, numCopies))
       );
-      const ok = results.filter(r => r.status === "fulfilled").length;
-      const failed = results.length - ok;
-      if (failed === 0) {
-        toast.success(`Saved ${ok} to Internal Drafts!`);
+      let totalCreated = 0;
+      let totalRequested = 0;
+      let firstErr: string | null = null;
+      for (const r of results) {
+        if (r.status === "fulfilled") {
+          const d = r.value.data || {};
+          totalCreated += d.created ?? 1;
+          totalRequested += d.requested ?? 1;
+          if (d.failures?.[0]?.error && !firstErr) firstErr = d.failures[0].error;
+        } else {
+          totalRequested += numCopies;
+          if (!firstErr) {
+            firstErr = (r.reason as any)?.response?.data?.error
+              || (r.reason as any)?.message
+              || "unknown error";
+          }
+        }
+      }
+      if (totalCreated === totalRequested) {
+        toast.success(`Saved ${totalCreated} draft${totalCreated === 1 ? "" : "s"} to Internal Drafts.`);
         setSelectedItems(new Map());
         setPanelOpen(false);
         resetOptimization();
       } else {
-        const firstErr = (results.find(r => r.status === "rejected") as PromiseRejectedResult | undefined)?.reason;
-        const msg = firstErr?.response?.data?.message || firstErr?.message || "unknown error";
-        toast.error(`${ok} of ${results.length} succeeded. First error: ${msg}`);
-        if (ok > 0) {
+        toast.error(`${totalCreated}/${totalRequested} drafts created. First error: ${firstErr || "unknown error"}`);
+        if (totalCreated > 0) {
           setSelectedItems(new Map());
           setPanelOpen(false);
           resetOptimization();

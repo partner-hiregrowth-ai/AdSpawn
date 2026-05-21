@@ -1,6 +1,6 @@
 # Meta Ad Objectives
 
-CloneZone supports all 6 current Meta (ODAX) campaign objectives. Each objective determines which optimization goals, destination types, and promoted object fields are valid.
+AdSpawn supports all 6 current Meta (ODAX) campaign objectives. Each objective determines which optimization goals, destination types, and promoted object fields are valid.
 
 ## The 6 Objectives
 

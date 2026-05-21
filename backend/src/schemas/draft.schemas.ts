@@ -3,6 +3,7 @@ import { idString, nonEmptyIdArray } from './common';
 
 export const duplicateToDraftSchema = z.object({
   campaignId: idString,
+  count: z.number().int().min(1).max(50).optional(),
 }).passthrough();
 
 export const bulkPublishSchema = z.object({

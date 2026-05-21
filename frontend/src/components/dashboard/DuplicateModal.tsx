@@ -33,7 +33,7 @@ import { toast } from "sonner";
 import { duplicationApi, draftApi } from "@/services/api";
 import { NamingTemplateEditor } from "./NamingTemplateEditor";
 import { NamingPreview } from "./NamingPreview";
-import { cn } from "@/lib/utils";
+import { cn, extractApiError } from "@/lib/utils";
 
 interface DuplicateModalProps {
   isOpen: boolean;
@@ -100,7 +100,7 @@ export const DuplicateModal = ({
   adAccountId,
   onSuccess,
 }: DuplicateModalProps) => {
-  const [renamePattern, setRenamePattern] = useState("{{campaign_name}}{{adset_name}}{{ad_name}} - Copy");
+  const [renamePattern, setRenamePattern] = useState("{{campaign_name}}{{adset_name}}{{ad_name}} - Copy {{iteration_number}}");
   const [numCopies, setNumCopies] = useState(1);
   const [customBudget, setCustomBudget] = useState("40");
   const [country, setCountry] = useState("TH");
@@ -180,12 +180,12 @@ export const DuplicateModal = ({
 
   const handleDuplicate = async () => {
     if (!adAccountId) {
-      toast.error("No ad account selected");
+      toast.error("No ad account selected. Pick one from the Dashboard first.");
       return;
     }
     setLoading(true);
     try {
-      await duplicationApi.duplicateBulk({
+      const resp = await duplicationApi.duplicateBulk({
         items: selectedItems,
         adAccountId,
         options: {
@@ -196,12 +196,19 @@ export const DuplicateModal = ({
           context: { country, angle },
         },
       });
-      toast.success(`Successfully duplicated ${selectedItems.length * numCopies} items!`);
+      const { requested, created, failed, failures } = resp.data || {};
+      if (failed && failed > 0) {
+        const firstErr = failures?.[0]?.error || "unknown error";
+        toast.error(`Created ${created}/${requested} copies. ${failed} failed — first error: ${firstErr}`);
+      } else {
+        toast.success(`Created ${created} cop${created === 1 ? "y" : "ies"} on Meta (paused).`);
+      }
+      // Always run onSuccess so the user can see whichever copies did make it.
       onSuccess();
       onClose();
       resetState();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || "Failed to duplicate");
+      toast.error(extractApiError(error, "Couldn't start the duplicate job. Check your Facebook connection and try again."));
     } finally {
       setLoading(false);
     }
@@ -216,19 +223,34 @@ export const DuplicateModal = ({
     setDraftLoading(true);
     try {
       const results = await Promise.allSettled(
-        selectedItems.map((item) => draftApi.duplicateToDraft(item.id))
+        selectedItems.map((item) => draftApi.duplicateToDraft(item.id, numCopies))
       );
-      const ok = results.filter((r) => r.status === "fulfilled").length;
-      const failed = results.length - ok;
-      if (failed === 0) {
-        toast.success(`Saved ${ok} to Internal Drafts!`);
+      // Each per-item response now has { created, failed, requested } when N>1.
+      let totalCreated = 0;
+      let totalRequested = 0;
+      let firstErr: string | null = null;
+      for (const r of results) {
+        if (r.status === "fulfilled") {
+          const d = r.value.data || {};
+          totalCreated += d.created ?? 1;
+          totalRequested += d.requested ?? 1;
+          if (d.failures?.[0]?.error && !firstErr) firstErr = d.failures[0].error;
+        } else {
+          totalRequested += numCopies;
+          if (!firstErr) {
+            firstErr = (r.reason as any)?.response?.data?.error
+              || (r.reason as any)?.message
+              || "unknown error";
+          }
+        }
+      }
+      if (totalCreated === totalRequested) {
+        toast.success(`Saved ${totalCreated} draft${totalCreated === 1 ? "" : "s"} to Internal Drafts.`);
         onClose();
         resetState();
       } else {
-        const firstErr = (results.find((r) => r.status === "rejected") as PromiseRejectedResult | undefined)?.reason;
-        const msg = firstErr?.response?.data?.message || firstErr?.message || "unknown error";
-        toast.error(`${ok} of ${results.length} succeeded. First error: ${msg}`);
-        if (ok > 0) {
+        toast.error(`${totalCreated}/${totalRequested} drafts created. First error: ${firstErr || "unknown error"}`);
+        if (totalCreated > 0) {
           onClose();
           resetState();
         }

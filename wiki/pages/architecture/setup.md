@@ -1,6 +1,6 @@
 # Environment Setup
 
-How to get CloneZone running locally.
+How to get AdSpawn running locally.
 
 ## Prerequisites
 

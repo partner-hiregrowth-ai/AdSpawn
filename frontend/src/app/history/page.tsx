@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { cn } from "@/lib/utils";
+import { cn, extractApiError } from "@/lib/utils";
 
 export default function HistoryPage() {
   const [history, setHistory] = useState<any[]>([]);
@@ -33,8 +33,8 @@ export default function HistoryPage() {
     try {
       const response = await duplicationApi.getHistory();
       setHistory(response.data);
-    } catch (error) {
-      toast.error("Failed to fetch duplication history");
+    } catch (error: any) {
+      toast.error(extractApiError(error, "Couldn't load history. Check your connection and try Refresh."));
     } finally {
       setLoading(false);
     }
@@ -50,8 +50,8 @@ export default function HistoryPage() {
       await duplicationApi.deleteHistory(id);
       toast.success("History item deleted");
       setPendingDeleteId(null);
-    } catch (error) {
-      toast.error("Failed to delete history item");
+    } catch (error: any) {
+      toast.error(extractApiError(error, "Couldn't delete that history item. It may have been removed already."));
       setHistory(prev);
     } finally {
       setDeleting(false);
@@ -62,10 +62,11 @@ export default function HistoryPage() {
     setCleaning(true);
     try {
       const response = await duplicationApi.cleanupHistory();
-      toast.success(`Removed ${response.data.deletedCount} items no longer on Facebook.`);
+      const n = response.data.deletedCount;
+      toast.success(n === 0 ? "All history items are still on Facebook — nothing to clean up." : `Removed ${n} item${n === 1 ? "" : "s"} that no longer exist on Facebook.`);
       fetchHistory();
-    } catch (error) {
-      toast.error("Failed to cleanup history");
+    } catch (error: any) {
+      toast.error(extractApiError(error, "Couldn't sync with Facebook. Check your Facebook connection in Settings."));
     } finally {
       setCleaning(false);
     }
@@ -105,9 +106,18 @@ export default function HistoryPage() {
 
         <div className="bg-gray-900/30 border border-gray-800/60 rounded-xl">
           {loading ? (
-            <div className="p-16 flex flex-col items-center justify-center text-gray-500 gap-3">
-              <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
-              <p className="text-sm">Loading history...</p>
+            <div className="divide-y divide-gray-800/30">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex items-center gap-4 px-4 py-3">
+                  <div className="h-4 w-20 bg-gray-800/60 rounded animate-pulse" />
+                  <div className="h-4 w-32 bg-gray-800/60 rounded animate-pulse" />
+                  <div className="h-4 w-32 bg-gray-800/60 rounded animate-pulse" />
+                  <div className="h-4 w-16 bg-gray-800/60 rounded animate-pulse" />
+                  <div className="flex-1" />
+                  <div className="h-4 w-24 bg-gray-800/60 rounded animate-pulse" />
+                  <div className="h-6 w-6 bg-gray-800/60 rounded animate-pulse" />
+                </div>
+              ))}
             </div>
           ) : history.length === 0 ? (
             <div className="p-16 text-center">

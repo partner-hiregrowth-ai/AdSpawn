@@ -10,7 +10,7 @@ import { adAccountApi } from "@/services/api";
 import { AdAccount } from "@/types";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { cn } from "@/lib/utils";
+import { cn, extractApiError } from "@/lib/utils";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -22,8 +22,8 @@ export default function DashboardPage() {
     try {
       const response = await adAccountApi.getAdAccounts();
       setAdAccounts(response.data);
-    } catch (error) {
-      toast.error("Failed to load ad accounts");
+    } catch (error: any) {
+      toast.error(extractApiError(error, "Couldn't load your Meta ad accounts. Check your Facebook connection in Settings and try again."));
     } finally {
       setLoading(false);
     }

@@ -7,7 +7,7 @@ import { FacebookSDK } from "@/components/FacebookSDK";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "CloneZone - Professional Meta Ads Management",
+  title: "AdSpawn - Professional Meta Ads Management",
   description: "Duplicate Facebook Ads structures safely and efficiently.",
 };
 

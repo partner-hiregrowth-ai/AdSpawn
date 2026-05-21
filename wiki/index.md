@@ -1,4 +1,4 @@
-# CloneZone Wiki — Index
+# AdSpawn Wiki — Index
 
 ## Architecture
 

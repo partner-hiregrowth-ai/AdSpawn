@@ -88,8 +88,8 @@ export default function SettingsPage() {
     try {
       const res = await userApi.getStats();
       setStats(res.data);
-    } catch {
-      toast.error("Failed to load stats");
+    } catch (err: any) {
+      toast.error(extractApiError(err, "Couldn't load your stats. Refresh the page or check your connection."));
     } finally {
       setLoadingStats(false);
     }

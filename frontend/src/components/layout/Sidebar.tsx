@@ -85,7 +85,7 @@ export const Sidebar = () => {
         {!sidebarCollapsed && (
           <div className="flex items-center gap-2 px-3 mt-2 text-[10px] text-gray-700">
             <Zap className="w-3 h-3" />
-            CloneZone v1.0
+            AdSpawn v1.0
           </div>
         )}
       </div>

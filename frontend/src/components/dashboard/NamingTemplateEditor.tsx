@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { templateApi } from "@/services/api";
+import { extractApiError } from "@/lib/utils";
 
 const AVAILABLE_VARIABLES = [
   { label: "Campaign Name", value: "campaign_name" },
@@ -94,8 +95,8 @@ export const NamingTemplateEditor = ({ onPatternChange, initialPattern, type }: 
       });
       toast.success("Template saved!");
       fetchTemplates();
-    } catch (error) {
-      toast.error("Failed to save template");
+    } catch (error: any) {
+      toast.error(extractApiError(error, "Couldn't save the template. The name may already be in use."));
     }
   };
 

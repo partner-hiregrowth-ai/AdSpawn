@@ -1,6 +1,6 @@
-# CloneZone Wiki — Schema
+# AdSpawn Wiki — Schema
 
-This wiki is a structured, interlinked knowledge base for the CloneZone project. It is maintained by an LLM and designed to be browsed in Obsidian or any markdown viewer.
+This wiki is a structured, interlinked knowledge base for the AdSpawn project. It is maintained by an LLM and designed to be browsed in Obsidian or any markdown viewer.
 
 ## Structure
 

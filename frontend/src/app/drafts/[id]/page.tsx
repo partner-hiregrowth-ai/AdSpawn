@@ -8,10 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { draftApi, uploadApi } from "@/services/api";
 import {
   Save, Send, ShieldCheck, AlertTriangle, FileText, Layers,
-  Megaphone, Loader2, ArrowLeft, Trash2, Upload,
+  Megaphone, Loader2, ArrowLeft, Trash2, Upload, CheckCircle2, CircleHelp,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -33,6 +34,20 @@ function toDateTimeLocal(v: string | undefined): string {
   return s.slice(0, 16);
 }
 
+// Flatten the validation response into (errors, warnings) counts for header / toast.
+function countIssues(v: any): { errors: number; warnings: number } {
+  if (!v) return { errors: 0, warnings: 0 };
+  const all = [
+    ...(v.campaignErrors || []),
+    ...Object.values(v.adSetErrors || {}).flat(),
+    ...Object.values(v.adErrors || {}).flat(),
+  ] as { severity: string }[];
+  return {
+    errors: all.filter(e => e.severity === "error").length,
+    warnings: all.filter(e => e.severity === "warning").length,
+  };
+}
+
 function parseDateTimeParts(v: string | undefined): { date: string; hour: string; minute: string } {
   if (!v) return { date: "", hour: "", minute: "" };
   const s = String(v);
@@ -52,15 +67,18 @@ function DateTimeInput({ label, value, onChange }: { label: string; value: strin
   const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
   const minutes = ["00", "15", "30", "45"];
 
+  // Native <input type="date"> intentionally — the shadcn/base-ui Input wrapper
+  // interferes with the browser's native picker (it's designed for use inside a
+  // <Field> context that we don't have here).
   return (
     <div className="space-y-1.5">
       <Label className="text-xs text-gray-400">{label}</Label>
       <div className="flex gap-2">
-        <Input
+        <input
           type="date"
           value={parts.date}
           onChange={(e) => update(e.target.value, parts.hour, parts.minute)}
-          className="bg-gray-950/50 border-gray-800/40 flex-1"
+          className="h-8 flex-1 rounded-lg border border-gray-800/40 bg-gray-950/50 px-2.5 py-1 text-sm text-gray-200 outline-none focus-visible:border-blue-500/50 focus-visible:ring-2 focus-visible:ring-blue-500/30 [color-scheme:dark]"
         />
         <select
           value={parts.hour}
@@ -120,6 +138,99 @@ function UploadButton({ type, adAccountId, onUploaded }: { type: "image" | "vide
   );
 }
 
+// Reusable inline panel — splits issues by severity so the user can act on errors first.
+function ValidationIssuesPanel({ issues }: { issues: { field: string; message: string; severity: string }[] }) {
+  const errors = issues.filter(i => i.severity === "error");
+  const warnings = issues.filter(i => i.severity === "warning");
+  if (errors.length === 0 && warnings.length === 0) return null;
+  return (
+    <div className="space-y-2" id="validation-issues">
+      {errors.length > 0 && (
+        <div className="bg-red-500/5 border border-red-500/20 p-3.5 rounded-lg space-y-2">
+          <div className="flex items-center gap-2 text-red-400">
+            <AlertTriangle className="w-3.5 h-3.5" />
+            <span className="text-xs font-semibold">{errors.length} error{errors.length === 1 ? "" : "s"} — fix before publishing</span>
+          </div>
+          <ul className="text-[11px] text-red-200/90 space-y-1.5">
+            {errors.map((err, idx) => (
+              <li key={idx} className="flex gap-2">
+                <span className="text-red-500/60 shrink-0">•</span>
+                <span><span className="font-mono text-red-300/70">{err.field}</span> — {err.message}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {warnings.length > 0 && (
+        <div className="bg-amber-500/5 border border-amber-500/20 p-3.5 rounded-lg space-y-2">
+          <div className="flex items-center gap-2 text-amber-400">
+            <AlertTriangle className="w-3.5 h-3.5" />
+            <span className="text-xs font-semibold">{warnings.length} warning{warnings.length === 1 ? "" : "s"}</span>
+          </div>
+          <ul className="text-[11px] text-amber-200/90 space-y-1.5">
+            {warnings.map((err, idx) => (
+              <li key={idx} className="flex gap-2">
+                <span className="text-amber-500/60 shrink-0">•</span>
+                <span><span className="font-mono text-amber-300/70">{err.field}</span> — {err.message}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Tiny status pill so the user always knows where they stand without scrolling.
+function ValidationBadge({
+  isValidating,
+  isDirty,
+  results,
+}: {
+  isValidating: boolean;
+  isDirty: boolean;
+  results: any;
+}) {
+  if (isValidating) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-md bg-blue-500/10 text-blue-300 border border-blue-500/30">
+        <Loader2 className="w-3 h-3 animate-spin" /> Validating…
+      </span>
+    );
+  }
+  if (isDirty) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/30"
+        title="You have unsaved edits. Save to re-validate.">
+        <AlertTriangle className="w-3 h-3" /> Unsaved edits
+      </span>
+    );
+  }
+  if (!results) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-md bg-gray-800/60 text-gray-500 border border-gray-700/40">
+        <CircleHelp className="w-3 h-3" /> Not validated
+      </span>
+    );
+  }
+  const totals = countIssues(results);
+  if (results.isValid) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">
+        <CheckCircle2 className="w-3 h-3" /> Ready to publish
+        {totals.warnings > 0 && <span className="text-amber-300/80">· {totals.warnings} warning{totals.warnings === 1 ? "" : "s"}</span>}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-md bg-red-500/10 text-red-300 border border-red-500/30">
+      <AlertTriangle className="w-3 h-3" />
+      {totals.errors} error{totals.errors === 1 ? "" : "s"}
+      {totals.warnings > 0 && <span className="text-amber-300/80">· {totals.warnings} warning{totals.warnings === 1 ? "" : "s"}</span>}
+    </span>
+  );
+}
+
 export default function DraftEditorPage({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
   const params = use(paramsPromise);
   const router = useRouter();
@@ -168,11 +279,21 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
           }
         }
       }
-    } catch { toast.error("Failed to load draft details"); }
+    } catch (err: any) { toast.error(extractApiError(err, "Couldn't load this draft. It may have been deleted, or your session expired.")); }
     finally { setIsLoading(false); }
   };
 
   useEffect(() => { fetchDraft(); }, [params.id]);
+
+  // Auto-validate when the draft first opens so the user immediately sees
+  // any issues without having to click "Validate". Skipped while loading and
+  // while the user has unsaved edits (server only knows about saved state).
+  const [hasAutoValidated, setHasAutoValidated] = useState(false);
+  useEffect(() => {
+    if (!draft || isLoading || hasAutoValidated || isDirty) return;
+    setHasAutoValidated(true);
+    runValidation({ silent: true });
+  }, [draft, isLoading, hasAutoValidated, isDirty]);
 
   // Warn when navigating/refreshing/closing with unsaved edits.
   useEffect(() => {
@@ -265,50 +386,91 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
       }
       toast.success(pending.size > 1 ? `Saved ${pending.size} changes` : "Changes saved");
       setEditCache(new Map());
-      fetchDraft();
-    } catch { toast.error("Failed to save changes"); }
+      await fetchDraft();
+      // Re-validate silently against the freshly saved state so the badge stays current.
+      runValidation({ silent: true });
+    } catch (err: any) {
+      toast.error(extractApiError(err, "Failed to save changes. Please check your edits and try again."));
+    }
     finally { setIsSaving(false); }
   };
 
-  const handleValidate = async () => {
-    if (isDirty) {
-      toast.error("Save your changes before validating.");
-      return;
-    }
+  // Single validation runner used by manual click, auto-on-load, and post-save.
+  // silent: don't toast on success/failure — used by background re-validations.
+  const runValidation = async ({ silent = false }: { silent?: boolean } = {}) => {
     setIsValidating(true);
     try {
       const response = await draftApi.validateDraft(params.id);
       setValidationResults(response.data);
-      if (response.data.isValid) toast.success("Validation passed!");
-      else toast.error("Validation failed. Please fix the errors.");
-      fetchDraft();
-    } catch { toast.error("Validation failed"); }
+      if (!silent) {
+        if (response.data.isValid) {
+          toast.success("Validation passed — you're ready to publish.");
+        } else {
+          const totals = countIssues(response.data);
+          toast.error(`Found ${totals.errors} error${totals.errors === 1 ? "" : "s"}${totals.warnings > 0 ? ` and ${totals.warnings} warning${totals.warnings === 1 ? "" : "s"}` : ""}. See details below.`);
+          // Scroll the issues panel into view so the user doesn't have to hunt.
+          requestAnimationFrame(() => {
+            document.getElementById("validation-issues")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          });
+        }
+      }
+      // Always refresh so the per-entity validationErrors render inline.
+      await fetchDraft();
+    } catch (err: any) {
+      if (!silent) toast.error(extractApiError(err, "Couldn't validate this draft right now. Try again in a moment."));
+    }
     finally { setIsValidating(false); }
   };
 
-  const handlePublish = async () => {
+  const handleValidate = async () => {
     if (isDirty) {
-      toast.error("Save your changes before publishing.");
+      toast.error("You have unsaved edits. Save them first so validation runs against the latest values.");
       return;
     }
-    if (!confirm("Publish to Meta? This will create real campaigns, ad sets, and ads (all PAUSED).")) return;
+    await runValidation();
+  };
+
+  const [showPublishConfirm, setShowPublishConfirm] = useState(false);
+  const [showCleanupConfirm, setShowCleanupConfirm] = useState(false);
+
+  const handlePublish = () => {
+    if (isDirty) {
+      toast.error("You have unsaved edits. Save them first so the published campaign reflects the latest values.");
+      return;
+    }
+    if (validationResults && !validationResults.isValid) {
+      toast.error("Fix the validation issues listed below before publishing.");
+      return;
+    }
+    setShowPublishConfirm(true);
+  };
+
+  const confirmPublish = async () => {
+    setShowPublishConfirm(false);
     setIsPublishing(true);
     try {
       await draftApi.publishDraft(params.id);
-      toast.success("Published successfully!");
+      toast.success("Published! Your campaign is live on Meta (paused, ready for review).");
       router.push("/drafts");
-    } catch (error: any) { toast.error(error.response?.data?.userMessage || error.response?.data?.error || "Publishing failed"); }
+    } catch (err: any) {
+      toast.error(extractApiError(err, "Publishing failed. Check the error details and try again."));
+    }
     finally { setIsPublishing(false); }
   };
 
-  const handleCleanup = async () => {
-    if (!confirm("This will DELETE all Meta objects created by previous publish attempts and reset this draft for a fresh publish. Continue?")) return;
+  const handleCleanup = () => setShowCleanupConfirm(true);
+
+  const confirmCleanup = async () => {
+    setShowCleanupConfirm(false);
     setIsCleaning(true);
     try {
       const response = await draftApi.cleanupMetaObjects(params.id);
-      toast.success(`Cleaned up ${response.data.deleted.length} Meta objects. Draft reset.`);
-      fetchDraft();
-    } catch (error: any) { toast.error(error.response?.data?.error || "Cleanup failed"); }
+      toast.success(`Deleted ${response.data.deleted.length} Meta object${response.data.deleted.length === 1 ? "" : "s"}. Draft reset — you can publish again from scratch.`);
+      await fetchDraft();
+      runValidation({ silent: true });
+    } catch (err: any) {
+      toast.error(extractApiError(err, "Cleanup failed. The previously created Meta objects may still exist."));
+    }
     finally { setIsCleaning(false); }
   };
 
@@ -902,7 +1064,12 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <ValidationBadge
+              isValidating={isValidating}
+              isDirty={isDirty}
+              results={validationResults}
+            />
             {(draft.status === "FAILED" || hasMetaId) && draft.status !== "PUBLISHED" && (
               <Button variant="outline" size="sm" className="gap-1.5 border-red-800 text-red-400 hover:bg-red-500/10"
                 onClick={handleCleanup} disabled={isCleaning}>
@@ -911,15 +1078,43 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
               </Button>
             )}
             <Button variant="outline" size="sm" className="gap-1.5 border-gray-800 text-gray-400"
-              onClick={handleValidate} disabled={isValidating}>
+              onClick={handleValidate} disabled={isValidating || isDirty}
+              title={isDirty ? "Save your edits first" : "Re-run validation"}>
               <ShieldCheck className={cn("w-3.5 h-3.5", isValidating && "animate-spin")} /> Validate
             </Button>
             <Button size="sm" className="gap-1.5 bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/20"
-              onClick={handlePublish} disabled={isPublishing || draft.status === "PUBLISHING" || draft.status === "PUBLISHED"}>
+              onClick={handlePublish}
+              disabled={isPublishing || draft.status === "PUBLISHING" || draft.status === "PUBLISHED" || isDirty || (!!validationResults && !validationResults.isValid)}
+              title={
+                isDirty ? "Save your edits first" :
+                (validationResults && !validationResults.isValid) ? "Fix validation issues first" :
+                "Publish this draft to Meta"
+              }>
               <Send className="w-3.5 h-3.5" /> {isPublishing ? "Publishing..." : "Publish to Meta"}
             </Button>
           </div>
         </div>
+
+        <ConfirmDialog
+          open={showPublishConfirm}
+          onOpenChange={(open) => { if (!open) setShowPublishConfirm(false); }}
+          title="Publish this draft to Meta?"
+          description={`This creates real campaigns, ad sets, and ads on your Meta Ads account "${draft.adAccountId}". Everything will be created as PAUSED — nothing will spend until you activate it on Meta.`}
+          confirmLabel="Publish now"
+          variant="warning"
+          onConfirm={confirmPublish}
+          isLoading={isPublishing}
+        />
+        <ConfirmDialog
+          open={showCleanupConfirm}
+          onOpenChange={(open) => { if (!open) setShowCleanupConfirm(false); }}
+          title="Delete previously published Meta objects?"
+          description="This permanently deletes the campaigns, ad sets, and ads that this draft created on Meta during earlier publish attempts. Your local draft stays intact, and you can publish again from a clean slate."
+          confirmLabel="Delete on Meta"
+          variant="danger"
+          onConfirm={confirmCleanup}
+          isLoading={isCleaning}
+        />
 
         <div className="flex flex-col md:flex-row flex-1 gap-5 overflow-hidden">
           <div className="w-full md:w-72 border-b md:border-b-0 md:border-r border-gray-800/40 overflow-y-auto pr-0 md:pr-3 max-h-48 md:max-h-none pb-3 md:pb-0">
@@ -989,17 +1184,7 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
                 </div>
 
                 {editData.validationErrors && editData.validationErrors.length > 0 && (
-                  <div className="bg-red-500/5 border border-red-500/20 p-3.5 rounded-lg space-y-2">
-                    <div className="flex items-center gap-2 text-red-400">
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                      <span className="text-xs font-semibold">Validation Issues</span>
-                    </div>
-                    <ul className="text-[11px] text-red-400/80 list-disc pl-5 space-y-0.5">
-                      {editData.validationErrors.map((err: any, idx: number) => (
-                        <li key={idx}>{err.message} <span className="text-red-500/40">({err.field})</span></li>
-                      ))}
-                    </ul>
-                  </div>
+                  <ValidationIssuesPanel issues={editData.validationErrors} />
                 )}
 
                 <Tabs defaultValue="form" className="w-full">

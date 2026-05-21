@@ -5,7 +5,16 @@ import { ObjectiveConversionService } from '../objectiveConversion.service';
 import { sleep } from '../../utils/sleep';
 
 export class DraftService {
-  static async duplicateCampaignToDraft(campaignId: string, userId: string, accessToken: string) {
+  static async duplicateCampaignToDraft(
+    campaignId: string,
+    userId: string,
+    accessToken: string,
+    options?: { iteration?: number }
+  ) {
+    // When the user requests multiple copies, this is called repeatedly with
+    // iteration set so each draft gets a distinct name.
+    const iteration = options?.iteration;
+    const suffix = iteration && iteration > 0 ? ` ${iteration}` : '';
     const fbService = new FacebookService(accessToken);
 
     // 1. Fetch Campaign
@@ -29,7 +38,7 @@ export class DraftService {
       data: {
         userId,
         adAccountId,
-        name: `${campaignData.name} - Internal Draft`,
+        name: `${campaignData.name} - Internal Draft${suffix}`,
         objective: campaignData.objective,
         data: campaignData,
         status: DraftStatus.DRAFT,
@@ -47,7 +56,7 @@ export class DraftService {
           userId,
           adAccountId,
           draftCampaignId: draftCampaign.id,
-          name: `${adSet.name} - Internal Draft`,
+          name: `${adSet.name} - Internal Draft${suffix}`,
           data: adSet,
           status: DraftStatus.DRAFT,
         }
@@ -61,7 +70,7 @@ export class DraftService {
             userId,
             adAccountId,
             draftAdSetId: draftAdSet.id,
-            name: `${ad.name} - Internal Draft`,
+            name: `${ad.name} - Internal Draft${suffix}`,
             data: ad,
             status: DraftStatus.DRAFT,
           }

@@ -81,7 +81,8 @@ export const wideCreationApi = {
 };
 
 export const draftApi = {
-  duplicateToDraft: (campaignId: string) => api.post('/drafts/duplicate', { campaignId }),
+  duplicateToDraft: (campaignId: string, count?: number) =>
+    api.post('/drafts/duplicate', count && count > 1 ? { campaignId, count } : { campaignId }),
   listCampaigns: () => api.get('/drafts/campaigns'),
   getCampaign: (id: string) => api.get(`/drafts/campaigns/${id}`),
   updateCampaign: (id: string, data: any) => api.patch(`/drafts/campaigns/${id}`, data),

@@ -16,16 +16,48 @@ function isFacebookAuthError(message: string): boolean {
 
 export class DraftController {
   static async duplicateToDraft(req: Request, res: Response) {
-    try {
-      const { campaignId } = req.body;
-      const authReq = req as AuthRequest;
+    const { campaignId, count } = req.body;
+    const authReq = req as AuthRequest;
+    const numCopies = Math.max(1, Math.min(50, Number(count) || 1));
 
-      const draft = await DraftService.duplicateCampaignToDraft(campaignId, authReq.userId!, authReq.userAccessToken!);
-      res.json(draft);
-    } catch (error: any) {
-      console.error(`[DraftController] Error in duplicateToDraft:`, error);
-      res.status(500).json({ error: error.message });
+    const drafts: any[] = [];
+    const failures: { iteration: number; error: string }[] = [];
+
+    for (let i = 0; i < numCopies; i++) {
+      try {
+        // iteration starts at 1 when there are multiple copies so names are distinct.
+        const draft = await DraftService.duplicateCampaignToDraft(
+          campaignId,
+          authReq.userId!,
+          authReq.userAccessToken!,
+          { iteration: numCopies > 1 ? i + 1 : 0 },
+        );
+        drafts.push(draft);
+      } catch (error: any) {
+        const msg = error?.response?.data?.error?.error_user_msg
+          || error?.response?.data?.error?.message
+          || error?.message
+          || 'unknown error';
+        console.error(`[DraftController] duplicateToDraft copy ${i + 1}/${numCopies} failed:`, msg);
+        failures.push({ iteration: i + 1, error: msg });
+      }
     }
+
+    if (drafts.length === 0) {
+      const firstErr = failures[0]?.error || 'No drafts were created.';
+      return res.status(500).json({ error: firstErr, failures });
+    }
+
+    res.json({
+      success: failures.length === 0,
+      requested: numCopies,
+      created: drafts.length,
+      failed: failures.length,
+      drafts,
+      failures,
+      // Back-compat for older callers that read a single draft from the response.
+      ...drafts[0],
+    });
   }
 
   static async listCampaigns(req: Request, res: Response) {

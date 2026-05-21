@@ -261,13 +261,43 @@ export class FacebookService {
 
     const original = await this.withRetry(
       () => this.client.get(`/${adSetId}`, {
-        params: { fields: 'billing_event,optimization_goal,bid_amount,daily_budget,lifetime_budget,targeting,promoted_object,attribution_spec,optimization_sub_event,destination_type,bid_strategy' },
+        params: { fields: 'billing_event,optimization_goal,bid_amount,daily_budget,lifetime_budget,targeting,promoted_object,attribution_spec,optimization_sub_event,destination_type,bid_strategy,start_time,end_time' },
       }),
       `duplicateAdSet:read(${adSetId})`
     );
 
     const data = original.data;
-    
+
+    // If we're going to send lifetime_budget, Meta requires a future end_time
+    // (>24h after start). When the source's end_time is missing or in the past
+    // (typical for already-completed ad sets) we'd otherwise hit Meta error
+    // 100/1487094. Auto-bump to start+30 days so the duplicate can be created.
+    const usingLifetimeBudget = !!data.lifetime_budget;
+    const MIN_END_BUFFER_MS = 25 * 60 * 60 * 1000; // 25h safety margin past start
+    const DEFAULT_END_OFFSET_MS = 30 * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const sourceEndMs = data.end_time ? new Date(data.end_time).getTime() : NaN;
+    const sourceStartMs = data.start_time ? new Date(data.start_time).getTime() : NaN;
+    const startMs = !isNaN(sourceStartMs) && sourceStartMs > now ? sourceStartMs : now;
+    let resolvedStart: string | undefined;
+    let resolvedEnd: string | undefined;
+    if (usingLifetimeBudget) {
+      const needsBump = isNaN(sourceEndMs) || sourceEndMs < startMs + MIN_END_BUFFER_MS;
+      resolvedEnd = needsBump
+        ? new Date(startMs + DEFAULT_END_OFFSET_MS).toISOString()
+        : data.end_time;
+      // Only forward an explicit start_time if the source had one in the future;
+      // otherwise let Meta default to "now" so we don't lock the new ad set to a stale start.
+      if (!isNaN(sourceStartMs) && sourceStartMs > now) {
+        resolvedStart = data.start_time;
+      }
+    } else {
+      // Daily budget — Meta does NOT require end_time. Only carry the source values
+      // over if they make sense in the future.
+      if (!isNaN(sourceStartMs) && sourceStartMs > now) resolvedStart = data.start_time;
+      if (!isNaN(sourceEndMs) && sourceEndMs > now) resolvedEnd = data.end_time;
+    }
+
     // Helper to build payload
     const buildPayload = (includeBudget: boolean) => {
       let payload: any = {
@@ -288,6 +318,12 @@ export class FacebookService {
         }
         if (data.bid_strategy) payload.bid_strategy = data.bid_strategy;
         if (data.bid_amount) payload.bid_amount = data.bid_amount;
+
+        // lifetime_budget *requires* end_time. daily_budget tolerates either.
+        // resolvedEnd/resolvedStart were computed above with safe defaults.
+        if (payload.lifetime_budget && resolvedEnd) payload.end_time = resolvedEnd;
+        if (resolvedStart) payload.start_time = resolvedStart;
+        if (!payload.lifetime_budget && resolvedEnd) payload.end_time = resolvedEnd;
       }
 
       if (data.promoted_object) {
@@ -301,8 +337,14 @@ export class FacebookService {
         // Deep clone and sanitize targeting
         const sanitizedTargeting = JSON.parse(JSON.stringify(data.targeting));
         delete sanitizedTargeting.id;
-        delete sanitizedTargeting.targeting_automation;
         delete sanitizedTargeting.contextual_targeting_options;
+        // Meta error 1870227 requires advantage_audience to be explicitly 0 or 1
+        // on every new ad set. Preserve the source's setting; if missing, default
+        // to OFF (0) so the ad set isn't unexpectedly opted into Advantage Audience.
+        const sourceAA = data.targeting?.targeting_automation?.advantage_audience;
+        sanitizedTargeting.targeting_automation = {
+          advantage_audience: sourceAA === 1 ? 1 : 0,
+        };
         payload.targeting = sanitizedTargeting;
       }
 
@@ -381,16 +423,41 @@ export class FacebookService {
     const isCBO = !!(original.data.bid_strategy || original.data.daily_budget || original.data.lifetime_budget);
     const newCampaign = await this.duplicateCampaign(campaignId, campaignName, adAccountId, customBudget);
 
+    // Track ad-set successes so we can roll back the empty campaign if NONE
+    // succeed — otherwise the user is left with an orphan campaign on Meta
+    // after every failed iteration.
+    let successCount = 0;
+    let lastError: Error | null = null;
+
     for (let i = 0; i < adSets.length; i++) {
       if (i > 0) await sleep(400);
       const adSet = adSets[i];
-      const newAdSet = await this.duplicateAdSet(adSet.id, `${adSet.name} - Copy`, newCampaign.id, adAccountId, customBudget, isCBO);
-      const ads = await this.getAds(adSet.id);
-      for (let j = 0; j < ads.length; j++) {
-        if (j > 0) await sleep(200);
-        await this.duplicateAd(ads[j].id, `${ads[j].name} - Copy`, newAdSet.id, adAccountId)
-          .catch(err => console.warn(`[FacebookService] Failed to dup ad ${ads[j].id}:`, err.message));
+      try {
+        const newAdSet = await this.duplicateAdSet(adSet.id, `${adSet.name} - Copy`, newCampaign.id, adAccountId, customBudget, isCBO);
+        successCount++;
+        const ads = await this.getAds(adSet.id);
+        for (let j = 0; j < ads.length; j++) {
+          if (j > 0) await sleep(200);
+          await this.duplicateAd(ads[j].id, `${ads[j].name} - Copy`, newAdSet.id, adAccountId)
+            .catch(err => console.warn(`[FacebookService] Failed to dup ad ${ads[j].id}:`, err.message));
+        }
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[FacebookService] Failed to dup ad set ${adSet.id}:`, err.response?.data?.error?.error_user_msg || err.message);
       }
+    }
+
+    if (successCount === 0 && adSets.length > 0) {
+      // Roll back the empty campaign so the user's Meta account doesn't pile up
+      // orphans. We swallow the delete error — at worst the user sees an empty
+      // campaign they can clean up manually.
+      try {
+        await this.client.delete(`/${newCampaign.id}`);
+        console.log(`[FacebookService] Rolled back empty campaign ${newCampaign.id} after ad-set duplication failed`);
+      } catch (delErr: any) {
+        console.warn(`[FacebookService] Failed to roll back empty campaign ${newCampaign.id}:`, delErr.message);
+      }
+      throw lastError ?? new Error('Failed to duplicate any ad sets');
     }
 
     return newCampaign;

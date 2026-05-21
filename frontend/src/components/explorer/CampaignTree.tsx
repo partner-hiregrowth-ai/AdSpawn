@@ -127,12 +127,27 @@ export function CampaignTree({
 
       <div className="overflow-auto flex-1">
         {loading ? (
-          <div className="p-16 flex flex-col items-center justify-center text-gray-500 gap-3">
-            <Loader2 className="w-6 h-6 animate-spin text-blue-500" /><p className="text-sm">Loading campaigns...</p>
+          <div className="divide-y divide-gray-800/40">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="flex items-center gap-3 px-4 py-3">
+                <div className="h-4 w-4 bg-gray-800/60 rounded animate-pulse" />
+                <div className="h-3 w-3 bg-gray-800/60 rounded animate-pulse" />
+                <div className="h-4 flex-1 bg-gray-800/60 rounded animate-pulse" style={{ maxWidth: `${40 + (i * 7) % 30}%` }} />
+                <div className="h-4 w-16 bg-gray-800/60 rounded animate-pulse" />
+                <div className="h-4 w-12 bg-gray-800/60 rounded animate-pulse" />
+              </div>
+            ))}
           </div>
         ) : filteredCampaigns.length === 0 ? (
-          <div className="p-16 text-center text-gray-600 text-sm">
-            {debouncedSearch ? `No results for "${debouncedSearch}"` : "No campaigns found in this account."}
+          <div className="p-16 text-center">
+            <p className="text-sm text-gray-400 font-medium">
+              {debouncedSearch ? `No campaigns match "${debouncedSearch}"` : "No campaigns in this account yet"}
+            </p>
+            <p className="text-xs text-gray-600 mt-1.5">
+              {debouncedSearch
+                ? "Try clearing the search or switching ad accounts."
+                : "Create a campaign in Meta Ads Manager — it will appear here when you refresh."}
+            </p>
           </div>
         ) : (
           <div className="divide-y divide-gray-800/40">

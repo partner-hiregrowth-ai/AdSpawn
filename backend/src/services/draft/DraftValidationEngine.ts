@@ -520,21 +520,63 @@ export class DraftValidationEngine {
         isValid = false;
       }
 
-      // Cross-validate: special_ad_category_country must cover ad set targeting countries
+      // Cross-validate: special_ad_category_country must cover ad set targeting countries.
+      // If sacCountries is empty, publish auto-derives them from ad set geos — that's fine.
+      // Only warn when sacCountries is set but missing some of the ad set's countries,
+      // because auto-derive only kicks in when the field is entirely empty.
       const cats: string[] = campaignData.special_ad_categories || [];
       const realCats = cats.filter((c: string) => c !== 'NONE');
       if (realCats.length > 0) {
         const sacCountries: string[] = campaignData.special_ad_category_country || [];
+        if (sacCountries.length > 0) {
+          for (const adSet of campaign.adSets) {
+            const adSetTargeting = (adSet.data as any)?.targeting;
+            const adSetCountries: string[] = adSetTargeting?.geo_locations?.countries || [];
+            const missing = adSetCountries.filter((c: string) => !sacCountries.includes(c));
+            if (missing.length > 0) {
+              campaignErrors.push({
+                field: 'special_ad_category_country',
+                message: `Ad set "${adSet.name}" targets ${missing.join(', ')} but those countries are not in Special Ad Category countries (${sacCountries.join(', ')}). Add them or remove from ad set targeting.`,
+                severity: 'error',
+              });
+              isValid = false;
+              break;
+            }
+          }
+        }
+
+        // Special Ad Categories force age 18–65 (Meta error 2909037: "Custom age
+        // selection is unavailable…"). Any custom age range is rejected.
         for (const adSet of campaign.adSets) {
-          const adSetTargeting = (adSet.data as any)?.targeting;
-          const adSetCountries: string[] = adSetTargeting?.geo_locations?.countries || [];
-          const missing = adSetCountries.filter((c: string) => sacCountries.length > 0 ? !sacCountries.includes(c) : true);
-          if (missing.length > 0 && sacCountries.length === 0) {
+          const t = (adSet.data as any)?.targeting;
+          if (!t) continue;
+          const ageMin = t.age_min !== undefined ? Number(t.age_min) : 18;
+          const ageMax = t.age_max !== undefined ? Number(t.age_max) : 65;
+          if (ageMin !== 18 || ageMax < 65) {
             campaignErrors.push({
-              field: 'special_ad_category_country',
-              message: `Special Ad Categories require country selection. Ad set "${adSet.name}" targets ${missing.join(', ')} but no Special Ad Category countries are set.`,
-              severity: 'warning',
+              field: 'special_ad_categories',
+              message: `Ad set "${adSet.name}" uses a custom age range (${ageMin}–${ageMax}), but Special Ad Categories require ages 18–65+. Reset the age range or remove Special Ad Categories.`,
+              severity: 'error',
             });
+            isValid = false;
+            break;
+          }
+        }
+
+        // Hard conflict: Special Ad Categories force age 18, but Thailand
+        // targeting forces age_min ≥ 20. The two cannot coexist — the user must
+        // drop one. Highlight this explicitly so they don't ping-pong between
+        // "TH requires 20" and "Special categories require 18".
+        for (const adSet of campaign.adSets) {
+          const t = (adSet.data as any)?.targeting;
+          const countries: string[] = t?.geo_locations?.countries || [];
+          if (countries.includes('TH')) {
+            campaignErrors.push({
+              field: 'special_ad_categories',
+              message: `Ad set "${adSet.name}" targets Thailand, which requires minimum age 20 — but Special Ad Categories require ages 18–65+. These cannot coexist. Either remove Thailand from targeting or remove Special Ad Categories from the campaign.`,
+              severity: 'error',
+            });
+            isValid = false;
             break;
           }
         }

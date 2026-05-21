@@ -1,4 +1,4 @@
-# CloneZone - Facebook Ads Structure Duplication & Management Tool
+# AdSpawn - Facebook Ads Structure Duplication & Management Tool
 
 A modern full-stack web application for duplicating, converting, and managing Facebook Ads structures using the Meta Marketing API v21.0.
 

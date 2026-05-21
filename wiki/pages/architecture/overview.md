@@ -1,6 +1,6 @@
 # Architecture Overview
 
-CloneZone is a full-stack tool for duplicating, converting, and bulk-managing Meta (Facebook) ad campaigns. It lets users clone existing campaigns, convert between objectives, edit drafts locally, and publish back to Meta.
+AdSpawn is a full-stack tool for duplicating, converting, and bulk-managing Meta (Facebook) ad campaigns. It lets users clone existing campaigns, convert between objectives, edit drafts locally, and publish back to Meta.
 
 ## High-Level Design
 

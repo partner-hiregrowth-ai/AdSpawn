@@ -111,7 +111,7 @@ function LoginContent() {
             <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-lg shadow-blue-600/30">
               <Layers className="w-5.5 h-5.5 text-white" style={{ width: 22, height: 22 }} />
             </div>
-            <span className="text-2xl font-bold tracking-tight text-white">CloneZone</span>
+            <span className="text-2xl font-bold tracking-tight text-white">AdSpawn</span>
           </div>
 
           {/* Headline */}
@@ -162,7 +162,7 @@ function LoginContent() {
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-lg shadow-blue-600/25">
               <Layers className="w-4.5 h-4.5 text-white" style={{ width: 18, height: 18 }} />
             </div>
-            <span className="text-2xl font-bold text-white tracking-tight">CloneZone</span>
+            <span className="text-2xl font-bold text-white tracking-tight">AdSpawn</span>
           </div>
 
           {/* Card */}
