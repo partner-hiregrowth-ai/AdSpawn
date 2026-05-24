@@ -677,12 +677,13 @@ export class DraftPublishService {
       } else if (adSetDailyBudget > 0) {
         adSetPayload.daily_budget = String(adSetDailyBudget);
       } else if (adSetLifetimeBudget > 0) {
-        // lifetime_budget requires end_time — fall back to daily if missing
-        if (adSetData.end_time) {
-          adSetPayload.lifetime_budget = String(adSetLifetimeBudget);
-        } else {
-          adSetPayload.daily_budget = String(adSetLifetimeBudget);
+        if (!adSetData.end_time) {
+          throw new PublishError(
+            `Ad set "${adSet.name}" uses lifetime_budget but has no end_time`,
+            'Lifetime budget requires an End Time. Set an end date in the ad set Schedule section, or switch to Daily Budget.',
+          );
         }
+        adSetPayload.lifetime_budget = String(adSetLifetimeBudget);
       }
       if (adSetData.start_time) adSetPayload.start_time = adSetData.start_time;
       if (adSetData.end_time) adSetPayload.end_time = adSetData.end_time;
@@ -794,11 +795,13 @@ export class DraftPublishService {
       const adSetLifetimeBudget = Number(adSetData.lifetime_budget) || 0;
       if (adSetDailyBudget > 0) updatePayload.daily_budget = String(adSetDailyBudget);
       else if (adSetLifetimeBudget > 0) {
-        if (adSetData.end_time) {
-          updatePayload.lifetime_budget = String(adSetLifetimeBudget);
-        } else {
-          updatePayload.daily_budget = String(adSetLifetimeBudget);
+        if (!adSetData.end_time) {
+          throw new PublishError(
+            `Ad set "${adSet.name}" uses lifetime_budget but has no end_time`,
+            'Lifetime budget requires an End Time. Set an end date in the ad set Schedule section, or switch to Daily Budget.',
+          );
         }
+        updatePayload.lifetime_budget = String(adSetLifetimeBudget);
       }
       if (adSetData.start_time) updatePayload.start_time = adSetData.start_time;
       if (adSetData.end_time) updatePayload.end_time = adSetData.end_time;

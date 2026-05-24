@@ -43,7 +43,7 @@ export class NamingEngine {
       const key = parts[0].trim();
       let value = variables[key];
 
-      if (value === undefined) return match; 
+      if (value === undefined) return '';
 
       // Apply transformations sequentially
       for (let i = 1; i < parts.length; i++) {

@@ -78,7 +78,15 @@ export function MetaField({
             min={0}
             step={isBudget ? 100 : 1}
             value={value || ""}
-            onChange={(e) => onChange?.(e.target.value)}
+            onChange={(e) => {
+              const raw = e.target.value;
+              if (raw === "") { onChange?.(undefined); return; }
+              const parsed = Number(raw);
+              if (!isNaN(parsed)) onChange?.(parsed);
+            }}
+            onKeyDown={(e) => {
+              if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
+            }}
             placeholder={placeholder || (isBudget ? "Amount in smallest currency unit" : "")}
             disabled={isReadOnly}
             className={cn(

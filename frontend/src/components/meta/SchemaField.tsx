@@ -173,15 +173,7 @@ function resolveFieldState(
     }
   }
 
-  if (field.incompatibleWith) {
-    for (const incompField of field.incompatibleWith) {
-      const incompValue = getNestedValue(allValues, incompField);
-      if (incompValue !== undefined && incompValue !== null && incompValue !== "" && incompValue !== 0) {
-        disabled = true;
-        break;
-      }
-    }
-  }
+  // incompatibleWith is now handled in handleChange (auto-clear) instead of disabling
 
   if (field.visibleWhen) {
     const depValue = getNestedValue(allValues, field.visibleWhen.field);
@@ -299,11 +291,17 @@ export function SchemaFieldRenderer({
   const handleChange = useCallback(
     (newValue: any) => {
       onFieldChange(path, newValue);
+      if (field.incompatibleWith && newValue !== undefined && newValue !== null && newValue !== "" && newValue !== 0) {
+        for (const incompField of field.incompatibleWith) {
+          const incompPath = context.parentPath ? `${context.parentPath}.${incompField}` : incompField;
+          onFieldChange(incompPath, undefined);
+        }
+      }
       if (field.invalidates && onFieldInvalidate) {
         field.invalidates.forEach((f) => onFieldInvalidate(f));
       }
     },
-    [path, field.invalidates, onFieldChange, onFieldInvalidate],
+    [path, field.incompatibleWith, field.invalidates, onFieldChange, onFieldInvalidate, context.parentPath],
   );
 
   // Immutable / locked display
@@ -488,6 +486,11 @@ function NumberField({
         step={field.step || 1}
         value={value ?? ""}
         onChange={(e) => onChange(e.target.value ? Number(e.target.value) : undefined)}
+        onKeyDown={(e) => {
+          if (["e", "E", "+", "-"].includes(e.key) && !field.min?.toString().includes("-")) {
+            e.preventDefault();
+          }
+        }}
         placeholder={field.placeholder}
         className={cn(
           "bg-gray-950 border-gray-800 focus:border-blue-500 font-mono text-gray-200",
@@ -523,6 +526,9 @@ function CurrencyField({
           if (raw === "") { onChange(undefined); return; }
           const parsed = parseInt(raw, 10);
           if (!isNaN(parsed)) onChange(parsed);
+        }}
+        onKeyDown={(e) => {
+          if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
         }}
         placeholder={field.placeholder || "e.g. 500 = $5.00"}
         className={cn(
