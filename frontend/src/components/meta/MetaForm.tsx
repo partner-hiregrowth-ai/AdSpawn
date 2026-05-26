@@ -29,6 +29,7 @@ interface MetaFormProps {
   onValidationChange?: (errors: string[]) => void;
   compact?: boolean;
   schema?: FormSchema;
+  adAccountId?: string;
 }
 
 export function MetaForm({
@@ -39,6 +40,7 @@ export function MetaForm({
   onValidationChange,
   compact,
   schema: externalSchema,
+  adAccountId,
 }: MetaFormProps) {
   const [schema, setSchema] = useState<FormSchema | null>(externalSchema || null);
   const [loading, setLoading] = useState(!externalSchema);
@@ -142,6 +144,7 @@ export function MetaForm({
           onChange={handleFieldChange}
           onInvalidate={handleInvalidate}
           compact={compact}
+          adAccountId={adAccountId}
         />
       ))}
     </div>

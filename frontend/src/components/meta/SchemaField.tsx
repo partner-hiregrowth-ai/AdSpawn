@@ -13,9 +13,13 @@ import {
   HelpCircle,
   X,
   Search,
+  Upload,
+  Loader2,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, extractApiError } from "@/lib/utils";
 import { formatBudget } from "@/lib/meta-schema";
+import { uploadApi } from "@/services/api";
+import { toast } from "sonner";
 
 // ─── Types mirroring backend MetaFormSchemaEngine ───
 
@@ -32,7 +36,8 @@ export type SchemaFieldType =
   | "array"
   | "multiEnum"
   | "tags"
-  | "time";
+  | "time"
+  | "upload";
 
 export interface EnumOption {
   value: string;
@@ -85,6 +90,7 @@ export interface FieldSchema {
   rows?: number;
   tagSuggestions?: string[];
   visibleWhen?: { field: string; equals?: any; notEquals?: any };
+  meta?: { uploadType?: "image" | "video" };
 }
 
 export interface FormSection {
@@ -104,6 +110,7 @@ interface FieldRenderContext {
   onFieldChange: (path: string, value: any) => void;
   onFieldInvalidate?: (field: string) => void;
   compact?: boolean;
+  adAccountId?: string;
 }
 
 // ─── Dependency evaluation ───
@@ -206,12 +213,14 @@ export function FormSectionRenderer({
   onChange,
   onInvalidate,
   compact,
+  adAccountId,
 }: {
   section: FormSection;
   values: Record<string, any>;
   onChange: (path: string, value: any) => void;
   onInvalidate?: (field: string) => void;
   compact?: boolean;
+  adAccountId?: string;
 }) {
   const [collapsed, setCollapsed] = useState(section.defaultCollapsed ?? false);
   const hasVisibleFields = section.fields.some(
@@ -260,6 +269,7 @@ export function FormSectionRenderer({
                 onFieldChange: onChange,
                 onFieldInvalidate: onInvalidate,
                 compact,
+                adAccountId,
               }}
             />
           ))}
@@ -354,6 +364,8 @@ export function SchemaFieldRenderer({
       return <TimeField field={field} value={value} onChange={handleChange} compact={compact} />;
     case "tags":
       return <TagsField field={field} value={value} onChange={handleChange} compact={compact} />;
+    case "upload":
+      return <UploadField field={field} value={value} onChange={handleChange} adAccountId={context.adAccountId} />;
     case "object":
       return (
         <ObjectField
@@ -1190,6 +1202,61 @@ function TimeField({
         </select>
         <span className="text-[10px] text-gray-500 ml-1">{formatTime(hours, mins)}</span>
       </div>
+      {field.helpText && <p className="text-[10px] text-gray-600">{field.helpText}</p>}
+    </div>
+  );
+}
+
+function UploadField({
+  field,
+  value,
+  onChange,
+  adAccountId,
+}: {
+  field: FieldSchema;
+  value: any;
+  onChange: (v: any) => void;
+  adAccountId?: string;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const uploadType = field.meta?.uploadType ?? "image";
+  const accept = uploadType === "image"
+    ? "image/jpeg,image/png,image/gif,image/webp"
+    : "video/mp4,video/quicktime,video/x-msvideo,video/webm";
+  const disabled = !adAccountId || uploading;
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !adAccountId) return;
+    setUploading(true);
+    try {
+      const resp = uploadType === "image"
+        ? await uploadApi.uploadImage(file, adAccountId)
+        : await uploadApi.uploadVideo(file, adAccountId);
+      onChange(uploadType === "image" ? resp.data.hash : resp.data.videoId);
+      toast.success(`${uploadType === "image" ? "Image" : "Video"} uploaded`);
+    } catch (err: any) {
+      toast.error(extractApiError(err, `${uploadType} upload failed`));
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  };
+
+  return (
+    <div className="space-y-1">
+      <FieldLabel field={field} />
+      {value && <p className="text-[10px] text-gray-500 font-mono truncate">{value}</p>}
+      <label className={cn(
+        "inline-flex items-center gap-1.5 text-[11px] px-2 py-1 rounded border cursor-pointer",
+        disabled
+          ? "text-gray-600 border-gray-800 cursor-not-allowed"
+          : "text-blue-400 border-blue-500/30 hover:bg-blue-500/10 hover:text-blue-300",
+      )}>
+        {uploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+        {uploading ? "Uploading..." : `Upload ${uploadType}`}
+        <input type="file" accept={accept} onChange={handleUpload} className="hidden" disabled={disabled} />
+      </label>
       {field.helpText && <p className="text-[10px] text-gray-600">{field.helpText}</p>}
     </div>
   );

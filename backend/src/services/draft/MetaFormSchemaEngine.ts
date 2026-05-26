@@ -61,7 +61,8 @@ export type SchemaFieldType =
   | 'array'
   | 'multiEnum'
   | 'tags'
-  | 'time';
+  | 'time'
+  | 'upload';
 
 export interface EnumOption {
   value: string;
@@ -117,6 +118,9 @@ export interface SchemaField {
   searchable?: boolean;
   rows?: number;
   tagSuggestions?: string[];
+
+  // Upload fields
+  meta?: { uploadType?: 'image' | 'video' };
 }
 
 export interface DependencyRule {
@@ -948,7 +952,8 @@ export class MetaFormSchemaEngine {
                 {
                   key: 'object_story_spec.link_data.image_hash',
                   label: 'Image Hash',
-                  type: 'string',
+                  type: 'upload',
+                  meta: { uploadType: 'image' },
                   required: false,
                   editable: true,
                   placeholder: 'Uploaded image hash (from Meta)',
@@ -969,7 +974,8 @@ export class MetaFormSchemaEngine {
                 {
                   key: 'object_story_spec.video_data.video_id',
                   label: 'Video ID',
-                  type: 'string',
+                  type: 'upload',
+                  meta: { uploadType: 'video' },
                   required: true,
                   editable: true,
                   placeholder: 'Enter video ID from Meta',
@@ -998,7 +1004,8 @@ export class MetaFormSchemaEngine {
                 {
                   key: 'object_story_spec.video_data.image_hash',
                   label: 'Thumbnail Hash',
-                  type: 'string',
+                  type: 'upload',
+                  meta: { uploadType: 'image' },
                   required: false,
                   editable: true,
                   placeholder: 'Thumbnail image hash (optional)',
@@ -1029,7 +1036,8 @@ export class MetaFormSchemaEngine {
                 {
                   key: 'object_story_spec.photo_data.image_hash',
                   label: 'Image Hash',
-                  type: 'string',
+                  type: 'upload',
+                  meta: { uploadType: 'image' },
                   required: true,
                   editable: true,
                   placeholder: 'Image hash from Meta ad account',
@@ -1117,8 +1125,8 @@ export class MetaFormSchemaEngine {
                       { key: 'link', label: 'Card URL', type: 'string', required: true, editable: true, placeholder: 'https://example.com/page' },
                       { key: 'name', label: 'Headline', type: 'string', required: false, editable: true, placeholder: 'Card headline' },
                       { key: 'description', label: 'Description', type: 'string', required: false, editable: true, placeholder: 'Card description' },
-                      { key: 'image_hash', label: 'Image Hash', type: 'string', required: false, editable: true, placeholder: 'Image hash for this card' },
-                      { key: 'video_id', label: 'Video ID', type: 'string', required: false, editable: true, placeholder: 'Video ID (alternative to image)' },
+                      { key: 'image_hash', label: 'Image Hash', type: 'upload', meta: { uploadType: 'image' }, required: false, editable: true, placeholder: 'Image hash for this card' },
+                      { key: 'video_id', label: 'Video ID', type: 'upload', meta: { uploadType: 'video' }, required: false, editable: true, placeholder: 'Video ID (alternative to image)' },
                     ],
                   },
                 },
@@ -1193,7 +1201,7 @@ export class MetaFormSchemaEngine {
                   arrayItemSchema: {
                     key: 'image', label: 'Image', type: 'object', required: true, editable: true,
                     objectSchema: [
-                      { key: 'hash', label: 'Image Hash', type: 'string', required: true, editable: true, placeholder: 'Image hash' },
+                      { key: 'hash', label: 'Image Hash', type: 'upload', meta: { uploadType: 'image' }, required: true, editable: true, placeholder: 'Image hash' },
                     ],
                   },
                 },
@@ -1206,8 +1214,8 @@ export class MetaFormSchemaEngine {
                   arrayItemSchema: {
                     key: 'video', label: 'Video', type: 'object', required: true, editable: true,
                     objectSchema: [
-                      { key: 'video_id', label: 'Video ID', type: 'string', required: true, editable: true, placeholder: 'Video ID' },
-                      { key: 'thumbnail_hash', label: 'Thumbnail Hash', type: 'string', required: false, editable: true, placeholder: 'Thumbnail hash' },
+                      { key: 'video_id', label: 'Video ID', type: 'upload', meta: { uploadType: 'video' }, required: true, editable: true, placeholder: 'Video ID' },
+                      { key: 'thumbnail_hash', label: 'Thumbnail Hash', type: 'upload', meta: { uploadType: 'image' }, required: false, editable: true, placeholder: 'Thumbnail hash' },
                     ],
                   },
                 },
