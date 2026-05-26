@@ -536,6 +536,7 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
                             <span className="text-xs font-medium text-gray-300">{editData.name}</span>
                           </div>
                           {Object.entries(editData.data || {}).map(([key, value]: [string, any]) => {
+                            if (key === "name") return null;
                             if (typeof value === "string" || typeof value === "number") {
                               return (
                                 <div key={key} className="flex justify-between items-center py-2 border-b border-gray-800/30">
