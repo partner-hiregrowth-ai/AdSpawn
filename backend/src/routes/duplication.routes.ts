@@ -25,18 +25,18 @@ router.use(authMiddleware);
 router.post('/sync', cleanupHistory);
 router.get('/history', getHistory);
 router.delete('/history/:id', deleteHistoryItem);
-router.post('/campaign', duplicateCampaign);
-router.post('/adset', duplicateAdSet);
-router.post('/ad', duplicateAd);
+router.post('/campaign', bulkLimiter, duplicateCampaign);
+router.post('/adset', bulkLimiter, duplicateAdSet);
+router.post('/ad', bulkLimiter, duplicateAd);
 router.post('/bulk', bulkLimiter, validateBody(bulkDuplicateSchema), duplicateItems);
 
 // Objective Conversion Routes
 router.post('/preview-conversion', previewConversion);
-router.post('/convert-objective', validateBody(convertObjectiveSchema), convertObjective);
+router.post('/convert-objective', bulkLimiter, validateBody(convertObjectiveSchema), convertObjective);
 
 // Optimization Routes
-router.post('/optimize-duplicate', optimizeDuplicate);
-router.post('/optimize-conversion', optimizeConversion);
+router.post('/optimize-duplicate', bulkLimiter, optimizeDuplicate);
+router.post('/optimize-conversion', bulkLimiter, optimizeConversion);
 router.post('/validate-optimization', validateOptimization);
 
 export default router;

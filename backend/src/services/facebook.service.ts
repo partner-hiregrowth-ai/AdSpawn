@@ -152,7 +152,6 @@ export class FacebookService {
         console.warn(`[FacebookService] getAdSets(${campaignId}) hit MAX_PAGES=${MAX_PAGES}, truncating`);
         break;
       }
-      await sleep(300);
     }
     return allAdSets;
   }
@@ -186,7 +185,6 @@ export class FacebookService {
         console.warn(`[FacebookService] getAds(${adSetId}) hit MAX_PAGES=${MAX_PAGES}, truncating`);
         break;
       }
-      await sleep(300);
     }
     return allAds;
   }

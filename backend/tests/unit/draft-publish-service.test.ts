@@ -1209,7 +1209,7 @@ describe('DraftPublishService.publishCampaign', () => {
     await expect(DraftPublishService.publishCampaign('camp-1', 'token')).rejects.toThrow();
   });
 
-  it('handles updateMetaAdSet error gracefully (does not throw)', async () => {
+  it('updateMetaAdSet throws and stops publish on error', async () => {
     const campaign = makeDraftCampaign();
     campaign.adSets[0].metaId = 'existing_adset';
     mockPrisma.draftCampaign.findUnique.mockResolvedValue(campaign);
@@ -1223,9 +1223,7 @@ describe('DraftPublishService.publishCampaign', () => {
       .mockRejectedValueOnce({ response: { data: { error: { message: 'Update failed' } } } }) // adset update fails
       .mockResolvedValueOnce({ data: { id: 'meta_ad_1' } });
 
-    // updateMetaAdSet catches errors silently and continues
-    const result = await DraftPublishService.publishCampaign('camp-1', 'token');
-    expect(result.success).toBe(true);
+    await expect(DraftPublishService.publishCampaign('camp-1', 'token')).rejects.toBeDefined();
   });
 
   it('handles ad creation error with structured error response', async () => {

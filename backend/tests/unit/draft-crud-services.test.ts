@@ -6,19 +6,23 @@ vi.mock('../../src/prisma', () => ({
     draftAd: {
       create: vi.fn(),
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
     },
     draftAdSet: {
       create: vi.fn(),
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
     },
     draftCampaign: {
       create: vi.fn(),
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       findMany: vi.fn(),
+      count: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
     },
@@ -180,14 +184,19 @@ describe('DraftCampaignService', () => {
     });
   });
 
-  it('listByUser returns campaigns ordered by createdAt desc', async () => {
+  it('listByUser returns campaigns ordered by createdAt desc with pagination', async () => {
     mockPrisma.draftCampaign.findMany.mockResolvedValue([]);
-    await DraftCampaignService.listByUser('user-1');
+    mockPrisma.draftCampaign.count.mockResolvedValue(0);
+    const result = await DraftCampaignService.listByUser('user-1');
     expect(mockPrisma.draftCampaign.findMany).toHaveBeenCalledWith({
       where: { userId: 'user-1' },
       orderBy: { createdAt: 'desc' },
+      skip: 0,
+      take: 50,
       include: { _count: { select: { adSets: true } } },
     });
+    expect(result.total).toBe(0);
+    expect(result.page).toBe(1);
   });
 
   it('update strips internal fields', async () => {

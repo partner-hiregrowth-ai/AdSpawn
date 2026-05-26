@@ -16,6 +16,7 @@ export const loginWithFacebook = async (req: Request, res: Response) => {
     // 2. Exchange short-lived token for a long-lived token (~60 days)
     // Short-lived tokens from the browser SDK expire in ~1-2 hours
     let tokenToStore = accessToken;
+    let tokenExpiresAt: Date | undefined;
     const appId = process.env.FB_APP_ID;
     const appSecret = process.env.FB_APP_SECRET;
     if (appId && appSecret) {
@@ -29,6 +30,9 @@ export const loginWithFacebook = async (req: Request, res: Response) => {
           },
         });
         tokenToStore = exchangeResponse.data.access_token;
+        if (exchangeResponse.data.expires_in) {
+          tokenExpiresAt = new Date(Date.now() + exchangeResponse.data.expires_in * 1000);
+        }
         console.log('[Auth] Successfully exchanged for long-lived token');
       } catch (exchangeError) {
         console.warn('[Auth] Could not exchange for long-lived token, using original:', exchangeError);
@@ -40,12 +44,12 @@ export const loginWithFacebook = async (req: Request, res: Response) => {
 
     if (!user) {
       user = await withRetry(() => prisma.user.create({
-        data: { facebookId: id, name, email, accessToken: tokenToStore },
+        data: { facebookId: id, name, email, accessToken: tokenToStore, accessTokenExpiresAt: tokenExpiresAt },
       }));
     } else {
       user = await withRetry(() => prisma.user.update({
         where: { id: user!.id },
-        data: { name, email, accessToken: tokenToStore },
+        data: { name, email, accessToken: tokenToStore, accessTokenExpiresAt: tokenExpiresAt },
       }));
     }
 

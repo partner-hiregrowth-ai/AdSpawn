@@ -32,6 +32,11 @@ export class PublishError extends Error {
   }
 }
 
+function redactPayload(payload: any): any {
+  const { targeting, ...rest } = payload;
+  return targeting ? { ...rest, targeting: '[redacted]' } : rest;
+}
+
 export class DraftPublishService {
   static async publishCampaign(campaignId: string, accessToken: string) {
     if (!accessToken) {
@@ -350,6 +355,12 @@ export class DraftPublishService {
         'draftPublishLog.create',
       );
 
+      // Best-effort cleanup of any Meta objects created before the failure.
+      // Fire-and-forget — we don't want cleanup errors to mask the original.
+      this.cleanupOrphanedMetaObjects(campaignId, accessToken).catch((cleanupErr) => {
+        console.warn('[DraftPublishService] Auto-cleanup after failure also failed:', cleanupErr.message);
+      });
+
       throw error;
     }
   }
@@ -454,7 +465,7 @@ export class DraftPublishService {
       campaignPayload.spend_cap = String(campaignData.spend_cap);
     }
 
-    console.log(`[DraftPublishService] Creating campaign:`, JSON.stringify(campaignPayload));
+    console.log(`[DraftPublishService] Creating campaign:`, JSON.stringify(redactPayload(campaignPayload)));
     try {
       const fbCampaign = await fbService.client.post(`/${accountId}/campaigns`, campaignPayload);
       return fbCampaign.data.id;
@@ -523,7 +534,7 @@ export class DraftPublishService {
       console.warn(`[DraftPublishService] Stripped immutable fields from campaign update: ${stripped.join(', ')}`);
     }
 
-    console.log(`[DraftPublishService] Updating existing Meta campaign ${metaCampaignId}:`, JSON.stringify(cleaned));
+    console.log(`[DraftPublishService] Updating existing Meta campaign ${metaCampaignId}:`, JSON.stringify(redactPayload(cleaned)));
     try {
       await fbService.client.post(`/${metaCampaignId}`, cleaned);
     } catch (error: any) {
@@ -698,7 +709,7 @@ export class DraftPublishService {
       }
     }
 
-    console.log(`[DraftPublishService] Creating ad set ${adSet.id}:`, JSON.stringify(adSetPayload));
+    console.log(`[DraftPublishService] Creating ad set ${adSet.id}:`, JSON.stringify(redactPayload(adSetPayload)));
     try {
       const fbAdSet = await fbService.client.post(`/${accountId}/adsets`, adSetPayload);
       return fbAdSet.data.id;
@@ -821,11 +832,12 @@ export class DraftPublishService {
       console.warn(`[DraftPublishService] Stripped immutable fields from ad set update: ${stripped.join(', ')}`);
     }
 
-    console.log(`[DraftPublishService] Updating existing Meta ad set ${metaAdSetId}:`, JSON.stringify(cleaned));
+    console.log(`[DraftPublishService] Updating existing Meta ad set ${metaAdSetId}:`, JSON.stringify(redactPayload(cleaned)));
     try {
       await fbService.client.post(`/${metaAdSetId}`, cleaned);
     } catch (error: any) {
       console.error(`[DraftPublishService] Failed to update Meta ad set ${metaAdSetId}:`, error.response?.data?.error || error.message);
+      throw error;
     }
   }
 
@@ -895,7 +907,7 @@ export class DraftPublishService {
       adPayload.url_parameters = adData.url_parameters;
     }
 
-    console.log(`[DraftPublishService] Creating ad ${ad.id}:`, JSON.stringify(adPayload));
+    console.log(`[DraftPublishService] Creating ad ${ad.id}:`, JSON.stringify(redactPayload(adPayload)));
     try {
       const fbAd = await fbService.client.post(`/${accountId}/ads`, adPayload);
       return fbAd.data.id;

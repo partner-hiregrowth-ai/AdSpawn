@@ -35,6 +35,19 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
     if (!user || !user.accessToken) {
       return res.status(401).json({ message: 'User not found or no access token', code: 'TOKEN_EXPIRED' });
     }
+
+    if (user.accessTokenExpiresAt) {
+      const now = Date.now();
+      const expiresAt = user.accessTokenExpiresAt.getTime();
+      if (now >= expiresAt) {
+        return res.status(401).json({ message: 'Facebook access token has expired. Please log in again.', code: 'TOKEN_EXPIRED' });
+      }
+      const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+      if (expiresAt - now < sevenDaysMs) {
+        res.setHeader('X-Token-Expiry-Warning', user.accessTokenExpiresAt.toISOString());
+      }
+    }
+
     req.userAccessToken = user.accessToken;
 
     next();

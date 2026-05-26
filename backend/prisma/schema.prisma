@@ -12,8 +12,9 @@ model User {
   facebookId      String            @unique
   email           String?
   name            String?
-  accessToken     String?
-  createdAt       DateTime          @default(now())
+  accessToken           String?
+  accessTokenExpiresAt  DateTime?
+  createdAt             DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
   duplicateJobs   DuplicateJob[]
   accounts        FacebookAccount[]
@@ -85,6 +86,9 @@ model DraftCampaign {
   updatedAt       DateTime      @updatedAt
   user            User          @relation(fields: [userId], references: [id])
   adSets          DraftAdSet[]
+
+  @@index([userId, status])
+  @@index([userId, createdAt(sort: Desc)])
 }
 
 model DraftAdSet {
@@ -102,6 +106,10 @@ model DraftAdSet {
   user            User          @relation(fields: [userId], references: [id])
   campaign        DraftCampaign @relation(fields: [draftCampaignId], references: [id], onDelete: Cascade)
   ads             DraftAd[]
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([draftCampaignId])
 }
 
 model DraftAd {
@@ -118,6 +126,10 @@ model DraftAd {
   updatedAt       DateTime      @updatedAt
   user            User          @relation(fields: [userId], references: [id])
   adSet           DraftAdSet    @relation(fields: [draftAdSetId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([draftAdSetId])
 }
 
 model DraftPublishLog {

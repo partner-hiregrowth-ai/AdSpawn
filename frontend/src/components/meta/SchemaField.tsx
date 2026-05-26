@@ -542,7 +542,7 @@ function CurrencyField({
         onKeyDown={(e) => {
           if (["e", "E", "+", "-"].includes(e.key)) e.preventDefault();
         }}
-        placeholder={field.placeholder || "e.g. 500 = $5.00"}
+        placeholder={field.placeholder || "e.g. 500 = 5.00 (×100 subunits)"}
         className={cn(
           "bg-gray-950 border-gray-800 focus:border-blue-500 font-mono text-yellow-400",
           compact ? "h-7 text-[11px]" : "h-8 text-sm",

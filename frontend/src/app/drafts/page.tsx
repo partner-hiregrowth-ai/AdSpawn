@@ -37,7 +37,7 @@ export default function DraftsPage() {
     try {
       setIsLoading(true);
       const response = await draftApi.listCampaigns();
-      setDrafts(response.data);
+      setDrafts(response.data.items ?? response.data);
     } catch (error: any) {
       console.error("Failed to fetch drafts:", error);
       toast.error(extractApiError(error, "Failed to load drafts"));

@@ -354,11 +354,10 @@ export class WideCreationService {
       ? template.adAccountId
       : `act_${template.adAccountId}`;
 
-    // Wrap the entire generation in a single transaction so a mid-loop failure
-    // does not leave orphaned campaigns/adsets in the DB. The 30s timeout
-    // accommodates large templates (~500 entities); larger inputs are rejected
-    // upstream at the controller.
-    return prisma.$transaction(async (tx) => {
+    // Sequential creates with manual rollback on failure — avoids single-transaction
+    // timeout risk on large templates. On error, any campaigns already written are
+    // deleted (cascade removes their adSets and ads automatically).
+    try {
       for (let ci = 0; ci < template.campaigns.length; ci++) {
       const campaignNode = template.campaigns[ci];
 
@@ -398,7 +397,7 @@ export class WideCreationService {
       const isCBO = !!(campaignPayload.daily_budget || campaignPayload.lifetime_budget);
 
       // Create draft campaign
-      const draftCampaign = await tx.draftCampaign.create({
+      const draftCampaign = await prisma.draftCampaign.create({
         data: {
           userId,
           adAccountId,
@@ -477,7 +476,7 @@ export class WideCreationService {
         if (resolvedAdSetFields.end_time) adSetPayload.end_time = resolvedAdSetFields.end_time;
 
         // Create draft adset
-        const draftAdSet = await tx.draftAdSet.create({
+        const draftAdSet = await prisma.draftAdSet.create({
           data: {
             userId,
             adAccountId,
@@ -522,7 +521,7 @@ export class WideCreationService {
           if (resolvedAdFields.url_parameters) adPayload.url_parameters = resolvedAdFields.url_parameters;
 
           // Create draft ad
-          const draftAd = await tx.draftAd.create({
+          const draftAd = await prisma.draftAd.create({
             data: {
               userId,
               adAccountId,
@@ -548,7 +547,13 @@ export class WideCreationService {
         },
         warnings,
       };
-    }, { timeout: 30_000, maxWait: 5_000 });
+    } catch (err) {
+      // Roll back any campaigns already created (cascade deletes adsets + ads).
+      if (campaignIds.length > 0) {
+        await prisma.draftCampaign.deleteMany({ where: { id: { in: campaignIds } } }).catch(() => {});
+      }
+      throw err;
+    }
   }
 
   // ── Bulk update fields across multiple entities with inheritance ──

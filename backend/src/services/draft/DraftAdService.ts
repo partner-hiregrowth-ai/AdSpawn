@@ -1,6 +1,12 @@
 import { prisma } from '../../prisma';
 import { DraftStatus } from '@prisma/client';
 
+function throwNotFound(entity: string): never {
+  const err: any = new Error(`${entity} not found`);
+  err.notFound = true;
+  throw err;
+}
+
 export class DraftAdService {
   static async create(userId: string, adAccountId: string, draftAdSetId: string, name: string, data: any) {
     return prisma.draftAd.create({
@@ -15,28 +21,36 @@ export class DraftAdService {
     });
   }
 
-  static async getById(id: string) {
+  static async getById(id: string, userId?: string) {
+    if (userId) {
+      return prisma.draftAd.findFirst({
+        where: { id, userId },
+        include: { adSet: { include: { campaign: true } } },
+      });
+    }
     return prisma.draftAd.findUnique({
       where: { id },
-      include: {
-        adSet: {
-          include: {
-            campaign: true,
-          },
-        },
-      },
+      include: { adSet: { include: { campaign: true } } },
     });
   }
 
-  static async update(id: string, updateData: any) {
-    const { id: _id, adSet, user, createdAt, updatedAt, userId, draftAdSetId, _count, ...cleanData } = updateData;
+  static async update(id: string, updateData: any, userId?: string) {
+    const { id: _id, adSet, user, createdAt, updatedAt, userId: _userId, draftAdSetId, _count, ...cleanData } = updateData;
+    if (userId) {
+      const exists = await prisma.draftAd.findFirst({ where: { id, userId } });
+      if (!exists) throwNotFound('Ad');
+    }
     return prisma.draftAd.update({
       where: { id },
       data: cleanData,
     });
   }
 
-  static async delete(id: string) {
+  static async delete(id: string, userId?: string) {
+    if (userId) {
+      const exists = await prisma.draftAd.findFirst({ where: { id, userId } });
+      if (!exists) throwNotFound('Ad');
+    }
     return prisma.draftAd.delete({
       where: { id },
     });

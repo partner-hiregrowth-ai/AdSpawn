@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { toast } from 'sonner';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -14,8 +15,22 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+let tokenWarningShown = false;
+
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const expiryWarning = response.headers['x-token-expiry-warning'];
+    if (expiryWarning && !tokenWarningShown) {
+      tokenWarningShown = true;
+      const expiresAt = new Date(expiryWarning);
+      const daysLeft = Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      toast.warning(`Your Facebook session expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'}. Please log in again soon.`, {
+        duration: 10000,
+        id: 'token-expiry-warning',
+      });
+    }
+    return response;
+  },
   (error) => {
     const data = error.response?.data;
     if (error.response?.status === 401 && data?.code === 'TOKEN_EXPIRED') {
@@ -83,7 +98,7 @@ export const wideCreationApi = {
 export const draftApi = {
   duplicateToDraft: (campaignId: string, count?: number) =>
     api.post('/drafts/duplicate', count && count > 1 ? { campaignId, count } : { campaignId }),
-  listCampaigns: () => api.get('/drafts/campaigns'),
+  listCampaigns: (page = 1, pageSize = 50) => api.get('/drafts/campaigns', { params: { page, pageSize } }),
   getCampaign: (id: string) => api.get(`/drafts/campaigns/${id}`),
   updateCampaign: (id: string, data: any) => api.patch(`/drafts/campaigns/${id}`, data),
   deleteCampaign: (id: string) => api.delete(`/drafts/campaigns/${id}`),

@@ -1,5 +1,10 @@
 import { FacebookService } from './facebook.service';
-import { VALID_BUYING_TYPES } from './draft/MetaFieldRegistry';
+import { VALID_BUYING_TYPES, sanitizeTargeting, ATTRIBUTION_SPEC_OBJECTIVES } from './draft/MetaFieldRegistry';
+
+function redactPayload(payload: any): any {
+  const { targeting, ...rest } = payload;
+  return targeting ? { ...rest, targeting: '[redacted]' } : rest;
+}
 
 export interface ConversionMapping {
   objective: string;
@@ -208,7 +213,7 @@ export class ObjectiveConversionService {
       status: 'PAUSED',
       billing_event: String(defaults.billing_event),
       optimization_goal: String(optimization_goal),
-      targeting: this.sanitizeTargeting(data.targeting)
+      targeting: sanitizeTargeting(data.targeting)
     };
 
     // Destination type
@@ -280,8 +285,7 @@ export class ObjectiveConversionService {
       if (engagementPageId) payload.promoted_object = { page_id: String(engagementPageId) };
     }
 
-    // attribution_spec only valid for TRAFFIC/SALES/LEADS — other objectives (ENGAGEMENT, AWARENESS, APP_PROMOTION) reject it
-    const ATTRIBUTION_SPEC_OBJECTIVES = new Set(['OUTCOME_SALES', 'OUTCOME_LEADS', 'OUTCOME_TRAFFIC']);
+    // attribution_spec only valid for SALES/LEADS/APP_PROMOTION — use canonical registry constant
     if (data.attribution_spec && ATTRIBUTION_SPEC_OBJECTIVES.has(targetObjective) && payload.destination_type !== 'ON_AD') {
       payload.attribution_spec = data.attribution_spec;
     }
@@ -319,23 +323,6 @@ export class ObjectiveConversionService {
       }
     }
     return JSON.parse(JSON.stringify(clean));
-  }
-
-  private sanitizeTargeting(targeting: any) {
-    const defaultTargeting = { geo_locations: { countries: ['TH'] } };
-    if (!targeting) return defaultTargeting;
-    try {
-      const sanitized = JSON.parse(JSON.stringify(targeting));
-      delete sanitized.id;
-      delete sanitized.targeting_automation;
-      delete sanitized.contextual_targeting_options;
-      if (!sanitized.geo_locations || Object.keys(sanitized.geo_locations).length === 0) {
-        sanitized.geo_locations = defaultTargeting.geo_locations;
-      }
-      return sanitized;
-    } catch (e) {
-      return defaultTargeting;
-    }
   }
 
   private sanitizePromotedObject(promotedObject: any) {
@@ -382,7 +369,7 @@ export class ObjectiveConversionService {
       campaignPayload.is_adset_budget_sharing_enabled = false;
     }
 
-    console.log(`[ObjectiveConversionService] Creating campaign:`, JSON.stringify(campaignPayload));
+    console.log(`[ObjectiveConversionService] Creating campaign:`, JSON.stringify(redactPayload(campaignPayload)));
     const newCampaign = (
       await this.fbService.client.post(`/${normalizedAccountId}/campaigns`, campaignPayload)
     ).data;
@@ -448,7 +435,7 @@ export class ObjectiveConversionService {
           console.log(`[ObjectiveConversionService] Removed budget fields (CBO campaign)`);
         }
 
-        console.log(`[ObjectiveConversionService] Creating ad set:`, JSON.stringify(adSetPayload));
+        console.log(`[ObjectiveConversionService] Creating ad set:`, JSON.stringify(redactPayload(adSetPayload)));
         const newAdSet = (
           await this.fbService.client.post(`/${normalizedAccountId}/adsets`, adSetPayload)
         ).data;
@@ -471,7 +458,7 @@ export class ObjectiveConversionService {
               `${fullAd.data.name || 'Ad'} - Converted`,
               newAdSet.id
             );
-            console.log(`[ObjectiveConversionService] Creating ad:`, JSON.stringify(adPayload));
+            console.log(`[ObjectiveConversionService] Creating ad:`, JSON.stringify(adPayload)); // ads don't contain targeting
             const newAd = (
               await this.fbService.client.post(`/${normalizedAccountId}/ads`, adPayload)
             ).data;

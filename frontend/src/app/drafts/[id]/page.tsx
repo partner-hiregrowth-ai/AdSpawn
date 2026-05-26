@@ -205,13 +205,24 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
     if (!isDirty) return;
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault();
-      // Modern browsers display their own generic message; setting returnValue
-      // is required for the prompt to fire.
       e.returnValue = "";
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
   }, [isDirty]);
+
+  // Auto-save after 3s of inactivity whenever there are pending edits.
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!isDirty || isSaving) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      handleSave();
+    }, 3000);
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [editCache, isDirty]);
 
   // Switching node now PRESERVES the previous node's edits in the cache (no auto-save).
   // When you come back, your in-progress edits are restored.
@@ -373,21 +384,24 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
                 <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full", statusColor)}>{draft.status}</span>
                 <span className="text-xs text-gray-600">{OBJECTIVE_LABELS[campaignObjective] || campaignObjective}</span>
                 {draft.metaId && <span className="text-[10px] text-gray-600 font-mono hidden sm:inline">Meta: {draft.metaId}</span>}
+                <ValidationBadge
+                  isValidating={isValidating}
+                  isDirty={isDirty}
+                  results={validationResults}
+                />
               </div>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <ValidationBadge
-              isValidating={isValidating}
-              isDirty={isDirty}
-              results={validationResults}
-            />
+          <div className="flex items-center gap-2 shrink-0">
             {(draft.status === "FAILED" || hasMetaId) && draft.status !== "PUBLISHED" && (
-              <Button variant="outline" size="sm" className="gap-1.5 border-red-800 text-red-400 hover:bg-red-500/10"
-                onClick={handleCleanup} disabled={isCleaning}>
-                {isCleaning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
-                Cleanup Meta
-              </Button>
+              <>
+                <Button variant="outline" size="sm" className="gap-1.5 border-red-900/60 text-red-400 hover:bg-red-500/10 hover:border-red-700"
+                  onClick={handleCleanup} disabled={isCleaning}>
+                  {isCleaning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
+                  Cleanup Meta
+                </Button>
+                <div className="w-px h-5 bg-gray-800" />
+              </>
             )}
             <Button variant="outline" size="sm" className="gap-1.5 border-gray-800 text-gray-400"
               onClick={handleValidate} disabled={isValidating || isDirty}

@@ -82,10 +82,10 @@ export class DraftController {
   static async listCampaigns(req: Request, res: Response) {
     try {
       const { userId } = req as AuthRequest;
-      console.log(`[DraftController] Listing campaigns for user: ${userId}`);
-      const drafts = await DraftCampaignService.listByUser(userId!);
-      console.log(`[DraftController] Found ${drafts.length} drafts`);
-      res.json(drafts);
+      const page = Math.max(1, parseInt(req.query.page as string) || 1);
+      const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string) || 50));
+      const result = await DraftCampaignService.listByUser(userId!, page, pageSize);
+      res.json(result);
     } catch (error: any) {
       console.error(`[DraftController] Error in listCampaigns:`, error);
       res.status(500).json({ error: error.message });
@@ -95,7 +95,9 @@ export class DraftController {
   static async getCampaign(req: Request, res: Response) {
     try {
       const id = req.params.id as string;
-      const draft = await DraftCampaignService.getById(id);
+      const { userId } = req as AuthRequest;
+      const draft = await DraftCampaignService.getById(id, userId!);
+      if (!draft) return res.status(404).json({ error: 'Draft not found' });
       res.json(draft);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -104,36 +106,42 @@ export class DraftController {
 
   static async updateCampaign(req: Request, res: Response) {
     const id = req.params.id as string;
+    const { userId } = req as AuthRequest;
     try {
       console.log(`[DraftController] Updating campaign: ${id}`, req.body);
-      const draft = await DraftCampaignService.update(id, req.body);
+      const draft = await DraftCampaignService.update(id, req.body, userId!);
       res.json(draft);
     } catch (error: any) {
       console.error(`[DraftController] Error updating campaign ${id}:`, error);
+      if (error.notFound) return res.status(404).json({ error: error.message });
       res.status(500).json({ error: error.message });
     }
   }
 
   static async updateAdSet(req: Request, res: Response) {
     const id = req.params.id as string;
+    const { userId } = req as AuthRequest;
     try {
       console.log(`[DraftController] Updating adset: ${id}`, req.body);
-      const draft = await DraftAdSetService.update(id, req.body);
+      const draft = await DraftAdSetService.update(id, req.body, userId!);
       res.json(draft);
     } catch (error: any) {
       console.error(`[DraftController] Error updating adset ${id}:`, error);
+      if (error.notFound) return res.status(404).json({ error: error.message });
       res.status(500).json({ error: error.message });
     }
   }
 
   static async updateAd(req: Request, res: Response) {
     const id = req.params.id as string;
+    const { userId } = req as AuthRequest;
     try {
       console.log(`[DraftController] Updating ad: ${id}`, req.body);
-      const draft = await DraftAdService.update(id, req.body);
+      const draft = await DraftAdService.update(id, req.body, userId!);
       res.json(draft);
     } catch (error: any) {
       console.error(`[DraftController] Error updating ad ${id}:`, error);
+      if (error.notFound) return res.status(404).json({ error: error.message });
       res.status(500).json({ error: error.message });
     }
   }
@@ -141,23 +149,24 @@ export class DraftController {
   static async validateDraft(req: Request, res: Response) {
     try {
       const id = req.params.id as string;
-      const draft = await DraftCampaignService.getById(id);
+      const { userId } = req as AuthRequest;
+      const draft = await DraftCampaignService.getById(id, userId!);
       if (!draft) return res.status(404).json({ error: 'Draft not found' });
 
       const validation = await DraftValidationEngine.validateFullDraft(draft);
-      
-      // Save validation results back to DB
-      await DraftCampaignService.update(id, { 
+
+      // Save validation results back to DB (internal updates — userId passed for safety)
+      await DraftCampaignService.update(id, {
         validationErrors: validation.campaignErrors,
         status: validation.isValid ? 'READY' : 'VALIDATION_FAILED'
-      });
+      }, userId!);
 
       for (const adSetId in validation.adSetErrors) {
-        await DraftAdSetService.update(adSetId, { validationErrors: validation.adSetErrors[adSetId] });
+        await DraftAdSetService.update(adSetId, { validationErrors: validation.adSetErrors[adSetId] }, userId!);
       }
 
       for (const adId in validation.adErrors) {
-        await DraftAdService.update(adId, { validationErrors: validation.adErrors[adId] });
+        await DraftAdService.update(adId, { validationErrors: validation.adErrors[adId] }, userId!);
       }
 
       res.json(validation);
@@ -170,6 +179,8 @@ export class DraftController {
     const id = req.params.id as string;
     const authReq = req as AuthRequest;
     try {
+      const owned = await prisma.draftCampaign.findFirst({ where: { id, userId: authReq.userId! } });
+      if (!owned) return res.status(404).json({ error: 'Draft not found' });
       const result = await DraftPublishService.publishCampaign(id, authReq.userAccessToken!);
       await prisma.duplicateJob.create({
         data: {
@@ -227,7 +238,7 @@ export class DraftController {
           });
         } catch (error: any) {
           if (isFacebookAuthError(error.message)) {
-            return res.status(401).json({ error: error.message, code: 'TOKEN_EXPIRED' });
+            return res.status(401).json({ error: error.message, code: 'TOKEN_EXPIRED', results });
           }
           const userMessage = error instanceof PublishError ? error.userMessage : error.message;
           results.push({ id, success: false, error: error.message, userMessage });
@@ -253,9 +264,11 @@ export class DraftController {
   static async deleteCampaign(req: Request, res: Response) {
     try {
       const id = req.params.id as string;
-      await DraftCampaignService.delete(id);
+      const { userId } = req as AuthRequest;
+      await DraftCampaignService.delete(id, userId!);
       res.json({ success: true });
     } catch (error: any) {
+      if (error.notFound) return res.status(404).json({ error: error.message });
       res.status(500).json({ error: error.message });
     }
   }
@@ -303,6 +316,8 @@ export class DraftController {
       const id = req.params.id as string;
       const authReq = req as AuthRequest;
 
+      const owned = await prisma.draftCampaign.findFirst({ where: { id, userId: authReq.userId! } });
+      if (!owned) return res.status(404).json({ error: 'Draft not found' });
       const result = await DraftPublishService.cleanupOrphanedMetaObjects(id, authReq.userAccessToken!);
       res.json(result);
     } catch (error: any) {
