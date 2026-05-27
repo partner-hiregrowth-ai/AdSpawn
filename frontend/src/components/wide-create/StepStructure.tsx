@@ -24,6 +24,7 @@ import {
   X,
 } from "lucide-react";
 import { TrackingSpecsEditor, type TrackingSpec } from "@/components/meta/TrackingSpecsEditor";
+import { CreativeOverrideEditor } from "@/components/wide-create/CreativeOverrideEditor";
 
 const OBJECTIVE_LABELS: Record<string, string> = {
   OUTCOME_TRAFFIC: "Traffic",
@@ -55,8 +56,10 @@ type OverrideFieldType =
   | "multiselect"
   | "boolean"
   | "json"
-  | "creativeId"
-  | "trackingSpecs";
+  | "creativeOverride"
+  | "trackingSpecs"
+  | "targeting"
+  | "promotedObject";
 interface OverrideFieldDef {
   key: string;
   label: string;
@@ -113,6 +116,42 @@ const BILLING_EVENT_OPTIONS = [
   { value: "CLICKS", label: "Clicks" },
 ];
 
+const OPTIMIZATION_GOAL_OPTIONS = [
+  { value: "REACH", label: "Reach" },
+  { value: "IMPRESSIONS", label: "Impressions" },
+  { value: "AD_RECALL_LIFT", label: "Ad Recall Lift" },
+  { value: "THRUPLAY", label: "ThruPlay" },
+  { value: "LINK_CLICKS", label: "Link Clicks" },
+  { value: "LANDING_PAGE_VIEWS", label: "Landing Page Views" },
+  { value: "OFFSITE_CONVERSIONS", label: "Conversions" },
+  { value: "POST_ENGAGEMENT", label: "Post Engagement" },
+  { value: "VIDEO_VIEWS", label: "Video Views" },
+  { value: "MESSAGES", label: "Messages" },
+  { value: "LEAD_GENERATION", label: "Lead Generation" },
+  { value: "QUALITY_LEAD", label: "Quality Lead" },
+  { value: "QUALITY_CALL", label: "Quality Call" },
+  { value: "VALUE", label: "Value" },
+  { value: "CONVERSATIONS", label: "Conversations" },
+  { value: "APP_INSTALLS", label: "App Installs" },
+  { value: "APP_INSTALLS_AND_OFFSITE_CONVERSIONS", label: "App Installs & Conversions" },
+];
+
+const DESTINATION_TYPE_OPTIONS = [
+  { value: "WEBSITE", label: "Website" },
+  { value: "APP", label: "App" },
+  { value: "MESSENGER", label: "Messenger" },
+  { value: "WHATSAPP", label: "WhatsApp" },
+  { value: "INSTAGRAM_DIRECT", label: "Instagram DM" },
+  { value: "ON_AD", label: "Instant Form" },
+  { value: "ON_POST", label: "On Post" },
+  { value: "ON_VIDEO", label: "On Video" },
+  { value: "ON_PAGE", label: "On Page" },
+  { value: "ON_EVENT", label: "On Event" },
+  { value: "FACEBOOK", label: "Facebook" },
+  { value: "SHOP_AUTOMATIC", label: "Shop" },
+  { value: "UNDEFINED", label: "Default (Unset)" },
+];
+
 const CAMPAIGN_OVERRIDE_FIELDS: OverrideFieldDef[] = [
   { key: "name", label: "Name", type: "text", placeholder: "Override generated name" },
   { key: "status", label: "Status", type: "select", options: STATUS_OPTIONS, help: "Publish forces PAUSED; this is a stored preference" },
@@ -133,8 +172,8 @@ const CAMPAIGN_OVERRIDE_FIELDS: OverrideFieldDef[] = [
 const ADSET_OVERRIDE_FIELDS: OverrideFieldDef[] = [
   { key: "name", label: "Name", type: "text", placeholder: "Override generated name" },
   { key: "status", label: "Status", type: "select", options: STATUS_OPTIONS, help: "Publish forces PAUSED; this is a stored preference" },
-  { key: "optimization_goal", label: "Optimization Goal", type: "text", placeholder: "e.g. LINK_CLICKS" },
-  { key: "destination_type", label: "Destination Type", type: "text", placeholder: "e.g. WEBSITE" },
+  { key: "optimization_goal", label: "Optimization Goal", type: "select", options: OPTIMIZATION_GOAL_OPTIONS },
+  { key: "destination_type", label: "Destination Type", type: "select", options: DESTINATION_TYPE_OPTIONS },
   { key: "billing_event", label: "Billing Event", type: "select", options: BILLING_EVENT_OPTIONS },
   { key: "daily_budget", label: "Daily Budget (cents)", type: "number", placeholder: "e.g. 5000", help: "Ignored under CBO campaigns" },
   { key: "lifetime_budget", label: "Lifetime Budget (cents)", type: "number", placeholder: "e.g. 100000", help: "Ignored under CBO campaigns" },
@@ -143,16 +182,17 @@ const ADSET_OVERRIDE_FIELDS: OverrideFieldDef[] = [
   { key: "start_time", label: "Start Time", type: "datetime" },
   { key: "end_time", label: "End Time", type: "datetime" },
   { key: "is_dynamic_creative", label: "Dynamic Creative", type: "boolean", help: "Enable Dynamic Creative for this ad set" },
-  { key: "targeting", label: "Targeting", type: "json", fullWidth: true, placeholder: '{ "geo_locations": { "countries": ["US"] }, "age_min": 18 }', help: "JSON format" },
-  { key: "promoted_object", label: "Promoted Object", type: "json", fullWidth: true, placeholder: '{ "pixel_id": "123", "custom_event_type": "PURCHASE" }', help: "JSON format — pixel_id / page_id / application_id / custom_event_type" },
+  { key: "targeting", label: "Targeting", type: "targeting", fullWidth: true },
+  { key: "promoted_object", label: "Promoted Object", type: "promotedObject", fullWidth: true },
 ];
 
 const AD_OVERRIDE_FIELDS: OverrideFieldDef[] = [
   { key: "name", label: "Name", type: "text", placeholder: "Override generated name" },
   { key: "status", label: "Status", type: "select", options: STATUS_OPTIONS, help: "Publish forces PAUSED; this is a stored preference" },
-  // Stored as `creative: { creative_id }` to match the shape the backend reads
-  // (WideCreationService applies resolvedAdFields.creative directly).
-  { key: "creative", label: "Creative ID", type: "creativeId", placeholder: "Override creative for this ad", help: "Reuses an existing creative_id" },
+  // Stored as `creative: {...}` to match the shape the backend reads
+  // (WideCreationService applies resolvedAdFields.creative directly). Supports
+  // creative_id, object_story_spec (inline), and asset_feed_spec (Dynamic Creative).
+  { key: "creative", label: "Creative", type: "creativeOverride", fullWidth: true, help: "Override the creative for this ad — reuse an existing creative_id, or define an inline / dynamic creative" },
   { key: "url_parameters", label: "URL Parameters", type: "text", placeholder: "utm_source=fb&utm_medium=paid", help: "Appended to the destination URL" },
   { key: "tracking_specs", label: "Tracking Specs", type: "trackingSpecs", fullWidth: true, help: "Bind action types to objects (page / pixel / conversion)" },
 ];
@@ -578,19 +618,36 @@ function OverrideField({
     );
   }
 
-  if (def.type === "creativeId") {
-    const creativeId = value?.creative_id ?? "";
+  if (def.type === "creativeOverride") {
     return (
       <div>
         <Label className="text-[10px] text-gray-500">{def.label}</Label>
-        <Input
-          type="text"
-          value={creativeId}
-          onChange={(e) => onChange(e.target.value === "" ? undefined : { creative_id: e.target.value })}
-          placeholder={def.placeholder}
-          className="bg-gray-800 border-gray-700 mt-1 h-8 text-xs"
-        />
-        {def.help && <p className="text-[9px] text-gray-600 mt-0.5">{def.help}</p>}
+        <div className="mt-1">
+          <CreativeOverrideEditor value={value} onChange={onChange} />
+        </div>
+        {def.help && <p className="text-[9px] text-gray-600 mt-1">{def.help}</p>}
+      </div>
+    );
+  }
+
+  if (def.type === "targeting") {
+    return (
+      <div>
+        <Label className="text-[10px] text-gray-500">{def.label}</Label>
+        <div className="mt-1">
+          <TargetingEditor value={value} onChange={onChange} />
+        </div>
+      </div>
+    );
+  }
+
+  if (def.type === "promotedObject") {
+    return (
+      <div>
+        <Label className="text-[10px] text-gray-500">{def.label}</Label>
+        <div className="mt-1">
+          <PromotedObjectEditor value={value} onChange={onChange} />
+        </div>
       </div>
     );
   }
@@ -621,6 +678,327 @@ function OverrideField({
         className="bg-gray-800 border-gray-700 mt-1 h-8 text-xs"
       />
       {def.help && <p className="text-[9px] text-gray-600 mt-0.5">{def.help}</p>}
+    </div>
+  );
+}
+
+// ─── Targeting editor ───
+
+const GENDER_OPTIONS = [
+  { value: 0, label: "All" },
+  { value: 1, label: "Male" },
+  { value: 2, label: "Female" },
+];
+
+const COUNTRIES = [
+  { code: "US", name: "United States" }, { code: "GB", name: "United Kingdom" },
+  { code: "CA", name: "Canada" }, { code: "AU", name: "Australia" },
+  { code: "TH", name: "Thailand" }, { code: "SG", name: "Singapore" },
+  { code: "MY", name: "Malaysia" }, { code: "PH", name: "Philippines" },
+  { code: "ID", name: "Indonesia" }, { code: "VN", name: "Vietnam" },
+  { code: "JP", name: "Japan" }, { code: "KR", name: "South Korea" },
+  { code: "TW", name: "Taiwan" }, { code: "HK", name: "Hong Kong" },
+  { code: "IN", name: "India" }, { code: "CN", name: "China" },
+  { code: "DE", name: "Germany" }, { code: "FR", name: "France" },
+  { code: "IT", name: "Italy" }, { code: "ES", name: "Spain" },
+  { code: "NL", name: "Netherlands" }, { code: "SE", name: "Sweden" },
+  { code: "NO", name: "Norway" }, { code: "DK", name: "Denmark" },
+  { code: "FI", name: "Finland" }, { code: "CH", name: "Switzerland" },
+  { code: "AT", name: "Austria" }, { code: "BE", name: "Belgium" },
+  { code: "PT", name: "Portugal" }, { code: "PL", name: "Poland" },
+  { code: "CZ", name: "Czech Republic" }, { code: "GR", name: "Greece" },
+  { code: "TR", name: "Turkey" }, { code: "RU", name: "Russia" },
+  { code: "UA", name: "Ukraine" }, { code: "IL", name: "Israel" },
+  { code: "AE", name: "UAE" }, { code: "SA", name: "Saudi Arabia" },
+  { code: "EG", name: "Egypt" }, { code: "ZA", name: "South Africa" },
+  { code: "NG", name: "Nigeria" }, { code: "BR", name: "Brazil" },
+  { code: "MX", name: "Mexico" }, { code: "AR", name: "Argentina" },
+  { code: "CO", name: "Colombia" }, { code: "CL", name: "Chile" },
+  { code: "PE", name: "Peru" }, { code: "NZ", name: "New Zealand" },
+];
+
+function CountryPicker({ selected, onChange }: { selected: string[]; onChange: (c: string[]) => void }) {
+  const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+
+  const filtered = COUNTRIES.filter(
+    (c) =>
+      !selected.includes(c.code) &&
+      (search === "" ||
+        c.name.toLowerCase().includes(search.toLowerCase()) ||
+        c.code.toLowerCase().includes(search.toLowerCase())),
+  ).slice(0, 8);
+
+  const add = (code: string) => {
+    onChange([...selected, code]);
+    setSearch("");
+  };
+  const remove = (code: string) => onChange(selected.filter((c) => c !== code));
+
+  return (
+    <div>
+      <div className="flex flex-wrap gap-1 mb-1">
+        {selected.map((code) => {
+          const country = COUNTRIES.find((c) => c.code === code);
+          return (
+            <span key={code} className="inline-flex items-center gap-0.5 rounded bg-blue-500/20 border border-blue-500/30 px-1.5 py-0.5 text-[10px] text-blue-300">
+              <span className="font-mono opacity-70">{code}</span>
+              {country && <span className="opacity-80"> {country.name}</span>}
+              <button type="button" onMouseDown={() => remove(code)} className="ml-0.5 text-blue-400/60 hover:text-blue-300">
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </span>
+          );
+        })}
+      </div>
+      <div className="relative">
+        <Input
+          type="text"
+          value={search}
+          placeholder="Search country…"
+          onChange={(e) => { setSearch(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          className="bg-gray-800 border-gray-700 h-6 text-[11px]"
+        />
+        {open && filtered.length > 0 && (
+          <div className="absolute z-50 w-full mt-0.5 rounded-md border border-gray-700 bg-gray-900 shadow-lg max-h-44 overflow-y-auto">
+            {filtered.map((c) => (
+              <button
+                key={c.code}
+                type="button"
+                onMouseDown={() => { add(c.code); setOpen(false); }}
+                className="w-full flex items-center gap-2 px-2 py-1.5 text-[11px] text-gray-300 hover:bg-gray-800 text-left"
+              >
+                <span className="font-mono text-[10px] text-gray-500 w-6 shrink-0">{c.code}</span>
+                {c.name}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TargetingEditor({ value, onChange }: { value: any; onChange: (v: any) => void }) {
+  const targeting = value && typeof value === "object" ? value : {};
+  const countries: string[] = targeting.geo_locations?.countries ?? [];
+  const ageMin: string = targeting.age_min != null ? String(targeting.age_min) : "";
+  const ageMax: string = targeting.age_max != null ? String(targeting.age_max) : "";
+  const genders: number[] = targeting.genders ?? [];
+
+  const emit = (patch: Partial<typeof targeting>) => {
+    const next = { ...targeting, ...patch };
+    if ((next.geo_locations?.countries ?? []).length === 0) delete next.geo_locations;
+    if (next.age_min == null) delete next.age_min;
+    if (next.age_max == null) delete next.age_max;
+    if ((next.genders ?? []).length === 0) delete next.genders;
+    onChange(Object.keys(next).length === 0 ? undefined : next);
+  };
+
+  const setAge = (field: "age_min" | "age_max", raw: string) => {
+    const n = raw === "" ? undefined : Number(raw);
+    emit({ [field]: n });
+  };
+
+  const setGender = (g: number) => {
+    if (g === 0) {
+      emit({ genders: [] });
+    } else {
+      const next = genders.includes(g) ? genders.filter((x) => x !== g) : [...genders, g];
+      emit({ genders: next });
+    }
+  };
+
+  return (
+    <div className="rounded-md border border-gray-700/60 bg-gray-800/40 p-2 space-y-2">
+      {/* Countries */}
+      <div>
+        <Label className="text-[9px] text-gray-500">Countries</Label>
+        <div className="mt-0.5">
+          <CountryPicker
+            selected={countries}
+            onChange={(newCountries) =>
+              emit({ geo_locations: { ...targeting.geo_locations, countries: newCountries } })
+            }
+          />
+        </div>
+      </div>
+
+      {/* Age */}
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <Label className="text-[9px] text-gray-500">Age Min</Label>
+          <Input
+            type="number"
+            min={13}
+            max={65}
+            value={ageMin}
+            placeholder="18"
+            onChange={(e) => setAge("age_min", e.target.value)}
+            className="bg-gray-800 border-gray-700 h-6 text-[11px] mt-0.5"
+          />
+        </div>
+        <div className="flex-1">
+          <Label className="text-[9px] text-gray-500">Age Max</Label>
+          <Input
+            type="number"
+            min={13}
+            max={65}
+            value={ageMax}
+            placeholder="65"
+            onChange={(e) => setAge("age_max", e.target.value)}
+            className="bg-gray-800 border-gray-700 h-6 text-[11px] mt-0.5"
+          />
+        </div>
+      </div>
+
+      {/* Gender */}
+      <div>
+        <Label className="text-[9px] text-gray-500">Gender</Label>
+        <div className="flex gap-1 mt-0.5">
+          {GENDER_OPTIONS.map((opt) => {
+            const isActive = opt.value === 0 ? genders.length === 0 : genders.includes(opt.value);
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setGender(opt.value)}
+                className={`flex-1 rounded-md border px-2 py-1 text-[10px] transition-colors ${
+                  isActive
+                    ? "border-blue-500 bg-blue-500/20 text-blue-300"
+                    : "border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600"
+                }`}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange(undefined)}
+          className="text-[9px] text-red-400/60 hover:text-red-400"
+        >
+          Clear targeting
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── Promoted object editor ───
+
+const PROMOTED_OBJECT_TYPES = [
+  { value: "none", label: "None" },
+  { value: "page", label: "Page" },
+  { value: "pixel", label: "Pixel" },
+  { value: "app", label: "App" },
+];
+
+const CUSTOM_EVENT_TYPES = [
+  "PURCHASE", "ADD_TO_CART", "INITIATE_CHECKOUT", "LEAD",
+  "COMPLETE_REGISTRATION", "VIEW_CONTENT", "SEARCH",
+  "SUBSCRIBE", "START_TRIAL", "CONTACT",
+];
+
+function detectPoType(value: any): string {
+  if (!value || typeof value !== "object") return "none";
+  if ("page_id" in value) return "page";
+  if ("pixel_id" in value) return "pixel";
+  if ("application_id" in value) return "app";
+  return "none";
+}
+
+function PromotedObjectEditor({ value, onChange }: { value: any; onChange: (v: any) => void }) {
+  const poType = detectPoType(value);
+  const po = value && typeof value === "object" ? value : {};
+
+  const changeType = (next: string) => {
+    if (next === "none") { onChange(undefined); return; }
+    if (next === "page") onChange({ page_id: "" });
+    if (next === "pixel") onChange({ pixel_id: "", custom_event_type: "PURCHASE" });
+    if (next === "app") onChange({ application_id: "" });
+  };
+
+  const setField = (field: string, val: string) => {
+    const next = { ...po };
+    if (val) next[field] = val;
+    else delete next[field];
+    onChange(Object.keys(next).length === 0 ? undefined : next);
+  };
+
+  return (
+    <div className="rounded-md border border-gray-700/60 bg-gray-800/40 p-2 space-y-2">
+      <div>
+        <Label className="text-[9px] text-gray-500">Type</Label>
+        <select
+          value={poType}
+          onChange={(e) => changeType(e.target.value)}
+          className="w-full mt-0.5 rounded-md bg-gray-800 border border-gray-700 text-xs text-gray-200 px-2 py-1.5"
+        >
+          {PROMOTED_OBJECT_TYPES.map((t) => (
+            <option key={t.value} value={t.value}>{t.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {poType === "page" && (
+        <div>
+          <Label className="text-[9px] text-gray-500">Page ID</Label>
+          <Input
+            type="text"
+            value={po.page_id ?? ""}
+            placeholder="e.g. 1064753226727354"
+            onChange={(e) => setField("page_id", e.target.value)}
+            className="bg-gray-800 border-gray-700 h-7 text-[11px] mt-0.5"
+          />
+        </div>
+      )}
+
+      {poType === "pixel" && (
+        <>
+          <div>
+            <Label className="text-[9px] text-gray-500">Pixel ID</Label>
+            <Input
+              type="text"
+              value={po.pixel_id ?? ""}
+              placeholder="e.g. 123456789"
+              onChange={(e) => setField("pixel_id", e.target.value)}
+              className="bg-gray-800 border-gray-700 h-7 text-[11px] mt-0.5"
+            />
+          </div>
+          <div>
+            <Label className="text-[9px] text-gray-500">Custom Event Type</Label>
+            <select
+              value={po.custom_event_type ?? "PURCHASE"}
+              onChange={(e) => setField("custom_event_type", e.target.value)}
+              className="w-full mt-0.5 rounded-md bg-gray-800 border border-gray-700 text-xs text-gray-200 px-2 py-1.5"
+            >
+              {CUSTOM_EVENT_TYPES.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+        </>
+      )}
+
+      {poType === "app" && (
+        <div>
+          <Label className="text-[9px] text-gray-500">Application ID</Label>
+          <Input
+            type="text"
+            value={po.application_id ?? ""}
+            placeholder="e.g. 987654321"
+            onChange={(e) => setField("application_id", e.target.value)}
+            className="bg-gray-800 border-gray-700 h-7 text-[11px] mt-0.5"
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -688,3 +1066,5 @@ function JsonOverrideField({
     </div>
   );
 }
+
+

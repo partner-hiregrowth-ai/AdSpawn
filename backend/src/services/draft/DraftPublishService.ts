@@ -71,13 +71,20 @@ function sanitizeAssetFeedSpec(afs: any): any {
     if (!ASSET_FEED_SPEC_WRITABLE_FIELDS.has(key)) continue;
     const value = afs[key];
     if (ASSET_FEED_SUBOBJECT_ARRAYS.includes(key) && Array.isArray(value)) {
-      cleaned[key] = value.map((entry: any) => {
-        if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
-          const { id, ...rest } = entry;
-          return rest;
-        }
-        return entry;
-      });
+      const entries = value
+        .map((entry: any) => {
+          if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+            const { id, ...rest } = entry;
+            return rest;
+          }
+          return entry;
+        })
+        // Drop entries where every string value is empty (in-progress / blank rows)
+        .filter((entry: any) => {
+          if (!entry || typeof entry !== 'object') return true;
+          return Object.values(entry).some((v) => typeof v === 'string' && v.trim() !== '');
+        });
+      if (entries.length > 0) cleaned[key] = entries;
     } else {
       cleaned[key] = value;
     }
