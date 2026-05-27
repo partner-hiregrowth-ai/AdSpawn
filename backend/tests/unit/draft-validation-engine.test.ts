@@ -470,6 +470,27 @@ describe('DraftValidationEngine.validateAd', () => {
     );
     expect(errors.some(e => e.field === 'creative.page_id')).toBe(false);
   });
+
+  it('warns that creative_id overrides asset_feed/platform_customizations for a NON-dynamic ad set', async () => {
+    // For a non-DC ad set the publish path uses the creative_id and discards the dynamic
+    // assets, so the warning is accurate.
+    const errors = await DraftValidationEngine.validateAd(
+      makeAd({ data: { creative: { id: '123', asset_feed_spec: { images: [{ hash: 'x' }], bodies: [{ text: 'y' }] } } } }),
+      false // not a dynamic creative ad set
+    );
+    expect(errors.some(e => e.field === 'creative.creative_id' && e.severity === 'warning')).toBe(true);
+  });
+
+  it('suppresses the creative_id override warning for a Dynamic Creative ad set', async () => {
+    // For a DC ad set the publish path builds an inline asset_feed_spec creative and omits
+    // creative_id entirely, so the dynamic assets are NOT ignored — the warning is misleading
+    // and must be suppressed.
+    const errors = await DraftValidationEngine.validateAd(
+      makeAd({ data: { creative: { id: '123', asset_feed_spec: { images: [{ hash: 'x' }], bodies: [{ text: 'y' }] } } } }),
+      true // dynamic creative ad set
+    );
+    expect(errors.some(e => e.field === 'creative.creative_id')).toBe(false);
+  });
 });
 
 describe('DraftValidationEngine.validateFullDraft', () => {

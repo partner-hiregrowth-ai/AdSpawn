@@ -5,6 +5,7 @@ import {
   stripReadOnlyFields,
   sanitizePromotedObject,
   sanitizeTargeting,
+  sanitizeTrackingSpecs,
   migrateOptimizationGoal,
   migrateDestinationType,
   IMMUTABLE_CAMPAIGN_FIELDS,
@@ -288,5 +289,55 @@ describe('stripReadOnlyFields', () => {
     expect(result.id).toBeUndefined();
     expect(result.created_time).toBeUndefined();
     expect(result.effective_status).toBeUndefined();
+  });
+});
+
+describe('sanitizeTrackingSpecs', () => {
+  it('returns an empty array for non-array input', () => {
+    expect(sanitizeTrackingSpecs(undefined as any)).toEqual([]);
+    expect(sanitizeTrackingSpecs(null as any)).toEqual([]);
+    expect(sanitizeTrackingSpecs({} as any)).toEqual([]);
+  });
+
+  it('removes post and post.wall references', () => {
+    const result = sanitizeTrackingSpecs([
+      { 'action.type': ['post_engagement'], page: ['123'], post: ['456'], 'post.wall': ['789'] },
+    ]);
+    expect(result).toEqual([{ 'action.type': ['post_engagement'], page: ['123'] }]);
+  });
+
+  it('filters out specs that only contain action.type (no object)', () => {
+    const result = sanitizeTrackingSpecs([
+      { 'action.type': ['onsite_conversion'], conversion_id: ['25753534954323372'] },
+      { 'action.type': ['onsite_conversion'] },
+      { page: ['1064753226727354'], 'action.type': ['post_interaction_gross'] },
+      { page: ['1064753226727354'], 'action.type': ['post_engagement'] },
+      { 'action.type': ['link_click'] },
+      { 'action.type': ['one_pd_landing_page_view'] },
+    ]);
+    expect(result).toEqual([
+      { 'action.type': ['onsite_conversion'], conversion_id: ['25753534954323372'] },
+      { page: ['1064753226727354'], 'action.type': ['post_interaction_gross'] },
+      { page: ['1064753226727354'], 'action.type': ['post_engagement'] },
+    ]);
+  });
+
+  it('filters out a spec that becomes object-less only after post references are stripped', () => {
+    const result = sanitizeTrackingSpecs([
+      { 'action.type': ['post_engagement'], post: ['456'] },
+    ]);
+    expect(result).toEqual([]);
+  });
+
+  it('filters out empty specs', () => {
+    expect(sanitizeTrackingSpecs([{}])).toEqual([]);
+  });
+
+  it('keeps specs that reference any non action.type object key', () => {
+    const specs = [
+      { 'action.type': ['offsite_conversion'], fb_pixel: ['123'] },
+      { 'action.type': ['app_install'], application: ['999'] },
+    ];
+    expect(sanitizeTrackingSpecs(specs)).toEqual(specs);
   });
 });

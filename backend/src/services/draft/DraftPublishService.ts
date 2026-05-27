@@ -38,6 +38,89 @@ function redactPayload(payload: any): any {
   return targeting ? { ...rest, targeting: '[redacted]' } : rest;
 }
 
+// Fields Meta accepts when CREATING an asset_feed_spec for a Dynamic Creative ad.
+// A GET on a live creative returns extra computed/read-only fields (e.g. `id`,
+// `effective_*`, `optimization_type`, nested object ids) that Meta rejects on a
+// create. We whitelist only the writable fields. `ad_formats` is required (inferred
+// elsewhere) — it is included so an already-set value survives sanitization.
+const ASSET_FEED_SPEC_WRITABLE_FIELDS = new Set([
+  'bodies',
+  'titles',
+  'descriptions',
+  'link_urls',
+  'images',
+  'videos',
+  'call_to_action_types',
+  'ad_formats',
+]);
+
+// Sub-object array fields whose individual entries may carry a read-only `id` from a
+// GET. We keep the entries but strip the `id` so Meta treats them as new asset specs.
+const ASSET_FEED_SUBOBJECT_ARRAYS = ['bodies', 'titles', 'descriptions', 'link_urls', 'images', 'videos'];
+
+/**
+ * Strip everything from a stored asset_feed_spec that Meta will not accept on a
+ * Dynamic Creative ad create. Keeps only the writable fields and removes any
+ * read-only `id` from each sub-object entry. Returns a NEW object — never mutates
+ * the stored draft data.
+ */
+function sanitizeAssetFeedSpec(afs: any): any {
+  if (!afs || typeof afs !== 'object') return afs;
+  const cleaned: any = {};
+  for (const key of Object.keys(afs)) {
+    if (!ASSET_FEED_SPEC_WRITABLE_FIELDS.has(key)) continue;
+    const value = afs[key];
+    if (ASSET_FEED_SUBOBJECT_ARRAYS.includes(key) && Array.isArray(value)) {
+      cleaned[key] = value.map((entry: any) => {
+        if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+          const { id, ...rest } = entry;
+          return rest;
+        }
+        return entry;
+      });
+    } else {
+      cleaned[key] = value;
+    }
+  }
+  return cleaned;
+}
+
+/**
+ * Strip read-only fields (`id`, any `effective_*` keys) from a stored
+ * platform_customizations object fetched from Meta. Recurses into nested objects
+ * and arrays so per-placement customizations are also cleaned. Returns a NEW object —
+ * never mutates the stored draft data.
+ */
+function sanitizePlatformCustomizations(value: any): any {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sanitizePlatformCustomizations(entry));
+  }
+  if (value && typeof value === 'object') {
+    const cleaned: any = {};
+    for (const key of Object.keys(value)) {
+      if (key === 'id') continue;
+      if (key.startsWith('effective_')) continue;
+      cleaned[key] = sanitizePlatformCustomizations(value[key]);
+    }
+    return cleaned;
+  }
+  return value;
+}
+
+// Meta error code 3 (often surfaced as "(#3) Application does not have the capability
+// to make this API call") means the FB App is in Development mode. Dynamic Creative
+// inline creatives — like object_story_spec — require the app to be in Live mode.
+const DEV_MODE_CAPABILITY_MESSAGE =
+  'Dynamic Creative ads require the Facebook App to be in Live mode. Switch your app to Live mode in the Facebook Developer portal and try again.';
+
+function isDevModeCapabilityError(error: any): boolean {
+  const errData = error?.response?.data?.error;
+  if (!errData) return false;
+  if (errData.code === 3) return true;
+  const msg: string = errData.message || '';
+  return /does not have the capability/i.test(msg);
+}
+
 export class DraftPublishService {
   static async publishCampaign(campaignId: string, accessToken: string) {
     if (!accessToken) {
@@ -877,10 +960,72 @@ export class DraftPublishService {
     const isMessengerDest = ['MESSENGER', 'WHATSAPP', 'INSTAGRAM_DIRECT'].includes(effectiveDestType);
     const forceInline = isMessengerDest && hasInlineCreative;
 
+    // Dynamic Creative ad sets only accept Dynamic Creative ads (error 100/1885702:
+    // "Only Dynamic Creative ad can be created since the Ad Set is Dynamic Creative Ad Set.").
+    // A DC ad set rejects BOTH a plain creative_id reference AND a pre-created adcreative
+    // object (the latter also fails in dev mode with "(#3) Application does not have the
+    // capability to make this API call."). The only path that works is an INLINE creative
+    // embedded directly in the ad's `creative` field, built from asset_feed_spec + page_id
+    // (+ platform_customizations), with is_dynamic_creative: true on the ad payload.
+    //
+    // When the stored creative is a "post-backed dynamic creative" (it has BOTH asset_feed_spec
+    // AND object_story_spec), Meta uses object_story_spec to provide the post format while
+    // asset_feed_spec provides the dynamic elements. Omitting object_story_spec in that case
+    // causes error 100/2490497 ("You must select an existing post or create a post for your ad
+    // creative."), so we must include it. (Per CLAUDE.md, object_story_spec requires the FB app
+    // to be in Live mode — in dev mode this will fail with a self-explanatory app-mode error,
+    // which is expected and acceptable.) When there is no stored object_story_spec, we omit it.
+    const isDynamicCreativeAdSet = !!adSet?.data?.is_dynamic_creative;
+
+    // DC ad set + stored asset_feed_spec → build the inline dynamic creative. This branch
+    // takes priority over the creative_id shortcut below because a DC ad set cannot reference
+    // a standalone creative.
+    if (isDynamicCreativeAdSet && hasAssetFeed) {
+      const pageId = adSet?.data?.promoted_object?.page_id
+        || adSet?.data?.page_id
+        || adData.page_id
+        || adData.creative?.page_id
+        || adData.creative?.object_story_spec?.page_id;
+
+      // A stored asset_feed_spec fetched from Meta's GET carries computed/read-only fields
+      // (e.g. `id`, `effective_*`, `optimization_type`, per-asset `id`s) that Meta rejects on
+      // create. Whitelist only the writable fields and drop read-only sub-object ids. This
+      // returns a NEW object, so the stored draft data is not mutated.
+      const afs = sanitizeAssetFeedSpec(adData.creative.asset_feed_spec);
+      if (afs.call_to_action_types?.length > 5) {
+        console.log(`[DraftPublishService] Trimming call_to_action_types from ${afs.call_to_action_types.length} to 5 (Meta limit)`);
+        afs.call_to_action_types = afs.call_to_action_types.slice(0, 5);
+      }
+
+      // Meta requires asset_feed_spec to declare exactly one ad format (error 100/1885374:
+      // "An asset feed can have exactly one ad format."). Infer it from the stored post format
+      // when not already set by stored data.
+      if (!afs.ad_formats) {
+        const oss = adData.creative.object_story_spec;
+        if (oss?.video_data) afs.ad_formats = ['SINGLE_VIDEO'];
+        else afs.ad_formats = ['SINGLE_IMAGE'];
+      }
+
+      // Inline creative for a Dynamic Creative ad: asset_feed_spec + page_id only.
+      // We deliberately DO NOT send object_story_spec. A stored object_story_spec fetched from
+      // Meta is a computed/read-only representation of the ad's post format — Meta surfaces it
+      // to describe the post but rejects it on ad creation (error 100/1443048: "Object story
+      // spec is ill formed..."). With asset_feed_spec.ad_formats present, object_story_spec is
+      // not needed; its absence does NOT trigger the earlier 100/2490497 ("must select an
+      // existing post") because that error was actually caused by the missing ad_formats.
+      creative = { asset_feed_spec: afs };
+      if (pageId) creative.page_id = String(pageId);
+      if (adData.creative.platform_customizations) {
+        // platform_customizations from a GET also carries read-only fields (`id`, `effective_*`).
+        // Strip them so Meta accepts the inline creative in Live mode.
+        creative.platform_customizations = sanitizePlatformCustomizations(adData.creative.platform_customizations);
+      }
+      console.log(`[DraftPublishService] Building inline dynamic creative for ad ${ad.id} (DC ad set, asset_feed_spec only)`);
+    }
     // If the ad was duplicated from a live Meta campaign, it will have both creative.id (the
     // existing Meta creative) and asset_feed_spec in its data. Re-creating the dynamic creative
     // may fail if the app lacks the required capability. Prefer the existing creative ID.
-    if (existingMetaCreativeId && hasAssetFeed && !forceInline) {
+    else if (existingMetaCreativeId && hasAssetFeed && !forceInline) {
       console.log(`[DraftPublishService] Using existing creative_id ${existingMetaCreativeId} for ad ${ad.id} (skipping asset_feed_spec pre-creation)`);
       creative = { creative_id: String(existingMetaCreativeId) };
     } else if (hasAssetFeed) {
@@ -1008,6 +1153,13 @@ export class DraftPublishService {
       creative,
     };
 
+    // Dynamic Creative ad sets require each ad to also declare is_dynamic_creative: true.
+    // Without this — and without the inline asset_feed_spec creative built above — Meta
+    // rejects the ad with error 100/1885702. The flag lives on the parent ad set's draft data.
+    if (isDynamicCreativeAdSet) {
+      adPayload.is_dynamic_creative = true;
+    }
+
     if (adData.tracking_specs) {
       adPayload.tracking_specs = sanitizeTrackingSpecs(adData.tracking_specs);
     }
@@ -1021,6 +1173,13 @@ export class DraftPublishService {
       const fbAd = await fbService.client.post(`/${accountId}/ads`, adPayload);
       return fbAd.data.id;
     } catch (error: any) {
+      // Dynamic Creative inline creatives are gated to Live mode. A dev-mode app returns
+      // error code 3 ("(#3) Application does not have the capability to make this API call.").
+      // Surface a clear, actionable message instead of the raw Meta error.
+      if (isDynamicCreativeAdSet && isDevModeCapabilityError(error)) {
+        const info = extractMetaErrorInfo(error, 'Ad');
+        throw new PublishError(info.detail, DEV_MODE_CAPABILITY_MESSAGE);
+      }
       throw this.toPublishError(error, 'Ad');
     }
   }

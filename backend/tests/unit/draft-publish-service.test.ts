@@ -412,7 +412,9 @@ describe('DraftPublishService.publishCampaign', () => {
 
   it('includes tracking_specs in ad payload', async () => {
     const campaign = makeDraftCampaign();
-    campaign.adSets[0].ads[0].data.tracking_specs = [{ 'action.type': ['offsite_conversion'] }];
+    campaign.adSets[0].ads[0].data.tracking_specs = [
+      { 'action.type': ['offsite_conversion'], fb_pixel: ['123'] },
+    ];
     mockPrisma.draftCampaign.findUnique.mockResolvedValue(campaign);
     mockPrisma.draftCampaign.update.mockResolvedValue({});
     mockPrisma.draftAdSet.update.mockResolvedValue({});
@@ -426,6 +428,57 @@ describe('DraftPublishService.publishCampaign', () => {
     await DraftPublishService.publishCampaign('camp-1', 'token');
     const adCall = mockFbPost.mock.calls[2];
     expect(adCall[1]).toHaveProperty('tracking_specs');
+  });
+
+  it('filters out tracking_specs entries that only contain action.type (no object)', async () => {
+    const campaign = makeDraftCampaign();
+    // Mirrors the real-world payload that triggered Meta error 100/1634005.
+    campaign.adSets[0].ads[0].data.tracking_specs = [
+      { 'action.type': ['onsite_conversion'], conversion_id: ['25753534954323372'] },
+      { 'action.type': ['onsite_conversion'] }, // no object -> filtered
+      { page: ['1064753226727354'], 'action.type': ['post_interaction_gross'] },
+      { page: ['1064753226727354'], 'action.type': ['post_engagement'] },
+      { 'action.type': ['link_click'] }, // no object -> filtered
+      { 'action.type': ['one_pd_landing_page_view'] }, // no object -> filtered
+    ];
+    mockPrisma.draftCampaign.findUnique.mockResolvedValue(campaign);
+    mockPrisma.draftCampaign.update.mockResolvedValue({});
+    mockPrisma.draftAdSet.update.mockResolvedValue({});
+    mockPrisma.draftAd.update.mockResolvedValue({});
+
+    mockFbPost
+      .mockResolvedValueOnce({ data: { id: 'meta_camp_1' } })
+      .mockResolvedValueOnce({ data: { id: 'meta_adset_1' } })
+      .mockResolvedValueOnce({ data: { id: 'meta_ad_1' } });
+
+    await DraftPublishService.publishCampaign('camp-1', 'token');
+    const adCall = mockFbPost.mock.calls[2];
+    expect(adCall[1].tracking_specs).toEqual([
+      { 'action.type': ['onsite_conversion'], conversion_id: ['25753534954323372'] },
+      { page: ['1064753226727354'], 'action.type': ['post_interaction_gross'] },
+      { page: ['1064753226727354'], 'action.type': ['post_engagement'] },
+    ]);
+  });
+
+  it('omits tracking_specs from payload when all entries are object-less', async () => {
+    const campaign = makeDraftCampaign();
+    campaign.adSets[0].ads[0].data.tracking_specs = [
+      { 'action.type': ['link_click'] },
+      { 'action.type': ['one_pd_landing_page_view'] },
+    ];
+    mockPrisma.draftCampaign.findUnique.mockResolvedValue(campaign);
+    mockPrisma.draftCampaign.update.mockResolvedValue({});
+    mockPrisma.draftAdSet.update.mockResolvedValue({});
+    mockPrisma.draftAd.update.mockResolvedValue({});
+
+    mockFbPost
+      .mockResolvedValueOnce({ data: { id: 'meta_camp_1' } })
+      .mockResolvedValueOnce({ data: { id: 'meta_adset_1' } })
+      .mockResolvedValueOnce({ data: { id: 'meta_ad_1' } });
+
+    await DraftPublishService.publishCampaign('camp-1', 'token');
+    const adCall = mockFbPost.mock.calls[2];
+    expect(adCall[1].tracking_specs).toEqual([]);
   });
 
   it('throws on ad without creative_id during publish', async () => {
@@ -832,6 +885,351 @@ describe('DraftPublishService.publishCampaign', () => {
     const adCall = mockFbPost.mock.calls[3];
     expect(adCall[1].creative.creative_id).toBe('meta_creative_1');
     expect(adCall[1].creative.asset_feed_spec).toBeUndefined();
+  });
+
+  it('reuses existing creative.id shortcut (skips asset_feed_spec pre-create) for non-dynamic ad set', async () => {
+    const campaign = makeDraftCampaign();
+    campaign.adSets[0].data.promoted_object = { page_id: '123' };
+    // Duplicated-from-live ad: has BOTH an existing Meta creative.id AND asset_feed_spec
+    campaign.adSets[0].ads[0].data = {
+      creative: {
+        id: '1657898495543425',
+        asset_feed_spec: { images: [{ hash: 'x' }], bodies: [{ text: 'y' }] },
+      },
+    };
+    mockPrisma.draftCampaign.findUnique.mockResolvedValue(campaign);
+    mockPrisma.draftCampaign.update.mockResolvedValue({});
+    mockPrisma.draftAdSet.update.mockResolvedValue({});
+    mockPrisma.draftAd.update.mockResolvedValue({});
+    mockFbPost
+      .mockResolvedValueOnce({ data: { id: 'meta_camp_1' } })
+      .mockResolvedValueOnce({ data: { id: 'meta_adset_1' } })
+      .mockResolvedValueOnce({ data: { id: 'meta_ad_1' } });
+
+    await DraftPublishService.publishCampaign('camp-1', 'token');
+    // Only 3 POSTs — no adcreative pre-create, the existing creative.id is reused directly
+    expect(mockFbPost).toHaveBeenCalledTimes(3);
+    const adCall = mockFbPost.mock.calls[2];
+    expect(adCall[0]).toMatch(/\/ads$/);
+    expect(adCall[1].creative.creative_id).toBe('1657898495543425');
+    expect(adCall[1].creative.asset_feed_spec).toBeUndefined();
+  });
+
+  it('builds an inline asset_feed_spec-only creative for a Dynamic Creative ad set (no creative_id, no object_story_spec)', async () => {
+    // Meta error 100/1885702 ("Only Dynamic Creative ad can be created...") happens when an ad
+    // on a DC ad set references a standalone creative_id OR a pre-created adcreative object
+    // (the latter also fails in dev mode with the (#3) capability error). The only working path
+    // is an INLINE creative embedded in the ad: asset_feed_spec + page_id (+ platform_customizations),
+    // with is_dynamic_creative: true on the ad payload. When the stored creative has no
+    // object_story_spec, the inline creative omits it (and creative_id).
+    const campaign = makeDraftCampaign();
+    campaign.adSets[0].data.promoted_object = { page_id: '1064753226727354' };
+    campaign.adSets[0].data.is_dynamic_creative = true;
+    campaign.adSets[0].ads[0].data = {
+      creative: {
+        id: '1657898495543425',
+        name: 'DC Creative',
+        asset_feed_spec: { images: [{ hash: 'x' }], bodies: [{ text: 'y' }] },
+        platform_customizations: { instagram: { title: 'IG' } },
+      },
+    };
+    mockPrisma.draftCampaign.findUnique.mockResolvedValue(campaign);
+    mockPrisma.draftCampaign.update.mockResolvedValue({});
+    mockPrisma.draftAdSet.update.mockResolvedValue({});
+    mockPrisma.draftAd.update.mockResolvedValue({});
+    mockFbPost
+      .mockResolvedValueOnce({ data: { id: 'meta_camp_1' } })
+      .mockResolvedValueOnce({ data: { id: 'meta_adset_1' } })
+      .mockResolvedValueOnce({ data: { id: 'meta_ad_1' } });
+
+    await DraftPublishService.publishCampaign('camp-1', 'token');
+    // Only 3 POSTs — no adcreative pre-create (would fail in dev mode); creative is inline on the ad
+    expect(mockFbPost).toHaveBeenCalledTimes(3);
+    // Ad set must be created as dynamic creative
+    const adSetCall = mockFbPost.mock.calls[1];
+    expect(adSetCall[0]).toMatch(/\/adsets$/);
+    expect(adSetCall[1].is_dynamic_creative).toBe(true);
+    // 3rd call = ad POST — inline asset_feed_spec creative + is_dynamic_creative flag
+    const adCall = mockFbPost.mock.calls[2];
+    expect(adCall[0]).toMatch(/\/ads$/);
+    expect(adCall[1].is_dynamic_creative).toBe(true);
+    // creative is inline: asset_feed_spec (with inferred ad_formats) + page_id + platform_customizations
+    expect(adCall[1].creative.asset_feed_spec).toEqual({
+      images: [{ hash: 'x' }],
+      bodies: [{ text: 'y' }],
+      ad_formats: ['SINGLE_IMAGE'],
+    });
+    expect(adCall[1].creative.page_id).toBe('1064753226727354');
+    expect(adCall[1].creative.platform_customizations).toEqual({ instagram: { title: 'IG' } });
+    // Must NOT include creative_id; no stored object_story_spec, so it is omitted
+    expect(adCall[1].creative.creative_id).toBeUndefined();
+    expect(adCall[1].creative.object_story_spec).toBeUndefined();
+  });
+
+  it('omits object_story_spec from the inline DC creative for a post-backed dynamic creative', async () => {
+    // When the stored creative is "post-backed" (has BOTH asset_feed_spec AND object_story_spec),
+    // the object_story_spec is a computed/read-only representation Meta surfaces to describe the
+    // post format — it is NOT accepted back on ad creation (error 100/1443048: "Object story spec
+    // is ill formed...", even after stripping instagram_user_id and link_data.message). With
+    // asset_feed_spec.ad_formats present, object_story_spec is not needed: the inline creative is
+    // asset_feed_spec + page_id only, and the format is inferred onto asset_feed_spec.ad_formats.
+    const campaign = makeDraftCampaign();
+    campaign.adSets[0].data.promoted_object = { page_id: '1064753226727354' };
+    campaign.adSets[0].data.is_dynamic_creative = true;
+    // Mirror the real-world payload that produced error 100/1443048.
+    const objectStorySpec = {
+      page_id: '1064753226727354',
+      link_data: {
+        link: 'http://example.com/',
+        message: 'yo',
+        call_to_action: { type: 'SEE_DETAILS' },
+      },
+      instagram_user_id: '17841415735127645',
+    };
+    campaign.adSets[0].ads[0].data = {
+      creative: {
+        id: '1657898495543425',
+        name: 'DC Creative',
+        asset_feed_spec: { images: [{ hash: 'x' }], bodies: [{ text: 'y' }] },
+        object_story_spec: objectStorySpec,
+        platform_customizations: { instagram: { title: 'IG' } },
+      },
+    };
+    mockPrisma.draftCampaign.findUnique.mockResolvedValue(campaign);
+    mockPrisma.draftCampaign.update.mockResolvedValue({});
+    mockPrisma.draftAdSet.update.mockResolvedValue({});
+    mockPrisma.draftAd.update.mockResolvedValue({});
+    mockFbPost
+      .mockResolvedValueOnce({ data: { id: 'meta_camp_1' } })
+      .mockResolvedValueOnce({ data: { id: 'meta_adset_1' } })
+      .mockResolvedValueOnce({ data: { id: 'meta_ad_1' } });
+
+    await DraftPublishService.publishCampaign('camp-1', 'token');
+    // Only 3 POSTs — no adcreative pre-create; creative is inline on the ad
+    expect(mockFbPost).toHaveBeenCalledTimes(3);
+    const adCall = mockFbPost.mock.calls[2];
+    expect(adCall[0]).toMatch(/\/ads$/);
+    expect(adCall[1].is_dynamic_creative).toBe(true);
+    // creative is inline: asset_feed_spec (with inferred ad_formats) + page_id + platform_customizations.
+    // ad_formats is inferred from the stored post format (link_data → SINGLE_IMAGE) to satisfy 100/1885374.
+    expect(adCall[1].creative.asset_feed_spec).toEqual({
+      images: [{ hash: 'x' }],
+      bodies: [{ text: 'y' }],
+      ad_formats: ['SINGLE_IMAGE'],
+    });
+    expect(adCall[1].creative.page_id).toBe('1064753226727354');
+    expect(adCall[1].creative.platform_customizations).toEqual({ instagram: { title: 'IG' } });
+    // object_story_spec must NOT be sent — it is the cause of error 100/1443048
+    expect(adCall[1].creative.object_story_spec).toBeUndefined();
+    // Still must NOT include creative_id
+    expect(adCall[1].creative.creative_id).toBeUndefined();
+    // The original stored draft object must NOT be mutated
+    expect(objectStorySpec.instagram_user_id).toBe('17841415735127645');
+    expect(objectStorySpec.link_data.message).toBe('yo');
+  });
+
+  it('infers ad_formats on asset_feed_spec from stored object_story_spec format in the inline DC creative', async () => {
+    // Meta requires asset_feed_spec to declare exactly one ad_formats so it knows which format to
+    // apply (error 100/1885374: "An asset feed can have exactly one ad format."). When ad_formats
+    // is absent we infer it from the stored post format: video_data → SINGLE_VIDEO, everything
+    // else → SINGLE_IMAGE. object_story_spec itself is never sent. Existing ad_formats is kept.
+    const cases: Array<{ name: string; oss: any; expected: string[] | undefined }> = [
+      { name: 'link_data', oss: { page_id: '999', link_data: { link: 'http://example.com' } }, expected: ['SINGLE_IMAGE'] },
+      { name: 'video_data', oss: { page_id: '999', video_data: { video_id: '456' } }, expected: ['SINGLE_VIDEO'] },
+      { name: 'photo_data', oss: { page_id: '999', photo_data: { image_hash: 'abc' } }, expected: ['SINGLE_IMAGE'] },
+      { name: 'fallback (none)', oss: { page_id: '999', text_data: { message: 'hi' } }, expected: ['SINGLE_IMAGE'] },
+    ];
+
+    for (const c of cases) {
+      vi.clearAllMocks();
+      const campaign = makeDraftCampaign();
+      campaign.adSets[0].data.promoted_object = { page_id: '999' };
+      campaign.adSets[0].data.is_dynamic_creative = true;
+      campaign.adSets[0].ads[0].data = {
+        creative: {
+          asset_feed_spec: { images: [{ hash: 'x' }], bodies: [{ text: 'y' }] },
+          object_story_spec: c.oss,
+        },
+      };
+      mockPrisma.draftCampaign.findUnique.mockResolvedValue(campaign);
+      mockPrisma.draftCampaign.update.mockResolvedValue({});
+      mockPrisma.draftAdSet.update.mockResolvedValue({});
+      mockPrisma.draftAd.update.mockResolvedValue({});
+      mockFbPost
+        .mockResolvedValueOnce({ data: { id: 'meta_camp_1' } })
+        .mockResolvedValueOnce({ data: { id: 'meta_adset_1' } })
+        .mockResolvedValueOnce({ data: { id: 'meta_ad_1' } });
+
+      await DraftPublishService.publishCampaign('camp-1', 'token');
+      const adCall = mockFbPost.mock.calls[2];
+      expect(adCall[1].creative.asset_feed_spec.ad_formats, `case: ${c.name}`).toEqual(c.expected);
+    }
+  });
+
+  it('keeps existing asset_feed_spec.ad_formats unchanged in the inline DC creative (no override)', async () => {
+    // If the stored asset_feed_spec already declares ad_formats, it must be preserved even when
+    // object_story_spec implies a different format.
+    const campaign = makeDraftCampaign();
+    campaign.adSets[0].data.promoted_object = { page_id: '999' };
+    campaign.adSets[0].data.is_dynamic_creative = true;
+    campaign.adSets[0].ads[0].data = {
+      creative: {
+        asset_feed_spec: { images: [{ hash: 'x' }], bodies: [{ text: 'y' }], ad_formats: ['SINGLE_VIDEO'] },
+        object_story_spec: { page_id: '999', link_data: { link: 'http://example.com' } },
+      },
+    };
+    mockPrisma.draftCampaign.findUnique.mockResolvedValue(campaign);
+    mockPrisma.draftCampaign.update.mockResolvedValue({});
+    mockPrisma.draftAdSet.update.mockResolvedValue({});
+    mockPrisma.draftAd.update.mockResolvedValue({});
+    mockFbPost
+      .mockResolvedValueOnce({ data: { id: 'meta_camp_1' } })
+      .mockResolvedValueOnce({ data: { id: 'meta_adset_1' } })
+      .mockResolvedValueOnce({ data: { id: 'meta_ad_1' } });
+
+    await DraftPublishService.publishCampaign('camp-1', 'token');
+    const adCall = mockFbPost.mock.calls[2];
+    // Inference must NOT override the stored ad_formats (link_data would imply SINGLE_IMAGE).
+    expect(adCall[1].creative.asset_feed_spec.ad_formats).toEqual(['SINGLE_VIDEO']);
+  });
+
+  it('trims call_to_action_types to 5 in the inline DC creative', async () => {
+    const campaign = makeDraftCampaign();
+    campaign.adSets[0].data.promoted_object = { page_id: '999' };
+    campaign.adSets[0].data.is_dynamic_creative = true;
+    campaign.adSets[0].ads[0].data = {
+      creative: {
+        asset_feed_spec: {
+          images: [{ hash: 'x' }],
+          call_to_action_types: ['SHOP_NOW', 'LEARN_MORE', 'SIGN_UP', 'SUBSCRIBE', 'DOWNLOAD', 'GET_OFFER', 'BOOK_TRAVEL'],
+        },
+      },
+    };
+    mockPrisma.draftCampaign.findUnique.mockResolvedValue(campaign);
+    mockPrisma.draftCampaign.update.mockResolvedValue({});
+    mockPrisma.draftAdSet.update.mockResolvedValue({});
+    mockPrisma.draftAd.update.mockResolvedValue({});
+    mockFbPost
+      .mockResolvedValueOnce({ data: { id: 'meta_camp_1' } })
+      .mockResolvedValueOnce({ data: { id: 'meta_adset_1' } })
+      .mockResolvedValueOnce({ data: { id: 'meta_ad_1' } });
+
+    await DraftPublishService.publishCampaign('camp-1', 'token');
+    expect(mockFbPost).toHaveBeenCalledTimes(3);
+    const adCall = mockFbPost.mock.calls[2];
+    expect(adCall[1].creative.asset_feed_spec.call_to_action_types).toHaveLength(5);
+    expect(adCall[1].creative.asset_feed_spec.call_to_action_types).toEqual([
+      'SHOP_NOW', 'LEARN_MORE', 'SIGN_UP', 'SUBSCRIBE', 'DOWNLOAD',
+    ]);
+  });
+
+  it('strips read-only fields from asset_feed_spec in the inline DC creative (live-mode correctness)', async () => {
+    // A stored asset_feed_spec fetched from Meta's GET carries computed/read-only fields that
+    // Meta rejects on a create: a top-level `id`, `effective_*`, `optimization_type`, and a
+    // read-only `id` on each sub-asset. Only the writable fields (bodies/titles/descriptions/
+    // link_urls/images/videos/call_to_action_types/ad_formats) may be sent, and sub-asset ids
+    // must be dropped.
+    const campaign = makeDraftCampaign();
+    campaign.adSets[0].data.promoted_object = { page_id: '999' };
+    campaign.adSets[0].data.is_dynamic_creative = true;
+    campaign.adSets[0].ads[0].data = {
+      creative: {
+        asset_feed_spec: {
+          id: '1234567890',
+          effective_optimization_type: 'DEGREES_OF_FREEDOM',
+          optimization_type: 'DEGREES_OF_FREEDOM',
+          additional_data: { multi_share_end_card: false },
+          images: [{ hash: 'x', id: 'img-ro-1' }],
+          bodies: [{ text: 'y', id: 'body-ro-1' }],
+          titles: [{ text: 't', id: 'title-ro-1' }],
+          ad_formats: ['SINGLE_IMAGE'],
+        },
+      },
+    };
+    mockPrisma.draftCampaign.findUnique.mockResolvedValue(campaign);
+    mockPrisma.draftCampaign.update.mockResolvedValue({});
+    mockPrisma.draftAdSet.update.mockResolvedValue({});
+    mockPrisma.draftAd.update.mockResolvedValue({});
+    mockFbPost
+      .mockResolvedValueOnce({ data: { id: 'meta_camp_1' } })
+      .mockResolvedValueOnce({ data: { id: 'meta_adset_1' } })
+      .mockResolvedValueOnce({ data: { id: 'meta_ad_1' } });
+
+    await DraftPublishService.publishCampaign('camp-1', 'token');
+    const adCall = mockFbPost.mock.calls[2];
+    // Only writable fields survive; read-only top-level keys and sub-asset ids are stripped.
+    expect(adCall[1].creative.asset_feed_spec).toEqual({
+      images: [{ hash: 'x' }],
+      bodies: [{ text: 'y' }],
+      titles: [{ text: 't' }],
+      ad_formats: ['SINGLE_IMAGE'],
+    });
+    // The stored draft must NOT be mutated.
+    expect(campaign.adSets[0].ads[0].data.creative.asset_feed_spec.id).toBe('1234567890');
+    expect(campaign.adSets[0].ads[0].data.creative.asset_feed_spec.images[0].id).toBe('img-ro-1');
+  });
+
+  it('strips read-only fields from platform_customizations in the inline DC creative', async () => {
+    // platform_customizations fetched from Meta also carries read-only fields (`id`,
+    // `effective_*`) that must be stripped before re-sending.
+    const campaign = makeDraftCampaign();
+    campaign.adSets[0].data.promoted_object = { page_id: '999' };
+    campaign.adSets[0].data.is_dynamic_creative = true;
+    campaign.adSets[0].ads[0].data = {
+      creative: {
+        asset_feed_spec: { images: [{ hash: 'x' }], bodies: [{ text: 'y' }], ad_formats: ['SINGLE_IMAGE'] },
+        platform_customizations: {
+          id: 'pc-ro-1',
+          effective_instagram_media_id: '999',
+          instagram: { title: 'IG', id: 'ig-ro-1', effective_object_story_id: '111' },
+        },
+      },
+    };
+    mockPrisma.draftCampaign.findUnique.mockResolvedValue(campaign);
+    mockPrisma.draftCampaign.update.mockResolvedValue({});
+    mockPrisma.draftAdSet.update.mockResolvedValue({});
+    mockPrisma.draftAd.update.mockResolvedValue({});
+    mockFbPost
+      .mockResolvedValueOnce({ data: { id: 'meta_camp_1' } })
+      .mockResolvedValueOnce({ data: { id: 'meta_adset_1' } })
+      .mockResolvedValueOnce({ data: { id: 'meta_ad_1' } });
+
+    await DraftPublishService.publishCampaign('camp-1', 'token');
+    const adCall = mockFbPost.mock.calls[2];
+    expect(adCall[1].creative.platform_customizations).toEqual({
+      instagram: { title: 'IG' },
+    });
+    // Stored draft must NOT be mutated.
+    expect(campaign.adSets[0].ads[0].data.creative.platform_customizations.id).toBe('pc-ro-1');
+  });
+
+  it('throws a clear Live-mode error when a DC ad fails with dev-mode capability error (code 3)', async () => {
+    // Dynamic Creative inline creatives are gated to Live mode. A dev-mode app returns error
+    // code 3 ("(#3) Application does not have the capability to make this API call."). The
+    // publish path must surface an actionable userMessage instead of the raw Meta error.
+    const campaign = makeDraftCampaign();
+    campaign.adSets[0].data.promoted_object = { page_id: '999' };
+    campaign.adSets[0].data.is_dynamic_creative = true;
+    campaign.adSets[0].ads[0].data = {
+      creative: { asset_feed_spec: { images: [{ hash: 'x' }], bodies: [{ text: 'y' }], ad_formats: ['SINGLE_IMAGE'] } },
+    };
+    mockPrisma.draftCampaign.findUnique.mockResolvedValue(campaign);
+    mockPrisma.draftCampaign.update.mockResolvedValue({});
+    mockPrisma.draftAdSet.update.mockResolvedValue({});
+    mockPrisma.draftAd.update.mockResolvedValue({});
+    mockPrisma.draftAdSet.updateMany.mockResolvedValue({});
+    mockPrisma.draftAd.updateMany.mockResolvedValue({});
+    mockPrisma.draftPublishLog.create.mockResolvedValue({});
+    mockFbPost
+      .mockResolvedValueOnce({ data: { id: 'meta_camp_1' } })
+      .mockResolvedValueOnce({ data: { id: 'meta_adset_1' } })
+      .mockRejectedValueOnce({
+        response: { data: { error: { message: '(#3) Application does not have the capability to make this API call.', code: 3 } } },
+      });
+
+    await expect(DraftPublishService.publishCampaign('camp-1', 'token')).rejects.toMatchObject({
+      userMessage: 'Dynamic Creative ads require the Facebook App to be in Live mode. Switch your app to Live mode in the Facebook Developer portal and try again.',
+    });
   });
 
   it('strips creative_type from publish payload', async () => {

@@ -636,8 +636,11 @@ export class DraftValidationEngine {
       });
     }
 
-    // Creative ID override warning
-    if (hasCreativeId && (hasAssetFeed || hasPlatformCustomizations)) {
+    // Creative ID override warning. Suppressed for Dynamic Creative ad sets: there the
+    // publish path builds an INLINE asset_feed_spec creative and omits creative_id entirely
+    // (see DraftPublishService.createMetaAd DC branch), so the dynamic assets are NOT ignored
+    // and the warning would be misleading.
+    if (hasCreativeId && (hasAssetFeed || hasPlatformCustomizations) && !isDynamicCreative) {
       errors.push({
         field: 'creative.creative_id',
         message: 'Platform customizations or dynamic assets will be ignored when using an existing Creative ID. Clear the Creative ID to use these advanced settings.',

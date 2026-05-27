@@ -602,5 +602,16 @@ export function sanitizeTrackingSpecs(specs: any[]): any[] {
     delete cleaned.post;
     delete cleaned['post.wall'];
     return cleaned;
-  }).filter(spec => Object.keys(spec).length > 0);
+  }).filter(spec => {
+    // Drop empty specs.
+    if (Object.keys(spec).length === 0) return false;
+    // Meta API (code 100/1634005): "Each action type must use at least one object."
+    // A valid tracking spec must reference at least one object (page, pixel,
+    // conversion_id, application, etc.) in addition to action.type. Specs that
+    // contain only action.type have no object and are rejected by Meta, so we
+    // filter them out at publish time. We only mutate the publish payload here;
+    // the stored draft tracking_specs are untouched.
+    const objectKeys = Object.keys(spec).filter(key => key !== 'action.type');
+    return objectKeys.length > 0;
+  });
 }
