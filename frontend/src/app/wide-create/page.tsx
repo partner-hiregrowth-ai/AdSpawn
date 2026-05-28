@@ -20,9 +20,10 @@ import {
   RotateCcw,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   Loader2,
 } from "lucide-react";
-import { extractApiError } from "@/lib/utils";
+import { cn, extractApiError } from "@/lib/utils";
 
 const STEP_LABELS = [
   { n: 1, label: "Objectives" },
@@ -38,6 +39,10 @@ export default function WideCreatePage() {
   const [isValidating, setIsValidating] = useState(false);
   const [validation, setValidation] = useState<any>(null);
   const [generationResult, setGenerationResult] = useState<any>(null);
+  const [filterLevel, setFilterLevel] = useState<string>('all');
+  const [filterField, setFilterField] = useState<string>('all');
+  const [filterCampaign, setFilterCampaign] = useState<string>('all');
+  const [filterSeverity, setFilterSeverity] = useState<string>('all');
 
   const totalCampaigns = store.campaigns.length;
   const totalAdSets = store.campaigns.reduce((sum, c) => sum + c.adSets.length, 0);
@@ -75,6 +80,7 @@ export default function WideCreatePage() {
       const template = store.toTemplate(selectedAccount.adaccount_id || selectedAccount.id);
       const res = await wideCreationApi.validate(template);
       setValidation(res.data);
+      setFilterLevel('all'); setFilterField('all'); setFilterCampaign('all'); setFilterSeverity('all');
       if (res.data.valid) {
         toast.success(`Valid! ${res.data.totalEntities.campaigns} campaigns, ${res.data.totalEntities.adSets} ad sets, ${res.data.totalEntities.ads} ads ready`);
       } else {
@@ -277,22 +283,118 @@ export default function WideCreatePage() {
               </div>
             </div>
 
-            {/* Validation errors */}
-            {validation && !validation.valid && (
-              <div className="mt-3 space-y-1 max-h-48 overflow-y-auto">
-                {validation.errors.map((err: any, i: number) => (
-                  <div key={i} className="text-xs text-red-400 flex items-start gap-1.5">
-                    <AlertCircle className="w-3 h-3 mt-0.5 shrink-0" />
-                    <span>
-                      <span className="text-red-300 font-medium">{err.entityLabel || err.path}</span>
-                      {err.field && <span className="text-red-400/70"> ({err.field})</span>}
-                      <span className="text-red-400/60"> — </span>
-                      {err.message}
-                    </span>
+            {/* Validation errors & warnings */}
+            {validation && (!validation.valid || validation.warnings?.length > 0) && (() => {
+              const allItems: { severity: 'error' | 'warning'; path: string; field?: string; message: string; entityLabel?: string }[] = [
+                ...(validation.errors || []).map((e: any) => ({ ...e, severity: 'error' as const })),
+                ...(validation.warnings || []).map((w: any) => ({ ...w, severity: 'warning' as const })),
+              ];
+              const getLevel = (item: any): string => {
+                const p: string = item.path || '';
+                if (p.includes('.ads[')) return 'ad';
+                if (p.includes('.adSets[') || p.includes('adsets[')) return 'adset';
+                return 'campaign';
+              };
+              const getCampaignName = (item: any): string => {
+                const label: string = item.entityLabel || '';
+                const match = label.match(/^([^›]+)/);
+                return match ? match[1].trim() : item.path?.split('.')[0] || 'Unknown';
+              };
+
+              const levelCounts: Record<string, number> = {};
+              const fieldCounts: Record<string, number> = {};
+              const campaignCounts: Record<string, number> = {};
+              const severityCounts: Record<string, number> = { error: 0, warning: 0 };
+              allItems.forEach(item => {
+                const lvl = getLevel(item);
+                levelCounts[lvl] = (levelCounts[lvl] || 0) + 1;
+                const f = item.field || 'general';
+                fieldCounts[f] = (fieldCounts[f] || 0) + 1;
+                const c = getCampaignName(item);
+                campaignCounts[c] = (campaignCounts[c] || 0) + 1;
+                severityCounts[item.severity]++;
+              });
+
+              const filtered = allItems.filter(item => {
+                if (filterLevel !== 'all' && getLevel(item) !== filterLevel) return false;
+                if (filterField !== 'all' && (item.field || 'general') !== filterField) return false;
+                if (filterCampaign !== 'all' && getCampaignName(item) !== filterCampaign) return false;
+                if (filterSeverity !== 'all' && item.severity !== filterSeverity) return false;
+                return true;
+              });
+
+              const chipStyle = (active: boolean, color: 'red' | 'gray' = 'red') =>
+                cn(
+                  "text-[11px] px-2.5 py-1 rounded-md border transition-colors",
+                  active
+                    ? color === 'red' ? "bg-red-500/15 text-red-400 border-red-500/30" : "bg-blue-500/15 text-blue-400 border-blue-500/30"
+                    : "text-gray-500 border-gray-800 hover:text-gray-300 hover:border-gray-700"
+                );
+
+              const levelLabels: Record<string, string> = { campaign: 'Campaign', adset: 'Ad Set', ad: 'Ad' };
+              const fieldLabels: Record<string, string> = { general: 'General' };
+
+              return (
+                <div className="mt-3 space-y-2">
+                  <div className="space-y-2">
+                    {/* Severity */}
+                    {(severityCounts.error > 0 && severityCounts.warning > 0) && (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] text-gray-600 uppercase tracking-wider w-16 shrink-0">Severity</span>
+                        <button onClick={() => setFilterSeverity('all')} className={chipStyle(filterSeverity === 'all', 'gray')}>All ({allItems.length})</button>
+                        <button onClick={() => setFilterSeverity('error')} className={chipStyle(filterSeverity === 'error')}>Errors ({severityCounts.error})</button>
+                        <button onClick={() => setFilterSeverity('warning')} className={cn(chipStyle(false), filterSeverity === 'warning' && "bg-amber-500/15 text-amber-400 border-amber-500/30")}>Warnings ({severityCounts.warning})</button>
+                      </div>
+                    )}
+                    {/* Level */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] text-gray-600 uppercase tracking-wider w-16 shrink-0">Level</span>
+                      <button onClick={() => setFilterLevel('all')} className={chipStyle(filterLevel === 'all', 'gray')}>All</button>
+                      {Object.entries(levelCounts).map(([k, count]) => (
+                        <button key={k} onClick={() => setFilterLevel(k)} className={chipStyle(filterLevel === k, 'gray')}>{levelLabels[k] || k} ({count})</button>
+                      ))}
+                    </div>
+                    {/* Field */}
+                    {Object.keys(fieldCounts).length > 1 && (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] text-gray-600 uppercase tracking-wider w-16 shrink-0">Field</span>
+                        <button onClick={() => setFilterField('all')} className={chipStyle(filterField === 'all', 'gray')}>All</button>
+                        {Object.entries(fieldCounts).map(([k, count]) => (
+                          <button key={k} onClick={() => setFilterField(k)} className={chipStyle(filterField === k, 'gray')}>{fieldLabels[k] || k} ({count})</button>
+                        ))}
+                      </div>
+                    )}
+                    {/* Campaign */}
+                    {Object.keys(campaignCounts).length > 1 && (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] text-gray-600 uppercase tracking-wider w-16 shrink-0">Campaign</span>
+                        <button onClick={() => setFilterCampaign('all')} className={chipStyle(filterCampaign === 'all', 'gray')}>All</button>
+                        {Object.entries(campaignCounts).map(([k, count]) => (
+                          <button key={k} onClick={() => setFilterCampaign(k)} className={chipStyle(filterCampaign === k, 'gray')}><span className="truncate max-w-[200px] inline-block align-bottom">{k}</span> ({count})</button>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                    {filtered.length === 0 ? (
+                      <div className="text-xs text-gray-600 py-2">No issues match the current filters.</div>
+                    ) : filtered.map((item, i) => (
+                      <div key={i} className={cn("text-xs flex items-start gap-1.5", item.severity === 'error' ? "text-red-400" : "text-amber-400")}>
+                        {item.severity === 'error'
+                          ? <AlertCircle className="w-3 h-3 mt-0.5 shrink-0" />
+                          : <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />}
+                        <span>
+                          <span className={item.severity === 'error' ? "text-red-300 font-medium" : "text-amber-300 font-medium"}>{item.entityLabel || item.path}</span>
+                          {item.field && <span className={item.severity === 'error' ? "text-red-400/70" : "text-amber-400/70"}> ({item.field})</span>}
+                          <span className="text-gray-600"> — </span>
+                          {item.message}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Generation result */}
             {generationResult && (

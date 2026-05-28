@@ -31,7 +31,10 @@ import {
   Clock,
   Pencil,
   Info,
+  Columns,
+  Rows3,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const OBJECTIVE_LABELS: Record<string, string> = {
   OUTCOME_TRAFFIC: "Traffic",
@@ -120,6 +123,7 @@ export function StepConfigure() {
   const [loading, setLoading] = useState(true);
   const [openSections, setOpenSections] = useState<Set<string>>(new Set(["campaign", "adset", "schedule"]));
   const [applyToAll, setApplyToAll] = useState(true);
+  const [layout, setLayout] = useState<'vertical' | 'horizontal'>('horizontal');
 
   useEffect(() => {
     loadAllSchemas();
@@ -195,124 +199,164 @@ export function StepConfigure() {
         })}
       </div>
 
-      <div className="flex items-center gap-2 text-xs text-gray-500">
-        <Checkbox checked={applyToAll} onCheckedChange={(v) => setApplyToAll(!!v)} />
-        <span>Apply changes to all {OBJECTIVE_LABELS[activeObjective]} entities</span>
-        <Copy className="w-3 h-3" />
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2 text-xs text-gray-500">
+          <Checkbox checked={applyToAll} onCheckedChange={(v) => setApplyToAll(!!v)} />
+          <span>Apply changes to all {OBJECTIVE_LABELS[activeObjective]} entities</span>
+          <Copy className="w-3 h-3" />
+        </div>
+        <div className="ml-auto flex items-center rounded-lg border border-gray-800 overflow-hidden shrink-0">
+          <button
+            onClick={() => setLayout('vertical')}
+            className={cn(
+              "h-8 w-8 flex items-center justify-center transition-colors",
+              layout === 'vertical' ? "bg-blue-500/15 text-blue-400" : "text-gray-500 hover:text-gray-300 hover:bg-gray-800/50"
+            )}
+            title="Vertical layout"
+          >
+            <Rows3 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => { setLayout('horizontal'); setOpenSections(new Set(["campaign", "adset", "schedule", "ad", "naming"])); }}
+            className={cn(
+              "h-8 w-8 flex items-center justify-center transition-colors border-l border-gray-800",
+              layout === 'horizontal' ? "bg-blue-500/15 text-blue-400" : "text-gray-500 hover:text-gray-300 hover:bg-gray-800/50"
+            )}
+            title="Horizontal layout"
+          >
+            <Columns className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
-      {/* ── Campaign Settings ── */}
-      <SectionAccordion
-        id="campaign"
-        title="Campaign Settings"
-        icon={<FolderTree className={`w-4 h-4 ${OBJECTIVE_COLORS[activeObjective]}`} />}
-        open={openSections.has("campaign")}
-        onToggle={() => toggleSection("campaign")}
-      >
-        {campSchema && firstCampaign ? (
-          <CampaignFields
-            schema={campSchema}
-            objective={activeObjective}
-            campaign={firstCampaign}
-            applyToAll={applyToAll}
-          />
-        ) : (
-          <p className="text-xs text-gray-500">No campaign schema available</p>
-        )}
-      </SectionAccordion>
+      <div className={cn(
+        layout === 'horizontal'
+          ? "flex items-stretch gap-4 overflow-x-auto pb-3 snap-x snap-mandatory h-[55vh]"
+          : "space-y-4"
+      )}>
+        {/* ── Campaign Settings ── */}
+        <div className={layout === 'horizontal' ? "min-w-[640px] shrink-0 snap-start" : ""}>
+          <SectionAccordion
+            id="campaign"
+            title="Campaign Settings"
+            icon={<FolderTree className={`w-4 h-4 ${OBJECTIVE_COLORS[activeObjective]}`} />}
+            open={openSections.has("campaign")}
+            onToggle={() => toggleSection("campaign")}
+          >
+            {campSchema && firstCampaign ? (
+              <CampaignFields
+                schema={campSchema}
+                objective={activeObjective}
+                campaign={firstCampaign}
+                applyToAll={applyToAll}
+              />
+            ) : (
+              <p className="text-xs text-gray-500">No campaign schema available</p>
+            )}
+          </SectionAccordion>
+        </div>
 
-      {/* ── Schedule ── */}
-      <SectionAccordion
-        id="schedule"
-        title="Schedule"
-        icon={<Calendar className="w-4 h-4 text-amber-400" />}
-        open={openSections.has("schedule")}
-        onToggle={() => toggleSection("schedule")}
-      >
-        <ScheduleSection
-          objective={activeObjective}
-          applyToAll={applyToAll}
-        />
-      </SectionAccordion>
+        {/* ── Schedule ── */}
+        <div className={layout === 'horizontal' ? "min-w-[360px] shrink-0 snap-start" : ""}>
+          <SectionAccordion
+            id="schedule"
+            title="Schedule"
+            icon={<Calendar className="w-4 h-4 text-amber-400" />}
+            open={openSections.has("schedule")}
+            onToggle={() => toggleSection("schedule")}
+          >
+            <ScheduleSection
+              objective={activeObjective}
+              applyToAll={applyToAll}
+            />
+          </SectionAccordion>
+        </div>
 
-      {/* ── Ad Set Settings ── */}
-      <SectionAccordion
-        id="adset"
-        title="Ad Set Settings"
-        icon={<Layers className="w-4 h-4 text-green-400" />}
-        open={openSections.has("adset")}
-        onToggle={() => toggleSection("adset")}
-      >
-        {/* Promoted Object */}
-        {promotedHint && (
-          <div className="mb-4 p-3 rounded-lg bg-yellow-950/20 border border-yellow-800/30">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-yellow-400 mt-0.5 shrink-0" />
-              <div className="flex-1">
-                <p className="text-xs text-yellow-300 font-medium mb-2">
-                  {OBJECTIVE_LABELS[activeObjective]} requires promoted object
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {promotedHint.fields.map((field) => (
-                    <div key={field}>
-                      <Label className="text-xs text-yellow-200/70">{promotedHint.labels[field]}</Label>
-                      <Input
-                        value={firstAdSet?.fields.promoted_object?.[field] || ""}
-                        onChange={(e) => {
-                          const val = { ...firstAdSet?.fields.promoted_object, [field]: e.target.value };
-                          if (applyToAll) {
-                            store.bulkUpdateAdSetField(activeObjective, "promoted_object", val);
-                          } else if (firstAdSet && firstCampaign) {
-                            store.updateAdSetField(firstCampaign.id, firstAdSet.id, "promoted_object", val);
-                          }
-                        }}
-                        placeholder={promotedHint.labels[field]}
-                        className="bg-gray-800 border-yellow-700/50 mt-1 text-sm"
-                      />
+        {/* ── Ad Set Settings ── */}
+        <div className={layout === 'horizontal' ? "min-w-[640px] shrink-0 snap-start" : ""}>
+          <SectionAccordion
+            id="adset"
+            title="Ad Set Settings"
+            icon={<Layers className="w-4 h-4 text-green-400" />}
+            open={openSections.has("adset")}
+            onToggle={() => toggleSection("adset")}
+          >
+            {/* Promoted Object */}
+            {promotedHint && (
+              <div className="mb-4 p-3 rounded-lg bg-yellow-950/20 border border-yellow-800/30">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-yellow-400 mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-xs text-yellow-300 font-medium mb-2">
+                      {OBJECTIVE_LABELS[activeObjective]} requires promoted object
+                    </p>
+                    <div className="grid grid-cols-1 gap-2">
+                      {promotedHint.fields.map((field) => (
+                        <div key={field}>
+                          <Label className="text-xs text-yellow-200/70">{promotedHint.labels[field]}</Label>
+                          <Input
+                            value={firstAdSet?.fields.promoted_object?.[field] || ""}
+                            onChange={(e) => {
+                              const val = { ...firstAdSet?.fields.promoted_object, [field]: e.target.value };
+                              if (applyToAll) {
+                                store.bulkUpdateAdSetField(activeObjective, "promoted_object", val);
+                              } else if (firstAdSet && firstCampaign) {
+                                store.updateAdSetField(firstCampaign.id, firstAdSet.id, "promoted_object", val);
+                              }
+                            }}
+                            placeholder={promotedHint.labels[field]}
+                            className="bg-gray-800 border-yellow-700/50 mt-1 text-sm"
+                          />
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
-        )}
+            )}
 
-        {asSchema && firstAdSet ? (
-          <AdSetFields
-            schema={asSchema}
-            objective={activeObjective}
-            campaigns={campaigns}
-            applyToAll={applyToAll}
-          />
-        ) : (
-          <p className="text-xs text-gray-500">No ad set schema available</p>
-        )}
-      </SectionAccordion>
+            {asSchema && firstAdSet ? (
+              <AdSetFields
+                schema={asSchema}
+                objective={activeObjective}
+                campaigns={campaigns}
+                applyToAll={applyToAll}
+              />
+            ) : (
+              <p className="text-xs text-gray-500">No ad set schema available</p>
+            )}
+          </SectionAccordion>
+        </div>
 
-      {/* ── Ad / Creative Settings ── */}
-      <SectionAccordion
-        id="ad"
-        title="Ad / Creative"
-        icon={<ImageIcon className="w-4 h-4 text-purple-400" />}
-        open={openSections.has("ad")}
-        onToggle={() => toggleSection("ad")}
-      >
-        <AdCreativeSection
-          objective={activeObjective}
-          applyToAll={applyToAll}
-        />
-      </SectionAccordion>
+        {/* ── Ad / Creative Settings ── */}
+        <div className={layout === 'horizontal' ? "min-w-[480px] shrink-0 snap-start" : ""}>
+          <SectionAccordion
+            id="ad"
+            title="Ad / Creative"
+            icon={<ImageIcon className="w-4 h-4 text-purple-400" />}
+            open={openSections.has("ad")}
+            onToggle={() => toggleSection("ad")}
+          >
+            <AdCreativeSection
+              objective={activeObjective}
+              applyToAll={applyToAll}
+            />
+          </SectionAccordion>
+        </div>
 
-      {/* ── Naming Patterns ── */}
-      <SectionAccordion
-        id="naming"
-        title="Naming Patterns"
-        icon={<Pencil className="w-4 h-4 text-gray-400" />}
-        open={openSections.has("naming")}
-        onToggle={() => toggleSection("naming")}
-      >
-        <NamingPatternSection />
-      </SectionAccordion>
+        {/* ── Naming Patterns ── */}
+        <div className={layout === 'horizontal' ? "min-w-[360px] shrink-0 snap-start" : ""}>
+          <SectionAccordion
+            id="naming"
+            title="Naming Patterns"
+            icon={<Pencil className="w-4 h-4 text-gray-400" />}
+            open={openSections.has("naming")}
+            onToggle={() => toggleSection("naming")}
+          >
+            <NamingPatternSection />
+          </SectionAccordion>
+        </div>
+      </div>
     </div>
   );
 }
@@ -379,16 +423,16 @@ function SectionAccordion({
   id: string; title: string; icon: React.ReactNode; open: boolean; onToggle: () => void; children: React.ReactNode;
 }) {
   return (
-    <Card className="bg-gray-900 border-gray-800">
+    <Card className="bg-gray-900 border-gray-800 h-full flex flex-col">
       <button
         onClick={onToggle}
-        className="w-full flex items-center gap-2 p-4 text-left hover:bg-gray-800/30 transition-colors"
+        className="w-full flex items-center gap-2 p-4 text-left hover:bg-gray-800/30 transition-colors shrink-0"
       >
         {icon}
         <span className="text-sm font-medium text-gray-200 flex-1">{title}</span>
         {open ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronRight className="w-4 h-4 text-gray-500" />}
       </button>
-      {open && <CardContent className="pt-0 pb-4 px-4">{children}</CardContent>}
+      {open && <CardContent className="pt-0 pb-4 px-4 flex-1 overflow-y-auto">{children}</CardContent>}
     </Card>
   );
 }
