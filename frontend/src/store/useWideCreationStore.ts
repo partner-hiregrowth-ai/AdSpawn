@@ -25,8 +25,14 @@ export interface WideCampaignNode {
   adSets: WideAdSetNode[];
 }
 
+export interface ObjectiveLevelDefaults {
+  campaign: Record<string, any>;
+  adSet: Record<string, any>;
+  ad: Record<string, any>;
+}
+
 export interface WideCreationState {
-  step: 1 | 2 | 3;
+  step: 1 | 2;
   templateName: string;
 
   // Step 1: Objective selection
@@ -36,6 +42,9 @@ export interface WideCreationState {
 
   // Generated structure
   campaigns: WideCampaignNode[];
+
+  // Per-objective defaults ("All" mode values)
+  objectiveDefaults: Record<string, ObjectiveLevelDefaults>;
 
   // Optional per-item field overrides keyed by stable nodeId (see nodeIdFor).
   // These layer on top of bulk (Step 3) config — item-level beats objective-level.
@@ -64,7 +73,7 @@ export interface WideCreationState {
   setAdsPerAdSet: (count: number) => void;
 
   // Step transitions
-  setStep: (step: 1 | 2 | 3) => void;
+  setStep: (step: 1 | 2) => void;
   generateStructure: () => void;
 
   // Navigation
@@ -99,6 +108,13 @@ export interface WideCreationState {
 
   // Bulk
   bulkUpdateSelectedField: (field: string, value: any) => void;
+
+  // Objective defaults ("All" mode)
+  setObjectiveDefault: (objective: string, level: 'campaign' | 'adSet' | 'ad', field: string, value: any) => void;
+  getObjectiveDefaults: (objective: string) => ObjectiveLevelDefaults;
+  getMergedFields: (objective: string, level: 'campaign' | 'adSet' | 'ad', entityFields: Record<string, any>) => Record<string, any>;
+  clearEntityOverride: (entityId: string, level: 'campaign' | 'adSet' | 'ad', field: string) => void;
+  isFieldOverridden: (entityFields: Record<string, any>, field: string) => boolean;
 
   // Per-item overrides
   setNodeOverride: (nodeId: string, fields: Record<string, any>) => void;
@@ -149,6 +165,7 @@ const initialState = {
   adSetsPerCampaign: 1,
   adsPerAdSet: 1,
   campaigns: [] as WideCampaignNode[],
+  objectiveDefaults: {} as Record<string, ObjectiveLevelDefaults>,
   nodeOverrides: {} as Record<string, Record<string, any>>,
   defaultCreative: null as Record<string, any> | null,
   namingPattern: {
@@ -400,6 +417,64 @@ export const useWideCreationStore = create<WideCreationState>((set, get) => ({
     };
   }),
 
+  // ── Objective Defaults ("All" mode) ──
+
+  setObjectiveDefault: (objective, level, field, value) => set((state) => {
+    const prev = state.objectiveDefaults[objective] || { campaign: {}, adSet: {}, ad: {} };
+    const updated = { ...prev, [level]: { ...prev[level], [field]: value } };
+    return { objectiveDefaults: { ...state.objectiveDefaults, [objective]: updated } };
+  }),
+
+  getObjectiveDefaults: (objective) => {
+    return get().objectiveDefaults[objective] || { campaign: {}, adSet: {}, ad: {} };
+  },
+
+  getMergedFields: (objective, level, entityFields) => {
+    const defaults = (get().objectiveDefaults[objective] || { campaign: {}, adSet: {}, ad: {} })[level];
+    return { ...defaults, ...entityFields };
+  },
+
+  clearEntityOverride: (entityId, level, field) => set((state) => {
+    if (level === 'campaign') {
+      return {
+        campaigns: state.campaigns.map(c => {
+          if (c.id !== entityId) return c;
+          const { [field]: _, ...rest } = c.fields;
+          return { ...c, fields: rest };
+        }),
+      };
+    }
+    if (level === 'adSet') {
+      return {
+        campaigns: state.campaigns.map(c => ({
+          ...c,
+          adSets: c.adSets.map(as => {
+            if (as.id !== entityId) return as;
+            const { [field]: _, ...rest } = as.fields;
+            return { ...as, fields: rest };
+          }),
+        })),
+      };
+    }
+    return {
+      campaigns: state.campaigns.map(c => ({
+        ...c,
+        adSets: c.adSets.map(as => ({
+          ...as,
+          ads: as.ads.map(a => {
+            if (a.id !== entityId) return a;
+            const { [field]: _, ...rest } = a.fields;
+            return { ...a, fields: rest };
+          }),
+        })),
+      })),
+    };
+  }),
+
+  isFieldOverridden: (entityFields, field) => {
+    return field in entityFields && entityFields[field] !== undefined;
+  },
+
   // ── Per-Item Overrides ──
 
   setNodeOverride: (nodeId, fields) => set((state) => {
@@ -440,28 +515,33 @@ export const useWideCreationStore = create<WideCreationState>((set, get) => ({
 
   // ── Reset ──
 
-  reset: () => set({ ...initialState, nodeOverrides: {}, selectedIds: new Set(), expandedIds: new Set() }),
+  reset: () => set({ ...initialState, objectiveDefaults: {}, nodeOverrides: {}, selectedIds: new Set(), expandedIds: new Set() }),
 
   // ── Export ──
 
   toTemplate: (adAccountId: string) => {
     const state = get();
     const ov = state.nodeOverrides;
-    // Per-item overrides win over bulk (Step 3) config, so they are merged last.
+    const od = state.objectiveDefaults;
     return {
       name: state.templateName || 'Wide Creation',
       adAccountId,
       namingPattern: state.namingPattern,
       ...(state.defaultCreative ? { defaults: { ad: { creative: state.defaultCreative } } } : {}),
-      campaigns: state.campaigns.map((c, ci) => ({
-        fields: { ...c.fields, ...(ov[nodeIdFor(ci)] || {}) },
-        adSetCount: c.adSets.length,
-        adSets: c.adSets.map((as, ai) => ({
-          fields: { ...as.fields, ...(ov[nodeIdFor(ci, ai)] || {}) },
-          adCount: as.ads.length,
-          ads: as.ads.map((a, di) => ({ fields: { ...a.fields, ...(ov[nodeIdFor(ci, ai, di)] || {}) } })),
-        })),
-      })),
+      campaigns: state.campaigns.map((c, ci) => {
+        const objDef = od[c.objective] || { campaign: {}, adSet: {}, ad: {} };
+        return {
+          fields: { ...objDef.campaign, ...c.fields, ...(ov[nodeIdFor(ci)] || {}) },
+          adSetCount: c.adSets.length,
+          adSets: c.adSets.map((as, ai) => ({
+            fields: { ...objDef.adSet, ...as.fields, ...(ov[nodeIdFor(ci, ai)] || {}) },
+            adCount: as.ads.length,
+            ads: as.ads.map((a, di) => ({
+              fields: { ...objDef.ad, ...a.fields, ...(ov[nodeIdFor(ci, ai, di)] || {}) },
+            })),
+          })),
+        };
+      }),
     };
   },
 

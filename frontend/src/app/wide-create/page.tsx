@@ -10,7 +10,6 @@ import { useAppStore } from "@/store/useAppStore";
 import { wideCreationApi } from "@/services/api";
 import { toast } from "sonner";
 import { StepObjectives } from "@/components/wide-create/StepObjectives";
-import { StepStructure } from "@/components/wide-create/StepStructure";
 import { StepConfigure } from "@/components/wide-create/StepConfigure";
 import {
   Grid3X3,
@@ -27,9 +26,8 @@ import { cn, extractApiError } from "@/lib/utils";
 
 const STEP_LABELS = [
   { n: 1, label: "Objectives" },
-  { n: 2, label: "Structure" },
-  { n: 3, label: "Configure" },
-  { n: 4, label: "Generate" },
+  { n: 2, label: "Configure" },
+  { n: 3, label: "Generate" },
 ];
 
 export default function WideCreatePage() {
@@ -52,21 +50,18 @@ export default function WideCreatePage() {
 
   const canGoNext = (): boolean => {
     if (store.step === 1) return store.objectiveSelections.length > 0;
-    if (store.step === 2) return totalCampaigns > 0;
     return true;
   };
 
   const handleNext = () => {
     if (store.step === 1) {
       store.generateStructure();
-    } else if (store.step < 3) {
-      store.setStep((store.step + 1) as any);
     }
   };
 
   const handleBack = () => {
     if (store.step > 1) {
-      store.setStep((store.step - 1) as any);
+      store.setStep(1);
     }
   };
 
@@ -167,7 +162,7 @@ export default function WideCreatePage() {
         <div className="overflow-x-auto pb-1 -mx-1 px-1">
         <div className="flex items-center gap-1 min-w-max">
           {STEP_LABELS.map(({ n, label }, i) => {
-            const isGenStep = n === 4;
+            const isGenStep = n === 3;
             const isDone = isGenStep ? !!generationResult : n < store.step;
             const isActive = isGenStep ? false : n === store.step;
             const isClickable = !isGenStep && (n <= store.step || (n === 2 && totalCampaigns > 0));
@@ -203,8 +198,7 @@ export default function WideCreatePage() {
 
         {/* Step Content */}
         {store.step === 1 && <StepObjectives />}
-        {store.step === 2 && <StepStructure />}
-        {store.step === 3 && <StepConfigure />}
+        {store.step === 2 && <StepConfigure />}
 
         {/* Navigation + Actions */}
         <Card className="bg-gray-900 border-gray-800">
@@ -241,7 +235,7 @@ export default function WideCreatePage() {
                   </div>
                 )}
 
-                {store.step >= 3 && (
+                {store.step >= 2 && (
                   <>
                     <Button
                       variant="outline"
@@ -269,7 +263,7 @@ export default function WideCreatePage() {
                   </>
                 )}
 
-                {store.step < 3 && (
+                {store.step < 2 && (
                   <Button
                     size="sm"
                     onClick={handleNext}

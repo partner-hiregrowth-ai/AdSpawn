@@ -193,7 +193,10 @@ describe('DraftCampaignService', () => {
       orderBy: { createdAt: 'desc' },
       skip: 0,
       take: 50,
-      include: { _count: { select: { adSets: true } } },
+      include: {
+        _count: { select: { adSets: true } },
+        adSets: { select: { _count: { select: { ads: true } } } },
+      },
     });
     expect(result.total).toBe(0);
     expect(result.page).toBe(1);
