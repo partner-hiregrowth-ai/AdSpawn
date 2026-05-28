@@ -55,11 +55,18 @@ export class DraftCampaignService {
         orderBy: { createdAt: 'desc' },
         skip,
         take: pageSize,
-        include: { _count: { select: { adSets: true } } },
+        include: {
+          _count: { select: { adSets: true } },
+          adSets: { select: { _count: { select: { ads: true } } } },
+        },
       }),
       prisma.draftCampaign.count({ where: { userId } }),
     ]);
-    return { items, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
+    const enriched = items.map(({ adSets, ...rest }) => ({
+      ...rest,
+      _count: { ...rest._count, ads: adSets.reduce((sum, s) => sum + s._count.ads, 0) },
+    }));
+    return { items: enriched, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
   }
 
   static async update(id: string, updateData: any, userId?: string) {

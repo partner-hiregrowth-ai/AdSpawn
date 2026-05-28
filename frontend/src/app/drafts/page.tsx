@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { draftApi, adAccountApi } from "@/services/api";
-import { Edit2, Trash2, Send, Layers, Loader2, X, Pencil, Play, Pause, Search, Download, Upload, CheckCircle2, AlertTriangle, FileText, FolderOpen, FolderTree, Grid3X3, MoreHorizontal } from "lucide-react";
+import { Edit2, Trash2, Send, Layers, Loader2, X, Pencil, Play, Pause, Search, Download, Upload, CheckCircle2, AlertTriangle, FileText, FolderOpen, FolderTree, Grid3X3, MoreHorizontal, LayoutGrid, List } from "lucide-react";
 import { OBJECTIVE_LABELS } from "@/lib/meta-schema";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -35,6 +35,7 @@ export default function DraftsPage() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [exportingId, setExportingId] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('table');
   const fetchDrafts = async () => {
     try {
       setIsLoading(true);
@@ -400,6 +401,28 @@ export default function DraftsPage() {
                 <SelectItem value="objective:asc" className="text-xs text-gray-300">Objective</SelectItem>
               </SelectContent>
             </Select>
+            <div className="flex items-center rounded-lg border border-gray-800 overflow-hidden shrink-0">
+              <button
+                onClick={() => setViewMode('card')}
+                className={cn(
+                  "h-9 w-9 flex items-center justify-center transition-colors",
+                  viewMode === 'card' ? "bg-blue-500/15 text-blue-400" : "text-gray-500 hover:text-gray-300 hover:bg-gray-800/50"
+                )}
+                title="Card view"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setViewMode('table')}
+                className={cn(
+                  "h-9 w-9 flex items-center justify-center transition-colors border-l border-gray-800",
+                  viewMode === 'table' ? "bg-blue-500/15 text-blue-400" : "text-gray-500 hover:text-gray-300 hover:bg-gray-800/50"
+                )}
+                title="Table view"
+              >
+                <List className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         )}
 
@@ -448,7 +471,7 @@ export default function DraftsPage() {
               </>
             )}
           </div>
-        ) : (
+        ) : viewMode === 'card' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredDrafts.map((draft, index) => {
               const isPublishable = draft.status !== "PUBLISHING" && draft.status !== "PUBLISHED";
@@ -553,6 +576,132 @@ export default function DraftsPage() {
                 </Card>
               );
             })}
+          </div>
+        ) : (
+          <div className="bg-gray-900/30 border border-gray-800/60 rounded-xl overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-800/60">
+                  <th className="w-10 px-3 py-3">
+                    <Checkbox
+                      checked={allSelected && publishableDrafts.length > 0}
+                      onCheckedChange={toggleSelectAll}
+                      disabled={isBusy || publishableDrafts.length === 0}
+                    />
+                  </th>
+                  <th className="text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider px-3 py-3">Name</th>
+                  <th className="text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider px-3 py-3">Objective</th>
+                  <th className="text-center text-[11px] font-medium text-gray-500 uppercase tracking-wider px-3 py-3">Ad Sets</th>
+                  <th className="text-center text-[11px] font-medium text-gray-500 uppercase tracking-wider px-3 py-3">Ads</th>
+                  <th className="text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider px-3 py-3">Status</th>
+                  <th className="text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider px-3 py-3">Updated</th>
+                  <th className="text-right text-[11px] font-medium text-gray-500 uppercase tracking-wider px-3 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredDrafts.map((draft) => {
+                  const isPublishable = draft.status !== "PUBLISHING" && draft.status !== "PUBLISHED";
+                  const isSelected = selectedIds.has(draft.id);
+                  return (
+                    <tr
+                      key={draft.id}
+                      className={cn(
+                        "border-b border-gray-800/30 hover:bg-gray-800/20 transition-colors",
+                        isSelected && "bg-blue-500/5"
+                      )}
+                    >
+                      <td className="px-3 py-2.5">
+                        {isPublishable ? (
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleSelect(draft.id)}
+                            disabled={isBusy}
+                          />
+                        ) : <div className="w-4" />}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <Link href={`/drafts/${draft.id}`} className="text-sm font-medium text-gray-200 hover:text-white transition-colors truncate block max-w-[280px]">
+                          {draft.name}
+                        </Link>
+                      </td>
+                      <td className="px-3 py-2.5 text-xs text-gray-500 truncate max-w-[180px]">
+                        {OBJECTIVE_LABELS[draft.objective] || draft.objective}
+                      </td>
+                      <td className="px-3 py-2.5 text-center text-xs text-gray-500">
+                        {draft._count?.adSets}
+                      </td>
+                      <td className="px-3 py-2.5 text-center text-xs text-gray-500">
+                        {draft._count?.ads ?? 0}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        {getStatusBadge(draft.status)}
+                      </td>
+                      <td className="px-3 py-2.5 text-[11px] text-gray-600 whitespace-nowrap">
+                        {new Date(draft.updatedAt).toLocaleDateString()}
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <div className="flex gap-1 items-center justify-end">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              render={
+                                <Button variant="ghost" size="icon" className="h-7 w-7" title="More actions">
+                                  <MoreHorizontal className="w-3.5 h-3.5 text-gray-500" />
+                                </Button>
+                              }
+                            />
+                            <DropdownMenuContent align="end" className="bg-gray-900 border-gray-800 w-36">
+                              {draft.status === 'PUBLISHED' && draft.metaId && (
+                                <>
+                                  <DropdownMenuItem
+                                    onClick={() => handleActivateDraft(draft)}
+                                    disabled={togglingId === draft.id}
+                                    className="text-xs text-emerald-400 focus:text-emerald-300 focus:bg-emerald-500/10 cursor-pointer"
+                                  >
+                                    <Play className="w-3 h-3 mr-2" /> Activate
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => handlePauseDraft(draft)}
+                                    disabled={togglingId === draft.id}
+                                    className="text-xs text-amber-400 focus:text-amber-300 focus:bg-amber-500/10 cursor-pointer"
+                                  >
+                                    <Pause className="w-3 h-3 mr-2" /> Pause
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator className="bg-gray-800" />
+                                </>
+                              )}
+                              <DropdownMenuItem
+                                onClick={() => handleExport(draft.id, draft.name)}
+                                disabled={exportingId === draft.id}
+                                className="text-xs text-gray-300 focus:text-gray-100 focus:bg-gray-800 cursor-pointer"
+                              >
+                                {exportingId === draft.id
+                                  ? <Loader2 className="w-3 h-3 mr-2 animate-spin" />
+                                  : <Download className="w-3 h-3 mr-2" />}
+                                Export
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator className="bg-gray-800" />
+                              <DropdownMenuItem
+                                onClick={() => { setDeleteTargetId(draft.id); setConfirmAction('delete'); }}
+                                disabled={isBusy}
+                                className="text-xs text-red-400 focus:text-red-300 focus:bg-red-500/10 cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3 mr-2" /> Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                          <Link href={`/drafts/${draft.id}`}>
+                            <Button size="sm" variant="ghost" className="h-7 gap-1.5 text-xs text-gray-400 hover:text-white">
+                              <Edit2 className="w-3 h-3" />
+                              Edit
+                            </Button>
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
