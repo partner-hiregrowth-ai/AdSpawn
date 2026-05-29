@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { draftApi, adAccountApi } from "@/services/api";
+import { useAppStore } from "@/store/useAppStore";
 import { Edit2, Trash2, Send, Layers, Loader2, X, Pencil, Play, Pause, Search, Download, Upload, CheckCircle2, AlertTriangle, FileText, FolderOpen, FolderTree, Grid3X3, MoreHorizontal, LayoutGrid, List } from "lucide-react";
 import { OBJECTIVE_LABELS } from "@/lib/meta-schema";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -18,6 +19,7 @@ import { BulkEditPanel } from "@/components/dashboard/BulkEditPanel";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 export default function DraftsPage() {
+  const profileId = useAppStore((s) => s.profile?.id);
   const [drafts, setDrafts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -50,8 +52,9 @@ export default function DraftsPage() {
   };
 
   useEffect(() => {
+    setSelectedIds(new Set());
     fetchDrafts();
-  }, []);
+  }, [profileId]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 200);

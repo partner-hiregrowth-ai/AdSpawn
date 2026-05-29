@@ -9,7 +9,7 @@ import {
   TableHeader,
   TableRow
 } from "@/components/ui/table";
-import { CheckCircle2, XCircle, Clock, ExternalLink, Loader2, Trash2, RefreshCw } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, ExternalLink, Loader2, Trash2, RefreshCw, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { duplicationApi } from "@/services/api";
 import { toast } from "sonner";
@@ -126,12 +126,14 @@ export default function HistoryPage() {
             <div className="divide-y divide-gray-800/30">
               {[1, 2, 3, 4, 5].map((i) => (
                 <div key={i} className="flex items-center gap-4 px-4 py-3">
+                  <div className="h-4 w-16 bg-gray-800/60 rounded animate-pulse" />
                   <div className="h-4 w-20 bg-gray-800/60 rounded animate-pulse" />
-                  <div className="h-4 w-32 bg-gray-800/60 rounded animate-pulse" />
-                  <div className="h-4 w-32 bg-gray-800/60 rounded animate-pulse" />
+                  <div className="h-4 w-28 bg-gray-800/60 rounded animate-pulse" />
+                  <div className="h-4 w-28 bg-gray-800/60 rounded animate-pulse" />
+                  <div className="h-4 w-24 bg-gray-800/60 rounded animate-pulse" />
                   <div className="h-4 w-16 bg-gray-800/60 rounded animate-pulse" />
                   <div className="flex-1" />
-                  <div className="h-4 w-24 bg-gray-800/60 rounded animate-pulse" />
+                  <div className="h-4 w-20 bg-gray-800/60 rounded animate-pulse" />
                   <div className="h-6 w-6 bg-gray-800/60 rounded animate-pulse" />
                 </div>
               ))}
@@ -147,9 +149,11 @@ export default function HistoryPage() {
             <Table>
               <TableHeader className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur-sm">
                 <TableRow className="border-gray-800/40 hover:bg-transparent">
+                  <TableHead className="text-gray-500 text-xs font-medium">Profile</TableHead>
                   <TableHead className="text-gray-500 text-xs font-medium">Type</TableHead>
                   <TableHead className="text-gray-500 text-xs font-medium">Source</TableHead>
                   <TableHead className="text-gray-500 text-xs font-medium">Target</TableHead>
+                  <TableHead className="text-gray-500 text-xs font-medium">Ad Account</TableHead>
                   <TableHead className="text-gray-500 text-xs font-medium">Status</TableHead>
                   <TableHead className="text-gray-500 text-xs font-medium">When</TableHead>
                   <TableHead className="text-gray-500 text-xs font-medium text-right">Actions</TableHead>
@@ -164,6 +168,14 @@ export default function HistoryPage() {
                       `stagger-${Math.min(index + 1, 6)}`
                     )}
                   >
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                        <User className="w-3 h-3 text-blue-400 shrink-0" />
+                        <span className="text-xs text-gray-300 truncate max-w-[100px]">
+                          {job.profile?.name || <span className="text-gray-600 italic">—</span>}
+                        </span>
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-1">
                         <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-gray-800/50 text-gray-400 w-fit">
@@ -191,6 +203,15 @@ export default function HistoryPage() {
                         </span>
                       ) : (
                         <span className="text-gray-700">--</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {job.details?.adAccountId ? (
+                        <span className="text-[11px] text-gray-500 font-mono truncate block max-w-[140px]" title={job.details.adAccountId}>
+                          {job.details.adAccountId}
+                        </span>
+                      ) : (
+                        <span className="text-gray-700">—</span>
                       )}
                     </TableCell>
                     <TableCell>

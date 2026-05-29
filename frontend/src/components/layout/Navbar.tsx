@@ -2,7 +2,7 @@
 
 import { useAppStore, Profile } from "@/store/useAppStore";
 import { usePathname, useRouter } from "next/navigation";
-import { User, LogOut, ChevronRight, Menu, Users, ChevronDown } from "lucide-react";
+import { User, LogOut, ChevronRight, Menu, Users, ChevronDown, CreditCard } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,7 +22,7 @@ const pageTitles: Record<string, string> = {
 };
 
 export const Navbar = () => {
-  const { user, team, profile, profiles, setProfile, selectedAccount, draftName, toggleMobileSidebar } = useAppStore();
+  const { user, team, profile, profiles, setProfile, adAccounts, selectedAccount, setSelectedAccount, draftName, toggleMobileSidebar } = useAppStore();
   const pathname = usePathname();
   const router = useRouter();
   const currentPage = pageTitles[pathname] || (pathname.startsWith("/drafts/") ? (draftName ?? "Draft Editor") : "");
@@ -55,7 +55,7 @@ export const Navbar = () => {
         {selectedAccount && (
           <>
             <ChevronRight className="w-3.5 h-3.5 text-gray-700 shrink-0 hidden sm:inline" />
-            <div className="px-2.5 py-1 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium max-w-[120px] truncate hidden sm:block">
+            <div className="px-2.5 py-1 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium max-w-[140px] truncate hidden sm:block">
               {selectedAccount.name}
             </div>
           </>
@@ -95,6 +95,49 @@ export const Navbar = () => {
               >
                 <Users className="w-3 h-3 mr-2" />
                 Manage profiles
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
+        {adAccounts.length > 0 && (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <button className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-gray-800/40 border border-gray-700/40 hover:bg-gray-800/60 transition-colors outline-none">
+                  <CreditCard className="w-3 h-3 text-cyan-400 shrink-0" />
+                  <span className="text-xs font-medium text-gray-300 max-w-[100px] truncate hidden sm:inline">
+                    {selectedAccount?.name || "Ad Account"}
+                  </span>
+                  <ChevronDown className="w-3 h-3 text-gray-600" />
+                </button>
+              }
+            />
+            <DropdownMenuContent align="end" className="w-56 bg-gray-900 border-gray-800 max-h-72 overflow-y-auto">
+              <div className="px-3 py-1.5">
+                <p className="text-[10px] text-gray-600 uppercase tracking-wider font-medium">Ad Account</p>
+              </div>
+              {adAccounts.map((acc) => (
+                <DropdownMenuItem
+                  key={acc.id}
+                  onClick={() => {
+                    setSelectedAccount(acc);
+                    router.push("/explorer");
+                  }}
+                  className={`text-xs cursor-pointer ${acc.id === selectedAccount?.id ? "text-cyan-400 bg-cyan-500/5" : "text-gray-300"}`}
+                >
+                  <CreditCard className="w-3 h-3 mr-2" />
+                  <span className="truncate">{acc.name}</span>
+                  {acc.currency && <span className="ml-auto text-[10px] text-gray-600 font-mono shrink-0">{acc.currency}</span>}
+                </DropdownMenuItem>
+              ))}
+              <DropdownMenuSeparator className="bg-gray-800" />
+              <DropdownMenuItem
+                onClick={() => router.push("/dashboard")}
+                className="text-xs text-gray-500 cursor-pointer"
+              >
+                <CreditCard className="w-3 h-3 mr-2" />
+                All accounts
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

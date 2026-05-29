@@ -20,6 +20,7 @@ export const getHistory = async (req: AuthRequest, res: Response) => {
     const jobs = await prisma.duplicateJob.findMany({
       where: { userId: req.userId },
       orderBy: { createdAt: 'desc' },
+      include: { profile: { select: { id: true, name: true } } },
     });
     res.json(jobs);
   } catch (error) {
@@ -121,6 +122,7 @@ export const convertObjective = async (req: AuthRequest, res: Response) => {
       await prisma.duplicateJob.create({
         data: {
           userId: req.userId!,
+          profileId: req.profileId || null,
           status: 'COMPLETED',
           type: 'CAMPAIGN',
           sourceId: item.id,
@@ -189,6 +191,7 @@ export const duplicateItems = async (req: AuthRequest, res: Response) => {
           await prisma.duplicateJob.create({
             data: {
               userId: req.userId!,
+              profileId: req.profileId || null,
               status: 'COMPLETED',
               type: item.type,
               sourceId: item.id,
@@ -208,6 +211,7 @@ export const duplicateItems = async (req: AuthRequest, res: Response) => {
         await prisma.duplicateJob.create({
           data: {
             userId: req.userId!,
+            profileId: req.profileId || null,
             status: 'FAILED',
             type: item.type,
             sourceId: item.id,
@@ -239,6 +243,7 @@ export const duplicateCampaign = async (req: AuthRequest, res: Response) => {
     await prisma.duplicateJob.create({
       data: {
         userId: req.userId!,
+        profileId: req.profileId || null,
         status: 'COMPLETED',
         type: 'CAMPAIGN',
         sourceId: campaignId,
@@ -262,6 +267,7 @@ export const duplicateAdSet = async (req: AuthRequest, res: Response) => {
     await prisma.duplicateJob.create({
       data: {
         userId: req.userId!,
+        profileId: req.profileId || null,
         status: 'COMPLETED',
         type: 'ADSET',
         sourceId: adSetId,
@@ -285,6 +291,7 @@ export const duplicateAd = async (req: AuthRequest, res: Response) => {
     await prisma.duplicateJob.create({
       data: {
         userId: req.userId!,
+        profileId: req.profileId || null,
         status: 'COMPLETED',
         type: 'AD',
         sourceId: adId,

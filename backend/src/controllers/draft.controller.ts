@@ -35,6 +35,7 @@ export class DraftController {
         await prisma.duplicateJob.create({
           data: {
             userId: authReq.userId!,
+            profileId: authReq.profileId || null,
             status: 'COMPLETED',
             type: 'CAMPAIGN',
             sourceId: campaignId,
@@ -52,6 +53,7 @@ export class DraftController {
         prisma.duplicateJob.create({
           data: {
             userId: authReq.userId!,
+            profileId: authReq.profileId || null,
             status: 'FAILED',
             type: 'CAMPAIGN',
             sourceId: campaignId,
@@ -177,6 +179,7 @@ export class DraftController {
       await prisma.duplicateJob.create({
         data: {
           userId: authReq.userId!,
+          profileId: authReq.profileId || null,
           status: 'COMPLETED',
           type: 'CAMPAIGN',
           sourceId: id,
@@ -194,6 +197,7 @@ export class DraftController {
       prisma.duplicateJob.create({
         data: {
           userId: authReq.userId!,
+          profileId: authReq.profileId || null,
           status: 'FAILED',
           type: 'CAMPAIGN',
           sourceId: id,
@@ -221,6 +225,7 @@ export class DraftController {
           await prisma.duplicateJob.create({
             data: {
               userId: authReq.userId!,
+              profileId: authReq.profileId || null,
               status: 'COMPLETED',
               type: 'CAMPAIGN',
               sourceId: id,
@@ -237,6 +242,7 @@ export class DraftController {
           prisma.duplicateJob.create({
             data: {
               userId: authReq.userId!,
+              profileId: authReq.profileId || null,
               status: 'FAILED',
               type: 'CAMPAIGN',
               sourceId: id,
