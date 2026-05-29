@@ -6,9 +6,9 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { draftApi, adAccountApi } from "@/services/api";
+import { draftApi, adAccountApi, profileApi } from "@/services/api";
 import { useAppStore } from "@/store/useAppStore";
-import { Edit2, Trash2, Send, Layers, Loader2, X, Pencil, Play, Pause, Search, Download, Upload, CheckCircle2, AlertTriangle, FileText, FolderOpen, FolderTree, Grid3X3, MoreHorizontal, LayoutGrid, List } from "lucide-react";
+import { Edit2, Trash2, Send, Layers, Loader2, X, Pencil, Play, Pause, Search, Download, Upload, CheckCircle2, AlertTriangle, FileText, FolderOpen, FolderTree, Grid3X3, MoreHorizontal, LayoutGrid, List, Share2, Eye, UserPlus } from "lucide-react";
 import { OBJECTIVE_LABELS } from "@/lib/meta-schema";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -38,6 +38,54 @@ export default function DraftsPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [viewMode, setViewMode] = useState<'card' | 'table'>('table');
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [activeTab, setActiveTab] = useState<'mine' | 'shared'>('mine');
+  const [sharedDrafts, setSharedDrafts] = useState<any[]>([]);
+  const [loadingShared, setLoadingShared] = useState(false);
+  const [showBulkShare, setShowBulkShare] = useState(false);
+  const [bulkShareTargetIds, setBulkShareTargetIds] = useState<string[]>([]);
+  const [bulkSharePermission, setBulkSharePermission] = useState("view");
+  const [isBulkSharing, setIsBulkSharing] = useState(false);
+  const [bulkShareProfiles, setBulkShareProfiles] = useState<any[]>([]);
+
+  const fetchSharedWithMe = async () => {
+    setLoadingShared(true);
+    try {
+      const response = await draftApi.getSharedWithMe();
+      setSharedDrafts(response.data);
+    } catch (error: any) {
+      toast.error(extractApiError(error, "Failed to load shared drafts"));
+    } finally {
+      setLoadingShared(false);
+    }
+  };
+
+  const openBulkShare = async () => {
+    setShowBulkShare(true);
+    setBulkShareTargetIds([]);
+    setBulkSharePermission("view");
+    try {
+      const res = await profileApi.list();
+      setBulkShareProfiles(res.data.filter((p: any) => p.id !== profileId));
+    } catch {
+      toast.error("Failed to load profiles");
+    }
+  };
+
+  const handleBulkShare = async () => {
+    if (bulkShareTargetIds.length === 0 || selectedIds.size === 0) return;
+    setIsBulkSharing(true);
+    try {
+      const res = await draftApi.bulkShareDrafts(Array.from(selectedIds), bulkShareTargetIds, bulkSharePermission);
+      toast.success(`Shared ${selectedIds.size} draft${selectedIds.size > 1 ? 's' : ''} with ${bulkShareTargetIds.length} profile${bulkShareTargetIds.length > 1 ? 's' : ''} (${res.data.created} new)`);
+      setShowBulkShare(false);
+      setBulkShareTargetIds([]);
+    } catch (err: any) {
+      toast.error(extractApiError(err, "Bulk share failed"));
+    } finally {
+      setIsBulkSharing(false);
+    }
+  };
+
   const fetchDrafts = async () => {
     try {
       setIsLoading(true);
@@ -54,7 +102,12 @@ export default function DraftsPage() {
   useEffect(() => {
     setSelectedIds(new Set());
     fetchDrafts();
+    if (activeTab === 'shared') fetchSharedWithMe();
   }, [profileId]);
+
+  useEffect(() => {
+    if (activeTab === 'shared') fetchSharedWithMe();
+  }, [activeTab]);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery), 200);
@@ -318,8 +371,120 @@ export default function DraftsPage() {
             </div>
         </div>
 
+        {/* Tab toggle */}
+        <div className="flex rounded-lg bg-gray-800/40 p-0.5 w-fit">
+          <button
+            onClick={() => setActiveTab('mine')}
+            className={cn(
+              "px-4 py-1.5 rounded-md text-xs font-medium transition-all",
+              activeTab === 'mine' ? "bg-gray-700/60 text-white" : "text-gray-500 hover:text-gray-300"
+            )}
+          >
+            My Drafts
+          </button>
+          <button
+            onClick={() => setActiveTab('shared')}
+            className={cn(
+              "px-4 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-1.5",
+              activeTab === 'shared' ? "bg-gray-700/60 text-white" : "text-gray-500 hover:text-gray-300"
+            )}
+          >
+            <Share2 className="w-3 h-3" /> Shared with me
+            {sharedDrafts.length > 0 && (
+              <span className="ml-0.5 text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded-full font-bold">
+                {sharedDrafts.length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Shared with me tab */}
+        {activeTab === 'shared' && (
+          <div className="space-y-3">
+            {loadingShared ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="bg-gray-900/30 border border-gray-800/40 rounded-xl p-4 space-y-3">
+                    <div className="h-4 w-2/3 bg-gray-800/70 rounded animate-pulse" />
+                    <div className="h-3 w-1/3 bg-gray-800/60 rounded animate-pulse" />
+                    <div className="h-3 w-1/2 bg-gray-800/50 rounded animate-pulse" />
+                  </div>
+                ))}
+              </div>
+            ) : sharedDrafts.length === 0 ? (
+              <div className="bg-gray-900/30 border border-gray-800/60 rounded-xl p-16 text-center">
+                <Share2 className="w-10 h-10 text-gray-700 mx-auto mb-3" />
+                <p className="text-gray-400 font-medium">No shared drafts</p>
+                <p className="text-gray-600 text-sm mt-1">When other profiles share drafts with you, they&apos;ll appear here.</p>
+              </div>
+            ) : (
+              <div className="bg-gray-900/30 border border-gray-800/60 rounded-xl overflow-hidden">
+                <table className="w-full">
+                  <thead className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur-sm">
+                    <tr className="border-b border-gray-800/60">
+                      <th className="text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Name</th>
+                      <th className="text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider px-3 py-3">Objective</th>
+                      <th className="text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider px-3 py-3">Shared by</th>
+                      <th className="text-center text-[11px] font-medium text-gray-500 uppercase tracking-wider px-3 py-3">Permission</th>
+                      <th className="text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider px-3 py-3">Status</th>
+                      <th className="text-right text-[11px] font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sharedDrafts.map((share: any) => {
+                      const draft = share.draftCampaign;
+                      if (!draft) return null;
+                      const canEdit = share.permission === 'edit';
+                      return (
+                        <tr key={share.id} className="border-b border-gray-800/30 hover:bg-gray-800/20 transition-colors">
+                          <td className="px-4 py-2.5">
+                            <Link
+                              href={`/drafts/${draft.id}`}
+                              className="text-sm font-medium text-gray-200 hover:text-white transition-colors truncate block max-w-[280px]"
+                            >
+                              {draft.name}
+                            </Link>
+                          </td>
+                          <td className="px-3 py-2.5 text-xs text-gray-500 truncate max-w-[180px]">
+                            {OBJECTIVE_LABELS[draft.objective] || draft.objective}
+                          </td>
+                          <td className="px-3 py-2.5 text-xs text-gray-400">
+                            {share.sharedBy?.name || 'Unknown'}
+                          </td>
+                          <td className="px-3 py-2.5 text-center">
+                            <span className={cn(
+                              "inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border",
+                              canEdit
+                                ? "bg-blue-500/10 text-blue-400 border-blue-500/30"
+                                : "bg-gray-800/50 text-gray-400 border-gray-700"
+                            )}>
+                              {canEdit ? <Edit2 className="w-2.5 h-2.5" /> : <Eye className="w-2.5 h-2.5" />}
+                              {canEdit ? 'Edit' : 'View'}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            {getStatusBadge(draft.status)}
+                          </td>
+                          <td className="px-4 py-2.5 text-right">
+                            <Link href={`/drafts/${draft.id}`}>
+                              <Button size="sm" variant="ghost" className="h-7 gap-1.5 text-xs text-gray-400 hover:text-white">
+                                {canEdit ? <Edit2 className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                {canEdit ? 'Edit' : 'View'}
+                              </Button>
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Bulk action toolbar — appears when items are selected */}
-        {selectedIds.size > 0 && (
+        {activeTab === 'mine' && selectedIds.size > 0 && (
           <div className="flex flex-wrap items-center gap-2 px-3 py-2 rounded-lg bg-blue-500/5 border border-blue-500/20">
             <span className="text-xs text-blue-400/70 shrink-0">{selectedIds.size} selected</span>
             <div className="flex-1 min-w-[8px]" />
@@ -332,6 +497,16 @@ export default function DraftsPage() {
             >
               <Pencil className="w-3.5 h-3.5" />
               Edit ({selectedIds.size})
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5 border-purple-500/30 text-purple-400 hover:bg-purple-500/10"
+              onClick={openBulkShare}
+              disabled={isBusy}
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              Share ({selectedIds.size})
             </Button>
             <Button
               variant="outline"
@@ -358,7 +533,7 @@ export default function DraftsPage() {
         )}
 
         {/* Search & Filters */}
-        {!isLoading && drafts.length > 0 && (
+        {activeTab === 'mine' && !isLoading && drafts.length > 0 && (
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <div className="relative flex-1 min-w-0">
@@ -451,7 +626,7 @@ export default function DraftsPage() {
           </div>
         )}
 
-        {isLoading ? (
+        {activeTab === 'mine' && (isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[1, 2, 3, 4, 5, 6].map((i) => (
               <div key={i} className="bg-gray-900/30 border border-gray-800/40 rounded-xl p-4 space-y-3">
@@ -734,7 +909,7 @@ export default function DraftsPage() {
               </tbody>
             </table>
           </div>
-        )}
+        ))}
       </div>
 
       <BulkEditPanel
@@ -792,6 +967,82 @@ export default function DraftsPage() {
         onConfirm={handleBulkPublish}
         isLoading={isBulkPublishing}
       />
+      {showBulkShare && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowBulkShare(false)}>
+          <div className="bg-gray-900 border border-gray-800 rounded-xl w-full max-w-md mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800/60">
+              <h3 className="text-sm font-semibold text-gray-100 flex items-center gap-2">
+                <Share2 className="w-4 h-4 text-purple-400" /> Share {selectedIds.size} draft{selectedIds.size > 1 ? 's' : ''}
+              </h3>
+              <button onClick={() => setShowBulkShare(false)} className="text-gray-600 hover:text-gray-300 transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs text-gray-400">Selected drafts</label>
+                <div className="max-h-28 overflow-y-auto space-y-0.5 border border-gray-800/60 rounded-lg p-2 bg-gray-950/30 text-xs text-gray-500">
+                  {Array.from(selectedIds).map(id => {
+                    const d = drafts.find(x => x.id === id);
+                    return d ? <div key={id} className="truncate py-0.5">• {d.name}</div> : null;
+                  })}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs text-gray-400">Share with profiles</label>
+                {bulkShareProfiles.length === 0 ? (
+                  <p className="text-xs text-gray-600 py-3 text-center">No other profiles available.</p>
+                ) : (
+                  <div className="max-h-40 overflow-y-auto space-y-1 border border-gray-800/60 rounded-lg p-2 bg-gray-950/30">
+                    {bulkShareProfiles.map((p: any) => (
+                      <label key={p.id} className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-gray-800/40 cursor-pointer transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={bulkShareTargetIds.includes(p.id)}
+                          onChange={(e) => {
+                            setBulkShareTargetIds(prev =>
+                              e.target.checked ? [...prev, p.id] : prev.filter(x => x !== p.id)
+                            );
+                          }}
+                          className="rounded border-gray-700 bg-gray-900 text-purple-500 focus:ring-purple-500/30 w-3.5 h-3.5"
+                        />
+                        <div className="w-5 h-5 rounded-full bg-purple-500/10 flex items-center justify-center shrink-0">
+                          <span className="text-[9px] font-bold text-purple-400">{p.name[0].toUpperCase()}</span>
+                        </div>
+                        <span className="text-xs text-gray-300">{p.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <Select value={bulkSharePermission} onValueChange={(v) => { if (v) setBulkSharePermission(v); }}>
+                  <SelectTrigger className="w-28 h-9 bg-gray-950/50 border-gray-800 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-gray-900 border-gray-800">
+                    <SelectItem value="view" className="text-xs text-gray-300">View</SelectItem>
+                    <SelectItem value="edit" className="text-xs text-gray-300">Edit</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="sm"
+                  className="h-9 flex-1 bg-purple-600 hover:bg-purple-700"
+                  onClick={handleBulkShare}
+                  disabled={isBulkSharing || bulkShareTargetIds.length === 0}
+                >
+                  {isBulkSharing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : (
+                    <span className="flex items-center gap-1.5">
+                      <UserPlus className="w-3.5 h-3.5" />
+                      Share with {bulkShareTargetIds.length || '...'} profile{bulkShareTargetIds.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

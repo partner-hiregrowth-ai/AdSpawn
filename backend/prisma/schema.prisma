@@ -28,9 +28,26 @@ model Profile {
   draftAdSets    DraftAdSet[]
   draftAds       DraftAd[]
   duplicateJobs  DuplicateJob[]
+  sharedByMe     DraftShare[]    @relation("SharedByProfile")
+  sharedWithMe   DraftShare[]    @relation("SharedWithProfile")
   createdAt      DateTime        @default(now())
 
   @@index([teamId])
+}
+
+model DraftShare {
+  id                  String        @id @default(cuid())
+  draftCampaignId     String
+  sharedByProfileId   String
+  sharedWithProfileId String
+  permission          String        @default("view")
+  createdAt           DateTime      @default(now())
+  draftCampaign       DraftCampaign @relation(fields: [draftCampaignId], references: [id], onDelete: Cascade)
+  sharedBy            Profile       @relation("SharedByProfile", fields: [sharedByProfileId], references: [id], onDelete: Cascade)
+  sharedWith          Profile       @relation("SharedWithProfile", fields: [sharedWithProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([draftCampaignId, sharedWithProfileId])
+  @@index([sharedWithProfileId])
 }
 
 model User {
@@ -116,6 +133,7 @@ model DraftCampaign {
   updatedAt       DateTime      @updatedAt
   profile         Profile       @relation(fields: [profileId], references: [id])
   adSets          DraftAdSet[]
+  shares          DraftShare[]
 
   @@index([profileId, status])
   @@index([profileId, createdAt(sort: Desc)])

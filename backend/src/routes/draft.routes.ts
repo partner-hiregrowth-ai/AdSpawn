@@ -39,5 +39,10 @@ router.post('/import', validateBody(importCampaignSchema), DraftController.impor
 router.post('/campaigns/:id/validate', DraftController.validateDraft);
 router.post('/campaigns/:id/publish', DraftController.publishDraft);
 router.post('/campaigns/:id/cleanup', DraftController.cleanupMetaObjects);
+router.post('/campaigns/bulk-share', bulkLimiter, DraftController.bulkShareDrafts);
+router.post('/campaigns/:id/share', DraftController.shareDraft);
+router.delete('/campaigns/:id/share/:shareId', DraftController.revokeDraftShare);
+router.get('/campaigns/:id/shares', DraftController.getDraftShares);
+router.get('/shared-with-me', DraftController.getSharedWithMe);
 
 export default router;

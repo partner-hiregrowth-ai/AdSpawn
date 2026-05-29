@@ -125,6 +125,14 @@ export const draftApi = {
   exportCampaign: (id: string) => api.get(`/drafts/campaigns/${id}/export`),
   importCampaign: (exported: any, adAccountId?: string) =>
     api.post('/drafts/import', { exported, adAccountId }),
+  shareDraft: (id: string, profileId: string, permission: string = 'view') =>
+    api.post(`/drafts/campaigns/${id}/share`, { profileId, permission }),
+  bulkShareDrafts: (campaignIds: string[], profileIds: string[], permission: string = 'view') =>
+    api.post('/drafts/campaigns/bulk-share', { campaignIds, profileIds, permission }),
+  revokeDraftShare: (id: string, shareId: string) =>
+    api.delete(`/drafts/campaigns/${id}/share/${shareId}`),
+  getDraftShares: (id: string) => api.get(`/drafts/campaigns/${id}/shares`),
+  getSharedWithMe: () => api.get('/drafts/shared-with-me'),
 };
 
 export const userApi = {

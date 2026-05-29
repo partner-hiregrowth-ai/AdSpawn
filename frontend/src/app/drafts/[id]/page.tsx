@@ -7,12 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import { draftApi } from "@/services/api";
+import { draftApi, profileApi } from "@/services/api";
 import { useAppStore } from "@/store/useAppStore";
 import {
   Save, Send, ShieldCheck, AlertTriangle, FileText, Layers,
   Megaphone, Loader2, ArrowLeft, Trash2, CheckCircle2, CircleHelp,
-  Zap, ZapOff, Info,
+  Zap, ZapOff, Info, Share2, X, UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -410,6 +410,65 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
 
   const hasMetaId = !!draft?.metaId || draft?.adSets?.some((s: any) => !!s.metaId);
 
+  const currentProfileId = useAppStore.getState().profile?.id;
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shares, setShares] = useState<any[]>([]);
+  const [teamProfiles, setTeamProfiles] = useState<any[]>([]);
+  const [shareTargetIds, setShareTargetIds] = useState<string[]>([]);
+  const [sharePermission, setSharePermission] = useState("view");
+  const [isSharing, setIsSharing] = useState(false);
+  const [loadingShares, setLoadingShares] = useState(false);
+
+  const openShareModal = async () => {
+    setShowShareModal(true);
+    setLoadingShares(true);
+    try {
+      const [sharesRes, profilesRes] = await Promise.all([
+        draftApi.getDraftShares(params.id),
+        profileApi.list(),
+      ]);
+      setShares(sharesRes.data);
+      setTeamProfiles(profilesRes.data);
+    } catch {
+      toast.error("Failed to load sharing info");
+    } finally {
+      setLoadingShares(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (shareTargetIds.length === 0) return;
+    setIsSharing(true);
+    try {
+      await Promise.all(
+        shareTargetIds.map(id => draftApi.shareDraft(params.id, id, sharePermission))
+      );
+      toast.success(`Shared with ${shareTargetIds.length} profile${shareTargetIds.length > 1 ? 's' : ''}`);
+      const res = await draftApi.getDraftShares(params.id);
+      setShares(res.data);
+      setShareTargetIds([]);
+      setSharePermission("view");
+    } catch (err: any) {
+      toast.error(extractApiError(err, "Failed to share draft"));
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
+  const handleRevokeShare = async (shareId: string) => {
+    try {
+      await draftApi.revokeDraftShare(params.id, shareId);
+      setShares(s => s.filter(x => x.id !== shareId));
+      toast.success("Share revoked");
+    } catch (err: any) {
+      toast.error(extractApiError(err, "Failed to revoke share"));
+    }
+  };
+
+  const unsharableProfiles = teamProfiles.filter(
+    p => p.id !== currentProfileId && !shares.some(s => s.sharedWithProfileId === p.id)
+  );
+
   if (isLoading) {
     return <DashboardLayout><div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div></DashboardLayout>;
   }
@@ -474,6 +533,10 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
               Auto-save
             </Button>
             <Button variant="outline" size="sm" className="gap-1.5 border-gray-800 text-gray-400"
+              onClick={openShareModal}>
+              <Share2 className="w-3.5 h-3.5" /> Share
+            </Button>
+            <Button variant="outline" size="sm" className="gap-1.5 border-gray-800 text-gray-400"
               onClick={handleValidate} disabled={isValidating || isDirty}
               title={isDirty ? "Save your edits first" : "Re-run validation"}>
               <ShieldCheck className={cn("w-3.5 h-3.5", isValidating && "animate-spin")} /> Validate
@@ -511,6 +574,114 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
           onConfirm={confirmCleanup}
           isLoading={isCleaning}
         />
+
+        {showShareModal && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+            <div className="w-full max-w-md bg-gray-900 border border-gray-800 rounded-2xl shadow-2xl animate-fade-in-up">
+              <div className="flex items-center justify-between p-5 border-b border-gray-800/60">
+                <h3 className="text-sm font-semibold text-gray-100 flex items-center gap-2">
+                  <Share2 className="w-4 h-4 text-blue-400" /> Share draft with profiles
+                </h3>
+                <button onClick={() => setShowShareModal(false)} className="text-gray-600 hover:text-gray-300 transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="p-5 space-y-4">
+                {loadingShares ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                  </div>
+                ) : (
+                  <>
+                    {unsharableProfiles.length > 0 && (
+                      <div className="space-y-3">
+                        <div className="space-y-1.5">
+                          <label className="text-xs text-gray-400">Select profiles to share with</label>
+                          <div className="max-h-40 overflow-y-auto space-y-1 border border-gray-800/60 rounded-lg p-2 bg-gray-950/30">
+                            {unsharableProfiles.map(p => (
+                              <label key={p.id} className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-gray-800/40 cursor-pointer transition-colors">
+                                <input
+                                  type="checkbox"
+                                  checked={shareTargetIds.includes(p.id)}
+                                  onChange={(e) => {
+                                    setShareTargetIds(prev =>
+                                      e.target.checked ? [...prev, p.id] : prev.filter(x => x !== p.id)
+                                    );
+                                  }}
+                                  className="rounded border-gray-700 bg-gray-900 text-blue-500 focus:ring-blue-500/30 w-3.5 h-3.5"
+                                />
+                                <div className="w-5 h-5 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
+                                  <span className="text-[9px] font-bold text-blue-400">{p.name[0].toUpperCase()}</span>
+                                </div>
+                                <span className="text-xs text-gray-300">{p.name}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Select value={sharePermission} onValueChange={(v) => { if (v) setSharePermission(v); }}>
+                            <SelectTrigger className="w-28 h-9 bg-gray-950/50 border-gray-800 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-gray-900 border-gray-800">
+                              <SelectItem value="view" className="text-xs text-gray-300">View</SelectItem>
+                              <SelectItem value="edit" className="text-xs text-gray-300">Edit</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button size="sm" className="h-9 flex-1 bg-blue-600 hover:bg-blue-700" onClick={handleShare} disabled={isSharing || shareTargetIds.length === 0}>
+                            {isSharing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : (
+                              <span className="flex items-center gap-1.5">
+                                <UserPlus className="w-3.5 h-3.5" />
+                                Share{shareTargetIds.length > 0 ? ` (${shareTargetIds.length})` : ''}
+                              </span>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {shares.length > 0 ? (
+                      <div className="space-y-2">
+                        <label className="text-xs text-gray-400">Shared with</label>
+                        <div className="space-y-1.5">
+                          {shares.map(share => (
+                            <div key={share.id} className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-800/30 border border-gray-800/60">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-6 h-6 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
+                                  <span className="text-[10px] font-bold text-blue-400">
+                                    {(share.sharedWith?.name || '?')[0].toUpperCase()}
+                                  </span>
+                                </div>
+                                <span className="text-xs text-gray-300 truncate">{share.sharedWith?.name}</span>
+                                <span className={cn(
+                                  "text-[10px] font-medium px-1.5 py-0.5 rounded",
+                                  share.permission === 'edit' ? "bg-blue-500/10 text-blue-400" : "bg-gray-800 text-gray-500"
+                                )}>
+                                  {share.permission}
+                                </span>
+                              </div>
+                              <button onClick={() => handleRevokeShare(share.id)} className="text-gray-600 hover:text-red-400 transition-colors p-1">
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-4">
+                        <p className="text-xs text-gray-600">Not shared with any profile yet.</p>
+                      </div>
+                    )}
+
+                    {unsharableProfiles.length === 0 && shares.length > 0 && (
+                      <p className="text-[11px] text-gray-600 text-center">All profiles already have access.</p>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col md:flex-row flex-1 gap-5 overflow-hidden">
           <div className="w-full md:w-72 border-b md:border-b-0 md:border-r border-gray-800/40 overflow-y-auto pr-0 md:pr-3 max-h-48 md:max-h-none pb-3 md:pb-0">

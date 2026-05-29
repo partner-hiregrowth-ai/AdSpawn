@@ -666,4 +666,117 @@ export class DraftController {
       res.status(500).json({ error: error.message });
     }
   }
+
+  static async shareDraft(req: Request, res: Response) {
+    const id = req.params.id as string;
+    const authReq = req as AuthRequest;
+    const { profileId: targetProfileId, permission = 'view' } = req.body;
+    try {
+      if (!targetProfileId) return res.status(400).json({ error: 'profileId is required' });
+      if (targetProfileId === authReq.profileId) return res.status(400).json({ error: 'Cannot share with yourself' });
+
+      const draft = await prisma.draftCampaign.findFirst({ where: { id } });
+      if (!draft) return res.status(404).json({ error: 'Draft not found' });
+
+      const share = await prisma.draftShare.create({
+        data: {
+          draftCampaignId: id,
+          sharedByProfileId: authReq.profileId!,
+          sharedWithProfileId: targetProfileId,
+          permission,
+        },
+        include: { sharedWith: { select: { id: true, name: true } } },
+      });
+      res.json(share);
+    } catch (error: any) {
+      if (error.code === 'P2002') return res.status(409).json({ error: 'Already shared with this profile' });
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  static async revokeDraftShare(req: Request, res: Response) {
+    const id = req.params.id as string;
+    const shareId = req.params.shareId as string;
+    try {
+      await prisma.draftShare.delete({ where: { id: shareId, draftCampaignId: id } });
+      res.json({ success: true });
+    } catch (error: any) {
+      if (error.code === 'P2025') return res.status(404).json({ error: 'Share not found' });
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  static async getDraftShares(req: Request, res: Response) {
+    const id = req.params.id as string;
+    try {
+      const shares = await prisma.draftShare.findMany({
+        where: { draftCampaignId: id },
+        include: {
+          sharedWith: { select: { id: true, name: true } },
+          sharedBy: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: 'asc' },
+      });
+      res.json(shares);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  static async bulkShareDrafts(req: Request, res: Response) {
+    const authReq = req as AuthRequest;
+    const { campaignIds, profileIds, permission = 'view' } = req.body;
+    try {
+      if (!Array.isArray(campaignIds) || campaignIds.length === 0) return res.status(400).json({ error: 'campaignIds is required' });
+      if (!Array.isArray(profileIds) || profileIds.length === 0) return res.status(400).json({ error: 'profileIds is required' });
+      if (profileIds.includes(authReq.profileId)) return res.status(400).json({ error: 'Cannot share with yourself' });
+
+      const data = campaignIds.flatMap((cid: string) =>
+        profileIds.map((pid: string) => ({
+          draftCampaignId: cid,
+          sharedByProfileId: authReq.profileId!,
+          sharedWithProfileId: pid,
+          permission,
+        }))
+      );
+
+      const result = await prisma.draftShare.createMany({ data, skipDuplicates: true });
+      res.json({ created: result.count, total: data.length });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  static async getSharedWithMe(req: Request, res: Response) {
+    const authReq = req as AuthRequest;
+    try {
+      const shares = await prisma.draftShare.findMany({
+        where: { sharedWithProfileId: authReq.profileId! },
+        include: {
+          draftCampaign: {
+            include: {
+              _count: { select: { adSets: true } },
+              adSets: { select: { _count: { select: { ads: true } } } },
+            },
+          },
+          sharedBy: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      const enriched = shares.map(({ draftCampaign, ...rest }) => {
+        if (!draftCampaign) return { ...rest, draftCampaign };
+        const { adSets, ...campaign } = draftCampaign;
+        return {
+          ...rest,
+          draftCampaign: {
+            ...campaign,
+            _count: { ...campaign._count, ads: adSets.reduce((sum, s) => sum + s._count.ads, 0) },
+          },
+        };
+      });
+      res.json(enriched);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
 }
