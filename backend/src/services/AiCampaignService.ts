@@ -482,11 +482,12 @@ async function callNativeGeminiWithValidationError(
     {
       functionResponse: {
         name: call?.functionCall?.name || 'generate_draft_template',
-        response: { status: 'validation_failed', errors: JSON.parse(errorJson) },
+        response: {
+          status: 'validation_failed',
+          errors: JSON.parse(errorJson),
+          instruction: 'The template failed validation. Explain the errors in plain language and ask the user for corrections.',
+        },
       },
-    },
-    {
-      text: 'The template failed validation. Please explain the errors to the user and ask for corrections.',
     },
   ];
 
