@@ -8,13 +8,16 @@ import { ShortcutsModal } from "./ShortcutsModal";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore, useAppHydration } from "@/store/useAppStore";
-import { teamApi, profileApi, adAccountApi } from "@/services/api";
+import { useGlobalData } from "@/store/useGlobalData";
 
 export const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
   const appHydrated = useAppHydration();
-  const { user, team, profile, adAccounts, setTeam, setProfile, setProfiles, setAdAccounts, mobileSidebarOpen, setMobileSidebarOpen } = useAppStore();
+  const { user, profile, mobileSidebarOpen, setMobileSidebarOpen } = useAppStore();
   const [mounted, setMounted] = useState(false);
+
+  // Use the optimized global data hook
+  useGlobalData();
 
   useEffect(() => {
     setMounted(true);
@@ -28,31 +31,6 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
       router.push("/profiles");
     }
   }, [user, profile, router]);
-
-  useEffect(() => {
-    if (!team && localStorage.getItem("token")) {
-      teamApi.getTeam().then(res => setTeam(res.data)).catch(() => {});
-    }
-  }, [team, setTeam]);
-
-  useEffect(() => {
-    if (adAccounts.length === 0 && localStorage.getItem("token")) {
-      adAccountApi.getAdAccounts().then(res => setAdAccounts(res.data)).catch(() => {});
-    }
-  }, [adAccounts.length, setAdAccounts]);
-
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-    profileApi.list().then(res => {
-      setProfiles(res.data);
-      const savedId = localStorage.getItem("profileId");
-      if (savedId && !profile) {
-        const found = res.data.find((p: any) => p.id === savedId);
-        if (found) setProfile(found);
-      }
-    }).catch(() => {});
-  }, []);
 
   if (!mounted || !appHydrated) return null;
 

@@ -12,6 +12,7 @@ import {
   Zap,
   Grid3X3,
   Settings,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/useAppStore";
@@ -20,8 +21,9 @@ const menuItems = [
   { icon: LayoutDashboard, label: "Account", href: "/dashboard", desc: "Select an ad account to work with" },
   { icon: FolderTree, label: "Explorer", href: "/explorer", desc: "Browse campaigns, ad sets, and ads — select to duplicate or convert" },
   { icon: Layers, label: "Drafts", href: "/drafts", desc: "Edit campaign drafts and publish to Meta" },
-  { icon: Grid3X3, label: "Wide Create", href: "/wide-create", desc: "Build bulk campaign structures from scratch across multiple objectives" },
-  { icon: History, label: "History", href: "/history", desc: "Log of all duplication and conversion jobs" },
+  { icon: Grid3X3,   label: "Wide Create", href: "/wide-create", desc: "Build bulk campaign structures from scratch across multiple objectives" },
+  { icon: Sparkles,  label: "AI Create",   href: "/ai-create",  desc: "Describe your campaign in plain language — AI builds the drafts" },
+  { icon: History,   label: "History",     href: "/history",    desc: "Log of all duplication and conversion jobs" },
   { icon: Settings, label: "Settings", href: "/settings", desc: "Account, team, and connection settings" },
 ];
 

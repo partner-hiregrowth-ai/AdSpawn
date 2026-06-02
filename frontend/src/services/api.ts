@@ -99,6 +99,13 @@ export const wideCreationApi = {
   getTree: (campaignIds: string[]) => api.post('/wide-creation/tree', { campaignIds }),
 };
 
+export const aiCreateApi = {
+  chat: (
+    messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+    adAccountId: string,
+  ) => api.post('/ai-create/chat', { messages, adAccountId }),
+};
+
 export const draftApi = {
   duplicateToDraft: (campaignId: string, count?: number) =>
     api.post('/drafts/duplicate', count && count > 1 ? { campaignId, count } : { campaignId }),

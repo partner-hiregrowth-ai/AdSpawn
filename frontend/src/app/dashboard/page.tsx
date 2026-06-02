@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { CreditCard, Globe, RefreshCcw, Loader2, ArrowRight, X } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { useEffect, useState } from "react";
+import useSWR from "swr";
 import { adAccountApi } from "@/services/api";
 import { AdAccount } from "@/types";
 import { toast } from "sonner";
@@ -15,8 +16,25 @@ import { cn, extractApiError } from "@/lib/utils";
 export default function DashboardPage() {
   const router = useRouter();
   const { setAdAccounts, adAccounts, setSelectedAccount } = useAppStore();
-  const [loading, setLoading] = useState(false);
   const [showBanner, setShowBanner] = useState(false);
+
+  // useSWR will automatically handle the loading state and caching
+  const { data: swrAdAccounts, isLoading: swrLoading, error, mutate } = useSWR("/adaccounts");
+
+  useEffect(() => {
+    if (swrAdAccounts) {
+      setAdAccounts(swrAdAccounts);
+    }
+  }, [swrAdAccounts, setAdAccounts]);
+
+  const loading = swrLoading;
+  const fetchAccounts = () => mutate();
+
+  useEffect(() => {
+    if (error) {
+      toast.error(extractApiError(error, "Couldn't load your Meta ad accounts. Check your Facebook connection in Settings and try again."));
+    }
+  }, [error]);
 
   useEffect(() => {
     if (!localStorage.getItem('adspawn-onboarded')) {
@@ -28,22 +46,6 @@ export default function DashboardPage() {
     localStorage.setItem('adspawn-onboarded', '1');
     setShowBanner(false);
   };
-
-  const fetchAccounts = async () => {
-    setLoading(true);
-    try {
-      const response = await adAccountApi.getAdAccounts();
-      setAdAccounts(response.data);
-    } catch (error: any) {
-      toast.error(extractApiError(error, "Couldn't load your Meta ad accounts. Check your Facebook connection in Settings and try again."));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchAccounts();
-  }, []);
 
   const getRecentAccountIds = (): string[] => {
     try { return JSON.parse(localStorage.getItem('adspawn-recent-accounts') || '[]'); } catch { return []; }
