@@ -23,35 +23,42 @@ export class DraftCampaignService {
   }
 
   static async getById(id: string, profileId?: string) {
+    const includeTree = {
+      adSets: {
+        include: {
+          ads: true,
+        },
+      },
+    };
     if (profileId) {
       return prisma.draftCampaign.findFirst({
-        where: { id, profileId },
-        include: {
-          adSets: {
-            include: {
-              ads: true,
-            },
-          },
+        where: {
+          id,
+          OR: [
+            { profileId },
+            { shares: { some: { sharedWithProfileId: profileId } } },
+          ],
         },
+        include: includeTree,
       });
     }
     return prisma.draftCampaign.findUnique({
       where: { id },
-      include: {
-        adSets: {
-          include: {
-            ads: true,
-          },
-        },
-      },
+      include: includeTree,
     });
   }
 
   static async listByProfile(profileId: string, page = 1, pageSize = 50) {
     const skip = (page - 1) * pageSize;
+    const where = {
+      OR: [
+        { profileId },
+        { shares: { some: { sharedWithProfileId: profileId } } },
+      ],
+    };
     const [items, total] = await Promise.all([
       prisma.draftCampaign.findMany({
-        where: { profileId },
+        where,
         orderBy: { createdAt: 'desc' },
         skip,
         take: pageSize,
@@ -60,7 +67,7 @@ export class DraftCampaignService {
           adSets: { select: { _count: { select: { ads: true } } } },
         },
       }),
-      prisma.draftCampaign.count({ where: { profileId } }),
+      prisma.draftCampaign.count({ where }),
     ]);
     const enriched = items.map(({ adSets, ...rest }) => ({
       ...rest,
@@ -80,7 +87,15 @@ export class DraftCampaignService {
 
     if (cleanData.data) {
       const existing = profileId
-        ? await prisma.draftCampaign.findFirst({ where: { id, profileId } })
+        ? await prisma.draftCampaign.findFirst({
+            where: {
+              id,
+              OR: [
+                { profileId },
+                { shares: { some: { sharedWithProfileId: profileId, permission: 'edit' } } },
+              ],
+            },
+          })
         : await prisma.draftCampaign.findUnique({ where: { id } });
       if (profileId && !existing) throwNotFound('Campaign');
       if (existing?.metaId && typeof cleanData.data === 'object') {
@@ -105,7 +120,15 @@ export class DraftCampaignService {
         }
       }
     } else if (profileId) {
-      const exists = await prisma.draftCampaign.findFirst({ where: { id, profileId } });
+      const exists = await prisma.draftCampaign.findFirst({
+        where: {
+          id,
+          OR: [
+            { profileId },
+            { shares: { some: { sharedWithProfileId: profileId, permission: 'edit' } } },
+          ],
+        },
+      });
       if (!exists) throwNotFound('Campaign');
     }
 

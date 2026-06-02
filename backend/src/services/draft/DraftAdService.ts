@@ -24,7 +24,13 @@ export class DraftAdService {
   static async getById(id: string, profileId?: string) {
     if (profileId) {
       return prisma.draftAd.findFirst({
-        where: { id, profileId },
+        where: {
+          id,
+          OR: [
+            { profileId },
+            { adSet: { campaign: { shares: { some: { sharedWithProfileId: profileId } } } } },
+          ],
+        },
         include: { adSet: { include: { campaign: true } } },
       });
     }
@@ -36,7 +42,15 @@ export class DraftAdService {
 
   static async update(id: string, updateData: any, profileId?: string) {
     if (profileId) {
-      const exists = await prisma.draftAd.findFirst({ where: { id, profileId } });
+      const exists = await prisma.draftAd.findFirst({
+        where: {
+          id,
+          OR: [
+            { profileId },
+            { adSet: { campaign: { shares: { some: { sharedWithProfileId: profileId, permission: 'edit' } } } } },
+          ],
+        },
+      });
       if (!exists) throwNotFound('Ad');
     }
 
@@ -56,7 +70,7 @@ export class DraftAdService {
 
   static async delete(id: string, profileId?: string) {
     if (profileId) {
-      const exists = await prisma.draftAd.findFirst({ where: { id, profileId } });
+      const exists = await prisma.draftAd.findFirst({ where: { id, profileId } }); // owner-only
       if (!exists) throwNotFound('Ad');
     }
     return prisma.draftAd.delete({
