@@ -189,13 +189,12 @@ describe('DraftCampaignService', () => {
     mockPrisma.draftCampaign.count.mockResolvedValue(0);
     const result = await DraftCampaignService.listByProfile('user-1');
     expect(mockPrisma.draftCampaign.findMany).toHaveBeenCalledWith({
-      where: { profileId: 'user-1' },
+      where: { OR: [{ profileId: 'user-1' }, { shares: { some: { sharedWithProfileId: 'user-1' } } }] },
       orderBy: { createdAt: 'desc' },
       skip: 0,
       take: 50,
       include: {
         _count: { select: { adSets: true } },
-        adSets: { select: { _count: { select: { ads: true } } } },
       },
     });
     expect(result.total).toBe(0);

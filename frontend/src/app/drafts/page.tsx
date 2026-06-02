@@ -228,27 +228,22 @@ export default function DraftsPage() {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
     setIsBulkPublishing(true);
-    const results: { id: string; success: boolean; error?: string }[] = [];
+    setPublishProgress({ current: 0, total: ids.length });
     try {
-      for (let i = 0; i < ids.length; i++) {
-        setPublishProgress({ current: i, total: ids.length });
-        try {
-          await draftApi.publishDraft(ids[i]);
-          results.push({ id: ids[i], success: true });
-        } catch (err: any) {
-          results.push({ id: ids[i], success: false, error: extractApiError(err, "Publish failed") });
-        }
-        setPublishProgress({ current: i + 1, total: ids.length });
-      }
+      const res = await draftApi.bulkPublishDrafts(ids);
+      const results: { id: string; success: boolean; error?: string; userMessage?: string }[] = res.data.results;
+      setPublishProgress({ current: ids.length, total: ids.length });
       const succeeded = results.filter((r) => r.success).length;
       const failed = results.filter((r) => !r.success);
       if (succeeded > 0) {
         setPublishedBanner({ count: succeeded });
         setTimeout(() => setPublishedBanner(null), 8000);
       }
-      failed.forEach((r) => toast.error(r.error || "Unknown error"));
+      failed.forEach((r) => toast.error(r.userMessage || r.error || "Unknown error"));
       setSelectedIds(new Set());
       fetchDrafts();
+    } catch (err: any) {
+      toast.error(extractApiError(err, "Bulk publish failed"));
     } finally {
       setIsBulkPublishing(false);
       setPublishProgress(null);
@@ -885,7 +880,6 @@ export default function DraftsPage() {
                   <th className="text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider px-3 py-3">Name</th>
                   <th className="text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider px-3 py-3">Objective</th>
                   <th className="text-center text-[11px] font-medium text-gray-500 uppercase tracking-wider px-3 py-3">Ad Sets</th>
-                  <th className="text-center text-[11px] font-medium text-gray-500 uppercase tracking-wider px-3 py-3">Ads</th>
                   <th className="text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider px-3 py-3">Status</th>
                   <th className="text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider px-3 py-3">Updated</th>
                   <th className="text-right text-[11px] font-medium text-gray-500 uppercase tracking-wider px-3 py-3">Actions</th>
@@ -922,9 +916,6 @@ export default function DraftsPage() {
                       </td>
                       <td className="px-3 py-2.5 text-center text-xs text-gray-500">
                         {draft._count?.adSets}
-                      </td>
-                      <td className="px-3 py-2.5 text-center text-xs text-gray-500">
-                        {draft._count?.ads ?? 0}
                       </td>
                       <td className="px-3 py-2.5">
                         {getStatusBadge(draft.status)}

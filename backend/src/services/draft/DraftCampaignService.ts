@@ -64,16 +64,11 @@ export class DraftCampaignService {
         take: pageSize,
         include: {
           _count: { select: { adSets: true } },
-          adSets: { select: { _count: { select: { ads: true } } } },
         },
       }),
       prisma.draftCampaign.count({ where }),
     ]);
-    const enriched = items.map(({ adSets, ...rest }) => ({
-      ...rest,
-      _count: { ...rest._count, ads: adSets.reduce((sum, s) => sum + s._count.ads, 0) },
-    }));
-    return { items: enriched, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
+    return { items, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
   }
 
   static async update(id: string, updateData: any, profileId?: string) {

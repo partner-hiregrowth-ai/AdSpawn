@@ -45,7 +45,13 @@ describe('DraftCampaignService ownership enforcement', () => {
     const result = await DraftCampaignService.getById('camp-1', 'profile-1');
 
     expect(mockPrisma.draftCampaign.findFirst).toHaveBeenCalledWith({
-      where: { id: 'camp-1', profileId: 'profile-1' },
+      where: {
+        id: 'camp-1',
+        OR: [
+          { profileId: 'profile-1' },
+          { shares: { some: { sharedWithProfileId: 'profile-1' } } },
+        ],
+      },
       include: { adSets: { include: { ads: true } } },
     });
     expect(result).toBeNull();

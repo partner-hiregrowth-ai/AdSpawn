@@ -298,26 +298,36 @@ export class DraftController {
         return res.status(400).json({ error: 'campaignIds must be a non-empty array' });
       }
 
-      let updatedCount = 0;
-      for (const id of campaignIds) {
-        const current = await prisma.draftCampaign.findFirst({
-          where: { id, profileId, status: { not: 'PUBLISHING' } },
-        });
-        if (!current) continue;
+      const candidates = await prisma.draftCampaign.findMany({
+        where: { id: { in: campaignIds }, profileId, status: { not: 'PUBLISHING' } },
+        select: { id: true, data: true },
+      });
 
-        const updatePayload: any = { status: 'DRAFT' };
-        if (updates.objective !== undefined) {
-          updatePayload.objective = updates.objective;
-        }
-        if (updates.data) {
-          updatePayload.data = { ...(current.data as any), ...updates.data };
-        }
-
-        await prisma.draftCampaign.update({ where: { id }, data: updatePayload });
-        updatedCount++;
+      if (candidates.length === 0) {
+        return res.json({ updated: 0 });
       }
 
-      res.json({ updated: updatedCount });
+      if (updates.data) {
+        const basePayload: any = { status: 'DRAFT' };
+        if (updates.objective !== undefined) basePayload.objective = updates.objective;
+        await prisma.$transaction(
+          candidates.map((c) =>
+            prisma.draftCampaign.update({
+              where: { id: c.id },
+              data: { ...basePayload, data: { ...(c.data as any), ...updates.data } },
+            })
+          )
+        );
+      } else {
+        const updatePayload: any = { status: 'DRAFT' };
+        if (updates.objective !== undefined) updatePayload.objective = updates.objective;
+        await prisma.draftCampaign.updateMany({
+          where: { id: { in: candidates.map((c) => c.id) } },
+          data: updatePayload,
+        });
+      }
+
+      res.json({ updated: candidates.length });
     } catch (error: any) {
       console.error(`[DraftController] Error in bulkUpdateCampaigns:`, error);
       res.status(500).json({ error: error.message });
