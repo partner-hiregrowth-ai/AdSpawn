@@ -89,23 +89,42 @@ Infer from keywords — do not ask the user to name the enum:
 - "app", "install", "download", "mobile"                 → OUTCOME_APP_PROMOTION (need application_id)
 If still ambiguous after reading the full message, default to OUTCOME_TRAFFIC.
 
-== SILENT DEFAULTS (never ask about these) ==
+== WHAT THE USER CAN SPECIFY (use exactly what they say) ==
+- Campaign name        e.g. "Summer Sale 2025"
+- Objective            e.g. "traffic", "awareness", "sales" (infer from keywords)
+- Daily budget (THB)   e.g. "500 baht/day" → 50000 satang
+- Number of campaigns  e.g. "3 campaigns"
+- Number of ad sets    e.g. "2 ad sets"
+- Number of ads        e.g. "2 ads per ad set"
+- Creative ID          e.g. "creative ID 12345" → ad.fields.creative = { "creative_id": "12345" }
+- Pixel ID             for OUTCOME_SALES
+- Page ID              for OUTCOME_LEADS
+- App ID + Store URL   for OUTCOME_APP_PROMOTION
+
+== SILENT DEFAULTS (apply without asking when the user does not specify) ==
 - campaigns: 1
 - ad sets per campaign: 1
 - ads per ad set: 1
-- daily_budget: 30000 satang (300 THB) — use this if the user does not mention a budget
+- daily_budget: 30000 satang (300 THB)
 - targeting: { "geo_locations": { "countries": ["TH"] }, "age_min": 20 }
 - status: "PAUSED"
 - bid_strategy: "LOWEST_COST_WITHOUT_CAP"
+- campaign name: "<Objective type> Campaign <today's date>"
+- ad set name: "<campaign name> - Ad Set <n>"
 - ad name: "<campaign name> - Ad <n>"
 - special_ad_categories: ["NONE"]
+- creative: omit (user adds it in the Drafts editor) unless creative_id is provided
 
-== WHEN TO ASK (only these two cases) ==
-1. Objective resolved to OUTCOME_LEADS / OUTCOME_SALES / OUTCOME_APP_PROMOTION
-   AND the required ID (page_id / pixel_id / application_id) is missing from the message.
-   → Ask for ONLY that one ID in a single sentence, then generate on the next turn.
-2. The message contains no recognisable intent at all (e.g. "hello", "help").
-   → Ask one short question: what kind of campaign do you want to run?
+== WHEN TO ASK (only these cases) ==
+1. OUTCOME_LEADS and page_id is missing → ask for page_id only.
+2. OUTCOME_SALES and pixel_id is missing → ask for pixel_id only.
+   (Do NOT ask for custom_event_type — always default to PURCHASE silently.)
+3. OUTCOME_APP_PROMOTION and application_id OR object_store_url is missing
+   → ask for both in one message: "What is your app ID and App Store / Play Store URL?"
+4. The message contains no recognisable intent (e.g. "hello", "help")
+   → Ask one question: what kind of campaign do you want to run?
+
+In all other cases: generate immediately without asking anything.
 
 In all other cases: generate immediately.
 
@@ -118,14 +137,16 @@ OUTCOME_SALES:         optimization_goal=OFFSITE_CONVERSIONS, billing_event=IMPR
 OUTCOME_APP_PROMOTION: optimization_goal=APP_INSTALLS,        billing_event=IMPRESSIONS, destination_type=APP
 
 == PROMOTED OBJECTS ==
-OUTCOME_SALES    → promoted_object: { "pixel_id": "<value>" }
+OUTCOME_SALES    → promoted_object: { "pixel_id": "<value>", "custom_event_type": "PURCHASE" }
+                   Default custom_event_type to PURCHASE silently unless user specifies another
+                   (valid values: PURCHASE, ADD_TO_CART, INITIATE_CHECKOUT, LEAD, COMPLETE_REGISTRATION, SUBSCRIBE)
 OUTCOME_LEADS    → promoted_object: { "page_id": "<value>" }
-OUTCOME_APP_PROMOTION → promoted_object: { "application_id": "<value>" }
+OUTCOME_APP_PROMOTION → promoted_object: { "application_id": "<value>", "object_store_url": "<App Store or Play Store URL>" }
+                        object_store_url is REQUIRED — always ask for it alongside application_id
 
 == AFTER GENERATION ==
 Tell the user the exact counts created (campaigns / ad sets / ads) in one sentence,
-then tell them to go to Drafts to add creative and publish. Keep it brief.
-Never ask about ad creative — the user adds it in the Drafts editor.
+then tell them to go to Drafts to add creative (if not already set) and publish. Keep it brief.
 
 == VALIDATION FEEDBACK ==
 If you receive VALIDATION_ERRORS, explain what is wrong in plain language and
@@ -191,7 +212,16 @@ const TOOL_PARAMS: any = {
                         properties: {
                           fields: {
                             type: 'object',
-                            properties: { name: { type: 'string' } },
+                            properties: {
+                              name: { type: 'string' },
+                              creative: {
+                                type: 'object',
+                                description: 'Optional. Set creative_id if the user provides an existing Meta creative ID.',
+                                properties: {
+                                  creative_id: { type: 'string', description: 'Existing Meta creative ID' },
+                                },
+                              },
+                            },
                             required: ['name'],
                           },
                         },

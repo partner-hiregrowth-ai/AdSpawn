@@ -102,10 +102,9 @@ function MessageBubble({ msg }: { msg: Message }) {
 // ─── Example prompts ─────────────────────────────────────────────────────────
 
 const EXAMPLES = [
-  "Traffic campaign for my restaurant website, 500 baht/day, 2 ad sets",
-  "Brand awareness for a new product launch, 1,000 baht/day",
-  "Lead generation campaign, page ID 123456789, 300 baht/day",
-  "App install campaign for app ID 987654321, 800 baht/day, 3 ad sets",
+  'Traffic campaign "Website Visits July", 500 baht/day, 2 ad sets, 2 ads each',
+  'Sales campaign "Checkout Push", pixel ID 123456789, 1,000 baht/day, 3 ad sets',
+  'App installs "Get the App", app ID 987654321, store URL https://apps.apple.com/app/id987654321, 800 baht/day',
 ];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -113,7 +112,17 @@ const EXAMPLES = [
 const WELCOME_MESSAGE: Message = {
   id: "welcome",
   role: "assistant",
-  content: "Hi! I'm AdSpawn AI.\n\nDescribe your campaign in one message — include your goal, budget (THB), and number of ad sets if you want more than one — and I'll create the drafts instantly, no back-and-forth needed.\n\nFor Sales/Leads/App campaigns, also include your pixel ID, page ID, or app ID.",
+  content: `Hi! I'm AdSpawn AI. Describe your campaign in one message and I'll create the drafts instantly.
+
+You can include any of these:
+• Campaign name — e.g. "Summer Sale 2025"
+• Goal — traffic, awareness, engagement, leads, sales, or app installs
+• Budget — e.g. "500 baht/day"
+• Number of campaigns, ad sets, and ads — e.g. "3 campaigns, 2 ad sets each"
+• Creative ID — e.g. "creative ID 9876543210" (or leave blank to add in Drafts)
+• Pixel ID (Sales) · Page ID (Leads) · App ID + Store URL (App)
+
+Defaults when not specified: 1 campaign · 1 ad set · 1 ad · 300 THB/day · Thailand targeting`,
 };
 
 export default function AiCreatePage() {
@@ -258,7 +267,7 @@ export default function AiCreatePage() {
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               disabled={isLoading}
-              placeholder="e.g. Traffic campaign for my website, 500 baht/day, 2 ad sets"
+              placeholder='e.g. Traffic campaign "Summer Sale", 500 baht/day, 2 ad sets, 2 ads each'
               className="flex-1 bg-gray-900 border border-gray-700/60 rounded-xl px-4 py-3 text-sm text-gray-100 placeholder:text-gray-600 resize-none outline-none focus:border-gray-600 transition-colors disabled:opacity-50"
             />
             <Button
