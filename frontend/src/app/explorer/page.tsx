@@ -509,9 +509,9 @@ export default function ExplorerPage() {
 
         {!selectedAccount ? (
           <div className="bg-gray-900/50 border border-gray-800/60 rounded-xl p-8 sm:p-16 text-center">
-            <FolderTree className="w-10 h-10 text-gray-700 mx-auto mb-3" />
+            <FolderTree className="w-10 h-10 text-gray-600 mx-auto mb-3" />
             <p className="text-gray-400 font-medium">No account selected</p>
-            <p className="text-gray-600 text-sm mt-1">Select an ad account from the dashboard first.</p>
+            <p className="text-gray-500 text-sm mt-1">Select an ad account from the dashboard first.</p>
             <Button variant="link" size="sm" className="text-blue-400 mt-3" onClick={() => window.location.href = '/dashboard'}>
               Go to Dashboard
             </Button>

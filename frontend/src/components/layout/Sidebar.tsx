@@ -17,12 +17,12 @@ import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/useAppStore";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Account", href: "/dashboard" },
-  { icon: FolderTree, label: "Explorer", href: "/explorer" },
-  { icon: Layers, label: "Drafts", href: "/drafts" },
-  { icon: Grid3X3, label: "Wide Create", href: "/wide-create" },
-  { icon: History, label: "History", href: "/history" },
-  { icon: Settings, label: "Settings", href: "/settings" },
+  { icon: LayoutDashboard, label: "Account", href: "/dashboard", desc: "Select an ad account to work with" },
+  { icon: FolderTree, label: "Explorer", href: "/explorer", desc: "Browse campaigns, ad sets, and ads — select to duplicate or convert" },
+  { icon: Layers, label: "Drafts", href: "/drafts", desc: "Edit campaign drafts and publish to Meta" },
+  { icon: Grid3X3, label: "Wide Create", href: "/wide-create", desc: "Build bulk campaign structures from scratch across multiple objectives" },
+  { icon: History, label: "History", href: "/history", desc: "Log of all duplication and conversion jobs" },
+  { icon: Settings, label: "Settings", href: "/settings", desc: "Account, team, and connection settings" },
 ];
 
 export const Sidebar = () => {
@@ -49,7 +49,8 @@ export const Sidebar = () => {
             <Link
               key={item.href}
               href={item.href}
-              title={sidebarCollapsed ? item.label : undefined}
+              title={sidebarCollapsed ? `${item.label} — ${item.desc}` : item.desc}
+              aria-current={isActive ? "page" : undefined}
               onClick={() => setMobileSidebarOpen(false)}
               className={cn(
                 "relative flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium group",

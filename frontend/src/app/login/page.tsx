@@ -101,7 +101,7 @@ function LoginContent() {
           <h1 className="text-[2.75rem] xl:text-5xl font-bold leading-[1.15] text-white mb-5">
             Meta Ads management
             <br />
-            <span className="bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-300 bg-clip-text text-transparent">
+            <span className="text-blue-400">
               at scale.
             </span>
           </h1>

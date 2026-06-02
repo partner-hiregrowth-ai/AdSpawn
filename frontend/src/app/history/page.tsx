@@ -140,9 +140,9 @@ export default function HistoryPage() {
             </div>
           ) : history.length === 0 ? (
             <div className="p-16 text-center">
-              <Clock className="w-10 h-10 text-gray-700 mx-auto mb-3" />
+              <Clock className="w-10 h-10 text-gray-600 mx-auto mb-3" />
               <p className="text-gray-400 font-medium">No history yet</p>
-              <p className="text-gray-600 text-sm mt-1">Duplications, conversions, and draft publishes will appear here.</p>
+              <p className="text-gray-500 text-sm mt-1">Duplications, conversions, and draft publishes will appear here.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -164,7 +164,7 @@ export default function HistoryPage() {
                   <TableRow
                     key={job.id}
                     className={cn(
-                      "border-gray-800/30 hover:bg-gray-800/20 transition-colors opacity-0 animate-fade-in-up",
+                      "border-gray-800/30 hover:bg-gray-800/20 transition-colors animate-fade-in-up",
                       `stagger-${Math.min(index + 1, 6)}`
                     )}
                   >

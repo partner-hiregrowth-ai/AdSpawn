@@ -80,7 +80,7 @@ export function CampaignTree({
             <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
             <input type="text" placeholder="Search campaigns, ad sets, ads..."
               value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-gray-950/50 border border-gray-800/60 rounded-lg py-2 pl-9 pr-8 text-sm focus:outline-none focus:border-blue-500/50 transition-colors placeholder:text-gray-700"
+              className="w-full bg-gray-950/50 border border-gray-800/60 rounded-lg py-2 pl-9 pr-8 text-sm focus:outline-none focus:border-blue-500/50 transition-colors placeholder:text-gray-500"
             />
             {searchQuery && (
               <button onClick={() => setSearchQuery("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-400 p-0.5">
@@ -122,7 +122,7 @@ export function CampaignTree({
           )}
         </div>
         {debouncedSearch && (
-          <p className="text-[11px] text-gray-700 pl-1">
+          <p className="text-[11px] text-gray-500 pl-1">
             Searches within expanded campaigns only — expand a campaign to include its ad sets and ads.
           </p>
         )}
@@ -144,9 +144,9 @@ export function CampaignTree({
         ) : filteredCampaigns.length === 0 ? (
           <div className="p-16 text-center">
             <p className="text-sm text-gray-400 font-medium">
-              {debouncedSearch ? `No campaigns match "${debouncedSearch}"` : "No campaigns in this account yet"}
+              {debouncedSearch ? `No campaigns match "${debouncedSearch}"` : "No campaigns in this account"}
             </p>
-            <p className="text-xs text-gray-600 mt-1.5">
+            <p className="text-xs text-gray-500 mt-1.5">
               {debouncedSearch
                 ? "Try clearing the search or switching ad accounts."
                 : "Create a campaign in Meta Ads Manager — it will appear here when you refresh."}
@@ -201,7 +201,7 @@ export function CampaignTree({
                     {!adSets[campaign.id] ? (
                       <div className="p-3 flex items-center gap-2 text-gray-600"><Loader2 className="w-3 h-3 animate-spin" /><span className="text-xs">Loading...</span></div>
                     ) : adSets[campaign.id].length === 0 ? (
-                      <div className="p-3 text-xs text-gray-700">No ad sets</div>
+                      <div className="p-3 text-xs text-gray-500">No ad sets</div>
                     ) : (debouncedSearch
                       ? adSets[campaign.id].filter(as => {
                           const q = debouncedSearch.toLowerCase();
@@ -253,7 +253,7 @@ export function CampaignTree({
                             {!ads[adset.id] ? (
                               <div className="p-2 pl-4 flex items-center gap-2 text-gray-600"><Loader2 className="w-3 h-3 animate-spin" /><span className="text-xs">Loading...</span></div>
                             ) : ads[adset.id].length === 0 ? (
-                              <div className="p-2 pl-4 text-xs text-gray-700">No ads</div>
+                              <div className="p-2 pl-4 text-xs text-gray-500">No ads</div>
                             ) : (debouncedSearch
                               ? ads[adset.id].filter((ad: any) => ad.name.toLowerCase().includes(debouncedSearch.toLowerCase()))
                               : ads[adset.id]

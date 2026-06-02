@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useWideCreationStore, useWideCreationHydration } from "@/store/useWideCreationStore";
 import { useAppStore } from "@/store/useAppStore";
 import { wideCreationApi } from "@/services/api";
@@ -21,6 +22,7 @@ import {
   AlertCircle,
   AlertTriangle,
   Loader2,
+  X,
 } from "lucide-react";
 import { cn, extractApiError } from "@/lib/utils";
 
@@ -42,6 +44,14 @@ export default function WideCreatePage() {
   const [filterField, setFilterField] = useState<string>('all');
   const [filterCampaign, setFilterCampaign] = useState<string>('all');
   const [filterSeverity, setFilterSeverity] = useState<string>('all');
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showHint, setShowHint] = useState(false);
+
+  useEffect(() => {
+    if (!localStorage.getItem('adspawn-widecreate-hint-seen')) {
+      setShowHint(true);
+    }
+  }, []);
 
   const totalCampaigns = store.campaigns.length;
   const totalAdSets = store.campaigns.reduce((sum, c) => sum + c.adSets.length, 0);
@@ -113,10 +123,14 @@ export default function WideCreatePage() {
   };
 
   const handleReset = () => {
-    if (!confirm("Reset all wide creation data?")) return;
+    setShowResetConfirm(true);
+  };
+
+  const confirmReset = () => {
     store.reset();
     setValidation(null);
     setGenerationResult(null);
+    setShowResetConfirm(false);
   };
 
   if (!hydrated) {
@@ -168,6 +182,27 @@ export default function WideCreatePage() {
             </Button>
           </div>
         </div>
+
+        {/* First-run hint */}
+        {showHint && (
+          <div className="flex items-start gap-3 bg-blue-500/5 border border-blue-500/15 rounded-xl px-4 py-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-blue-400 mb-0.5">Wide Create vs. Duplicate</p>
+              <p className="text-xs text-gray-400">
+                Wide Create builds fresh campaign structures from scratch across multiple objectives in one step.
+                Use it when you need new campaigns — not copies of existing ones.
+                Duplicate (in Explorer) is for copying live campaigns.
+              </p>
+            </div>
+            <button
+              onClick={() => { localStorage.setItem('adspawn-widecreate-hint-seen', '1'); setShowHint(false); }}
+              className="p-1 text-gray-600 hover:text-gray-400 rounded transition-colors shrink-0"
+              aria-label="Dismiss hint"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
 
         {/* Step indicators — horizontally scrollable on mobile */}
         <div className="overflow-x-auto pb-1 -mx-1 px-1">
@@ -427,6 +462,16 @@ export default function WideCreatePage() {
           </CardContent>
         </Card>
       </div>
+
+      <ConfirmDialog
+        open={showResetConfirm}
+        onOpenChange={(open) => !open && setShowResetConfirm(false)}
+        title="Reset Wide Creation"
+        description="This will clear all objectives, configurations, and generated structures. This cannot be undone."
+        confirmLabel="Reset all data"
+        variant="danger"
+        onConfirm={confirmReset}
+      />
     </DashboardLayout>
   );
 }

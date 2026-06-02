@@ -248,6 +248,14 @@ export function ActionPanel({
 
   const renderConvertPanel = () => (
     <div className="space-y-5">
+      <div className="bg-gray-900/50 border border-gray-800/60 p-3 rounded-lg flex gap-2.5">
+        <Info className="w-4 h-4 shrink-0 mt-0.5 text-gray-500" />
+        <p className="text-[11px] text-gray-400">
+          Converts the campaign to a different objective while preserving its structure.
+          Fields that don&apos;t apply to the new objective are automatically remapped or removed.
+          The result is saved as a <strong className="text-gray-300">PAUSED draft</strong> — nothing goes live until you publish.
+        </p>
+      </div>
       <div className="bg-amber-900/20 border border-amber-500/30 p-3 rounded-lg flex gap-2.5 text-amber-200">
         <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
         <p className="text-[11px]">

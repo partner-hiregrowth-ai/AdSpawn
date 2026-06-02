@@ -1,0 +1,348 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-02T00:00:00.000Z",
+  "title": "Design System: AdSpawn",
+  "extensions": {
+    "colorMeta": {
+      "signal-blue": {
+        "role": "primary",
+        "displayName": "Signal Blue",
+        "canonical": "oklch(0.623 0.214 259)",
+        "tonalRamp": [
+          "oklch(0.22 0.06 259)",
+          "oklch(0.30 0.09 259)",
+          "oklch(0.39 0.13 259)",
+          "oklch(0.48 0.17 259)",
+          "oklch(0.58 0.20 259)",
+          "oklch(0.62 0.21 259)",
+          "oklch(0.71 0.17 254)",
+          "oklch(0.88 0.07 254)"
+        ]
+      },
+      "signal-blue-light": {
+        "role": "primary",
+        "displayName": "Signal Blue Light",
+        "canonical": "oklch(0.707 0.165 254)",
+        "tonalRamp": [
+          "oklch(0.22 0.06 254)",
+          "oklch(0.31 0.09 254)",
+          "oklch(0.41 0.13 254)",
+          "oklch(0.51 0.16 254)",
+          "oklch(0.61 0.17 254)",
+          "oklch(0.71 0.17 254)",
+          "oklch(0.80 0.12 254)",
+          "oklch(0.91 0.06 254)"
+        ]
+      },
+      "signal-blue-deep": {
+        "role": "primary",
+        "displayName": "Signal Blue Deep",
+        "canonical": "oklch(0.546 0.245 262)",
+        "tonalRamp": [
+          "oklch(0.18 0.08 262)",
+          "oklch(0.26 0.12 262)",
+          "oklch(0.35 0.16 262)",
+          "oklch(0.44 0.20 262)",
+          "oklch(0.55 0.24 262)",
+          "oklch(0.63 0.21 262)",
+          "oklch(0.73 0.15 260)",
+          "oklch(0.87 0.07 258)"
+        ]
+      },
+      "context-cyan": {
+        "role": "secondary",
+        "displayName": "Context Cyan",
+        "canonical": "oklch(0.789 0.154 211)",
+        "tonalRamp": [
+          "oklch(0.20 0.05 211)",
+          "oklch(0.29 0.07 211)",
+          "oklch(0.39 0.10 211)",
+          "oklch(0.50 0.12 211)",
+          "oklch(0.62 0.14 211)",
+          "oklch(0.73 0.15 211)",
+          "oklch(0.82 0.12 211)",
+          "oklch(0.91 0.06 211)"
+        ]
+      },
+      "deep-void": {
+        "role": "neutral",
+        "displayName": "Deep Void",
+        "canonical": "oklch(0.145 0 0)",
+        "tonalRamp": [
+          "oklch(0.08 0 0)",
+          "oklch(0.14 0 0)",
+          "oklch(0.20 0 0)",
+          "oklch(0.27 0 0)",
+          "oklch(0.37 0 0)",
+          "oklch(0.50 0 0)",
+          "oklch(0.65 0 0)",
+          "oklch(0.85 0 0)"
+        ]
+      },
+      "surface-card": {
+        "role": "neutral",
+        "displayName": "Surface Card",
+        "canonical": "oklch(0.205 0 0)",
+        "tonalRamp": [
+          "oklch(0.10 0 0)",
+          "oklch(0.15 0 0)",
+          "oklch(0.20 0 0)",
+          "oklch(0.27 0 0)",
+          "oklch(0.37 0 0)",
+          "oklch(0.52 0 0)",
+          "oklch(0.68 0 0)",
+          "oklch(0.86 0 0)"
+        ]
+      },
+      "semantic-success": {
+        "role": "semantic",
+        "displayName": "Semantic Success (Active)",
+        "canonical": "oklch(0.702 0.165 162)",
+        "tonalRamp": [
+          "oklch(0.18 0.05 162)",
+          "oklch(0.26 0.08 162)",
+          "oklch(0.35 0.11 162)",
+          "oklch(0.46 0.14 162)",
+          "oklch(0.58 0.16 162)",
+          "oklch(0.70 0.17 162)",
+          "oklch(0.80 0.13 162)",
+          "oklch(0.90 0.07 162)"
+        ]
+      },
+      "semantic-warning": {
+        "role": "semantic",
+        "displayName": "Semantic Warning (Paused)",
+        "canonical": "oklch(0.824 0.163 85)",
+        "tonalRamp": [
+          "oklch(0.20 0.05 85)",
+          "oklch(0.30 0.08 85)",
+          "oklch(0.41 0.11 85)",
+          "oklch(0.53 0.14 85)",
+          "oklch(0.65 0.16 85)",
+          "oklch(0.75 0.17 85)",
+          "oklch(0.84 0.13 85)",
+          "oklch(0.92 0.07 85)"
+        ]
+      },
+      "semantic-error": {
+        "role": "semantic",
+        "displayName": "Semantic Error / Destructive",
+        "canonical": "oklch(0.704 0.191 22)",
+        "tonalRamp": [
+          "oklch(0.18 0.06 22)",
+          "oklch(0.27 0.09 22)",
+          "oklch(0.36 0.12 22)",
+          "oklch(0.46 0.15 22)",
+          "oklch(0.57 0.18 22)",
+          "oklch(0.70 0.19 22)",
+          "oklch(0.80 0.14 22)",
+          "oklch(0.90 0.07 22)"
+        ]
+      },
+      "facebook-action": {
+        "role": "special",
+        "displayName": "Facebook Action Blue",
+        "canonical": "oklch(0.523 0.226 256)",
+        "tonalRamp": [
+          "oklch(0.18 0.07 256)",
+          "oklch(0.27 0.11 256)",
+          "oklch(0.36 0.15 256)",
+          "oklch(0.46 0.19 256)",
+          "oklch(0.52 0.23 256)",
+          "oklch(0.62 0.21 256)",
+          "oklch(0.72 0.15 256)",
+          "oklch(0.86 0.07 256)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Page section headings — one per view context." },
+      "headline": { "displayName": "Headline", "purpose": "App name in navbar. Rarely used." },
+      "title": { "displayName": "Title", "purpose": "Card titles, modal headings, form section labels." },
+      "body": { "displayName": "Body", "purpose": "Default for all content. The interface is text-sm by default." },
+      "label": { "displayName": "Label", "purpose": "Button text, chip labels, nav items." },
+      "mono": { "displayName": "Mono", "purpose": "Campaign IDs, account IDs, currency codes. Never sentence copy." }
+    },
+    "shadows": [
+      {
+        "name": "structure-separator",
+        "value": "0 1px 3px rgba(0,0,0,0.3)",
+        "purpose": "Navbar only. Separates sticky nav from content layer."
+      },
+      {
+        "name": "interactive-hover-glow",
+        "value": "0 0 20px -5px rgba(59,130,246,0.15)",
+        "purpose": "Clickable cards on hover. Signal-blue ambient glow confirms interactivity."
+      },
+      {
+        "name": "login-elevation",
+        "value": "0 24px 80px rgba(0,0,0,0.5)",
+        "purpose": "Login panel card. Heavy lift from animated background. Not used in authenticated app."
+      }
+    ],
+    "motion": [
+      {
+        "name": "state-transition",
+        "value": "150ms ease-out",
+        "purpose": "Color and opacity state changes on interactive elements."
+      },
+      {
+        "name": "content-transition",
+        "value": "200ms ease-out",
+        "purpose": "Layout state changes: sidebar width, card border shifts, nav hover."
+      },
+      {
+        "name": "fade-in-up",
+        "value": "opacity 0 → 1, translateY 8px → 0, 300ms ease-out",
+        "purpose": "Initial content reveal for lists (ad accounts, campaign lists). Staggered 50ms per item, max 300ms delay. Reduce to instant opacity at prefers-reduced-motion."
+      },
+      {
+        "name": "pulse-dot",
+        "value": "opacity 1 → 0.4 → 1, 2s ease-in-out infinite",
+        "purpose": "ACTIVE status indicator dot only. Communicates live state. Remove at prefers-reduced-motion."
+      },
+      {
+        "name": "skeleton-pulse",
+        "value": "animate-pulse (Tailwind), 2s cubic-bezier(0.4,0,0.6,1) infinite",
+        "purpose": "Loading skeleton placeholder. Replaces all in-content spinners."
+      }
+    ],
+    "breakpoints": [
+      { "name": "md", "value": "768px", "purpose": "Sidebar collapses from overlay to inline. Mobile nav toggle appears below this." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Default CTA inside modals and confirmation panels. Near-white on dark.",
+      "html": "<button class=\"ds-btn-primary\"><span>Publish draft</span></button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 10px; gap: 6px; background: #f0f0f0; color: #111827; border: 1px solid transparent; border-radius: 10px; font-family: Inter, system-ui, sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 150ms ease-out, transform 50ms ease; white-space: nowrap; } .ds-btn-primary:hover { background: #e0e0e0; } .ds-btn-primary:active { transform: scale(0.98); } .ds-btn-primary:focus-visible { outline: 2px solid rgba(96,165,250,0.6); outline-offset: 2px; } .ds-btn-primary:disabled { opacity: 0.5; pointer-events: none; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Default toolbar button for most actions (Refresh, Export, Duplicate).",
+      "html": "<button class=\"ds-btn-outline\"><svg class=\"ds-btn-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><polyline points=\"1 4 1 10 7 10\"/><path d=\"M3.51 15a9 9 0 1 0 .49-3.51\"/></svg><span>Refresh</span></button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 10px; gap: 6px; background: transparent; color: #9ca3af; border: 1px solid rgba(55,65,81,0.6); border-radius: 10px; font-family: Inter, system-ui, sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 150ms ease-out, color 150ms ease-out, transform 50ms ease; white-space: nowrap; } .ds-btn-outline:hover { background: rgba(31,41,55,0.6); color: #e5e7eb; } .ds-btn-outline:active { transform: scale(0.98); } .ds-btn-outline:focus-visible { outline: 2px solid rgba(96,165,250,0.6); outline-offset: 2px; } .ds-btn-icon { width: 14px; height: 14px; flex-shrink: 0; }"
+    },
+    {
+      "name": "Facebook Login Button",
+      "kind": "button",
+      "refersTo": "button-facebook",
+      "description": "Login page only. The Meta OAuth handoff. Full-saturation Facebook blue.",
+      "html": "<button class=\"ds-btn-facebook\"><svg class=\"ds-btn-fb-icon\" viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z\"/></svg>Continue with Facebook</button>",
+      "css": ".ds-btn-facebook { display: inline-flex; align-items: center; justify-content: center; width: 100%; height: 48px; padding: 0 16px; gap: 10px; background: #1877F2; color: #fff; border: none; border-radius: 12px; font-family: Inter, system-ui, sans-serif; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 150ms ease-out, box-shadow 150ms ease-out, transform 50ms ease; } .ds-btn-facebook:hover { background: #1568d3; box-shadow: 0 8px 24px rgba(24,119,242,0.25); } .ds-btn-facebook:active { transform: scale(0.98); } .ds-btn-fb-icon { width: 16px; height: 16px; flex-shrink: 0; }"
+    },
+    {
+      "name": "Status Badge — Active",
+      "kind": "custom",
+      "refersTo": "status-badge-active",
+      "description": "Campaign ACTIVE state. Pulsing dot signals live status.",
+      "html": "<span class=\"ds-status-active\"><span class=\"ds-status-dot\"></span>ACTIVE</span>",
+      "css": ".ds-status-active { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; background: rgba(16,185,129,0.15); color: #34d399; border-radius: 9999px; font-family: Inter, system-ui, sans-serif; font-size: 10px; font-weight: 600; } .ds-status-dot { width: 6px; height: 6px; border-radius: 9999px; background: #34d399; flex-shrink: 0; animation: ds-pulse 2s ease-in-out infinite; } @keyframes ds-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } } @media (prefers-reduced-motion: reduce) { .ds-status-dot { animation: none; } }"
+    },
+    {
+      "name": "Status Badge — Paused",
+      "kind": "custom",
+      "refersTo": "status-badge-paused",
+      "description": "Campaign PAUSED state. No animation — paused is not live.",
+      "html": "<span class=\"ds-status-paused\">PAUSED</span>",
+      "css": ".ds-status-paused { display: inline-flex; align-items: center; padding: 2px 10px; background: rgba(245,158,11,0.15); color: #fbbf24; border-radius: 9999px; font-family: Inter, system-ui, sans-serif; font-size: 10px; font-weight: 600; }"
+    },
+    {
+      "name": "Card (Interactive)",
+      "kind": "card",
+      "refersTo": null,
+      "description": "Clickable card — ad account cards, campaign list items. Hover signals interactivity.",
+      "html": "<div class=\"ds-card-interactive\"><div class=\"ds-card-body\"><p class=\"ds-card-title\">Campaign Name</p><p class=\"ds-card-meta\">act_123456789</p></div></div>",
+      "css": ".ds-card-interactive { background: rgba(17,24,39,0.5); border: 1px solid rgba(55,65,81,0.6); border-radius: 12px; padding: 16px; cursor: pointer; transition: background 200ms ease-out, border-color 200ms ease-out, box-shadow 200ms ease-out; } .ds-card-interactive:hover { background: rgba(17,24,39,0.8); border-color: rgba(59,130,246,0.3); box-shadow: 0 0 20px -5px rgba(59,130,246,0.15); } .ds-card-title { font-family: Inter, system-ui, sans-serif; font-size: 14px; font-weight: 600; color: #e5e7eb; margin: 0 0 4px 0; } .ds-card-meta { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px; color: #6b7280; margin: 0; }"
+    },
+    {
+      "name": "Input Field",
+      "kind": "input",
+      "refersTo": null,
+      "description": "Standard text input. Transparent background, translucent border, gray focus ring.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Campaign name\" />",
+      "css": ".ds-input { display: block; width: 100%; height: 32px; padding: 0 10px; background: rgba(255,255,255,0.03); color: #f9fafb; border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; font-family: Inter, system-ui, sans-serif; font-size: 14px; outline: none; transition: border-color 150ms ease-out; } .ds-input::placeholder { color: #6b7280; } .ds-input:focus { border-color: rgba(107,114,128,0.8); box-shadow: 0 0 0 3px rgba(107,114,128,0.2); } .ds-input:disabled { opacity: 0.5; cursor: not-allowed; }"
+    },
+    {
+      "name": "Sidebar Nav Item",
+      "kind": "nav",
+      "refersTo": null,
+      "description": "Sidebar navigation link. Active state uses signal-blue with left-rail indicator.",
+      "html": "<a class=\"ds-nav-item ds-nav-item--active\" href=\"#\"><span class=\"ds-nav-rail\"></span><svg class=\"ds-nav-icon\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"3\" y=\"3\" width=\"7\" height=\"7\"/><rect x=\"14\" y=\"3\" width=\"7\" height=\"7\"/><rect x=\"3\" y=\"14\" width=\"7\" height=\"7\"/><rect x=\"14\" y=\"14\" width=\"7\" height=\"7\"/></svg><span class=\"ds-nav-label\">Drafts</span></a>",
+      "css": ".ds-nav-item { position: relative; display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: 10px; font-family: Inter, system-ui, sans-serif; font-size: 14px; font-weight: 500; color: #6b7280; text-decoration: none; transition: background 200ms ease-out, color 200ms ease-out; } .ds-nav-item:hover { background: rgba(31,41,55,0.6); color: #e5e7eb; } .ds-nav-item--active { background: rgba(37,99,235,0.15); color: #60a5fa; } .ds-nav-rail { display: none; position: absolute; left: 0; top: 50%; transform: translateY(-50%); width: 3px; height: 20px; background: #3b82f6; border-radius: 0 9999px 9999px 0; } .ds-nav-item--active .ds-nav-rail { display: block; } .ds-nav-icon { width: 18px; height: 18px; flex-shrink: 0; } .ds-nav-label { line-height: 1; }"
+    },
+    {
+      "name": "Account Chip (Navbar)",
+      "kind": "chip",
+      "refersTo": null,
+      "description": "Selected ad account or profile shown in navbar. Minimal blue tint, not a full badge.",
+      "html": "<div class=\"ds-account-chip\"><span class=\"ds-account-dot\"></span><span class=\"ds-account-name\">My Ad Account</span></div>",
+      "css": ".ds-account-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: rgba(59,130,246,0.05); border: 1px solid rgba(59,130,246,0.15); border-radius: 8px; font-family: Inter, system-ui, sans-serif; font-size: 12px; font-weight: 500; color: #93c5fd; max-width: 140px; overflow: hidden; } .ds-account-dot { width: 6px; height: 6px; border-radius: 9999px; background: #60a5fa; flex-shrink: 0; } .ds-account-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Mission Terminal",
+    "overview": "AdSpawn is built for media buyers who treat campaign management as precision work. The interface is dark by design — not as aesthetic fashion, but because the people using it spend hours in it, often alongside Meta Ads Manager on a second monitor. The Mission Terminal is a workspace that disappears into the task: no decoration, no onboarding ceremony, no choreography.\n\nThe system is permanently dark. html.dark is hardcoded — there is no light mode, no toggle. The depth hierarchy runs from #030712 (page body) through #111827 (cards, panels) to #1f2937 (overlays, hover states). Signal blue (#3b82f6 / #60a5fa) is the sole operational accent: it marks interactive elements, active states, and Meta-connected context. It never decorates.\n\nThis system explicitly rejects two failure modes: the cluttered bureaucracy of Meta Ads Manager (everything visible, nothing scannable) and the cold monochrome of developer tools like Vercel (too terminal-native, no professional warmth).",
+    "keyCharacteristics": [
+      "Always dark; depth through tonal layering, not shadows",
+      "One accent (signal blue) reserved for interaction and active state",
+      "Monospace for all technical values (campaign IDs, account IDs, currency codes)",
+      "Compact density: text-sm (14px) is the default, not the exception",
+      "Status is always explicit: ACTIVE / PAUSED / DELETED shown as colored badges, never inferred"
+    ],
+    "rules": [
+      {
+        "name": "The One Signal Rule",
+        "body": "Signal blue is the only color used for interactive feedback across the authenticated app. Cyan marks ad account context. Emerald/amber mark campaign status. Destructive red marks errors. No other colors communicate state.",
+        "section": "colors"
+      },
+      {
+        "name": "The Translucency Rule",
+        "body": "Colored backgrounds for states use low-opacity tints over the dark surface, never solid fills. This keeps the dark environment intact while communicating state.",
+        "section": "colors"
+      },
+      {
+        "name": "The Mono Rule",
+        "body": "All technical identifiers — campaign IDs, account IDs, currency codes — are rendered in font-mono at 10–11px with ink-dim color. Monospace for identifiers, Inter for everything else: no exceptions.",
+        "section": "typography"
+      },
+      {
+        "name": "The One Scale Rule",
+        "body": "Body text is text-sm (14px). Not text-base unless it's an input or modal heading. Density is a feature, not a compromise.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-By-Default Rule",
+        "body": "No surface has a shadow at rest. Shadows are state feedback (hover) or structural separation (nav), never decoration. A card without a shadow is not unfinished — it is correct.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do use signal-blue (#60a5fa for text, #3b82f6 for backgrounds) exclusively for interactive and active state",
+      "Do use monospace (font-mono) for all technical identifiers: campaign IDs, account IDs, currency codes, version labels",
+      "Do show status explicitly via StatusBadge (ACTIVE / PAUSED / other) — never infer it from context or hide it",
+      "Do use active:scale-[0.98] on all buttons for a tactile press response",
+      "Do use skeleton placeholders during loading — never a centered spinner inside content areas",
+      "Do keep all borders as translucent white (border-white/10 family) or border-gray-800/60 equivalent",
+      "Do use text-sm (14px) as the default body text size — density is a feature",
+      "Do use prefers-reduced-motion to replace fade-in-up sequences with instant opacity",
+      "Do keep empty states instructional: show what action creates the missing data"
+    ],
+    "donts": [
+      "Don't use gradient text (background-clip: text with a gradient) — replace with solid text-[#60a5fa]",
+      "Don't introduce a second accent color inside the authenticated app",
+      "Don't build interfaces that look like Meta Ads Manager: dense grids with no hierarchy",
+      "Don't go terminal-native (Vercel/Linear aesthetic): pure gray monochrome with no warmth",
+      "Don't use decorative motion in the authenticated app — float/orb/gradient animations are login-page only",
+      "Don't use side-stripe borders (border-left/border-right greater than 1px colored) on cards or list items",
+      "Don't create a light mode — the app is dark-only, html.dark is hardcoded",
+      "Don't use text-gray-600 or text-gray-700 for body copy on dark surfaces — fails 4.5:1 contrast",
+      "Don't use modal as a first resort — prefer inline edits, slide-over panels, inline validation"
+    ]
+  }
+}

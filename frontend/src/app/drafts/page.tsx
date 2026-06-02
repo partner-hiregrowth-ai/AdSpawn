@@ -114,6 +114,20 @@ export default function DraftsPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  useEffect(() => {
+    const busy = isBulkPublishing || isBulkDeleting;
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        if (selectedIds.size > 0 && !busy) {
+          e.preventDefault();
+          setConfirmAction('publish');
+        }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [selectedIds.size, isBulkPublishing, isBulkDeleting]);
+
   const handleDelete = async (id?: string) => {
     const targetId = id || deleteTargetId;
     if (!targetId) return;
@@ -413,9 +427,9 @@ export default function DraftsPage() {
               </div>
             ) : sharedDrafts.length === 0 ? (
               <div className="bg-gray-900/30 border border-gray-800/60 rounded-xl p-16 text-center">
-                <Share2 className="w-10 h-10 text-gray-700 mx-auto mb-3" />
+                <Share2 className="w-10 h-10 text-gray-600 mx-auto mb-3" />
                 <p className="text-gray-400 font-medium">No shared drafts</p>
-                <p className="text-gray-600 text-sm mt-1">When other profiles share drafts with you, they&apos;ll appear here.</p>
+                <p className="text-gray-500 text-sm mt-1">When other profiles share drafts with you, they&apos;ll appear here.</p>
               </div>
             ) : (
               <div className="bg-gray-900/30 border border-gray-800/60 rounded-xl overflow-hidden">
@@ -518,17 +532,23 @@ export default function DraftsPage() {
               {isBulkDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />}
               {isBulkDeleting ? "Deleting..." : `Delete (${selectedIds.size})`}
             </Button>
-            <Button
-              size="sm"
-              className="gap-1.5 bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/20"
-              onClick={() => setConfirmAction('publish')}
-              disabled={isBusy}
-            >
-              {isBulkPublishing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-              {isBulkPublishing && publishProgress
-                ? `Publishing ${publishProgress.current}/${publishProgress.total}…`
-                : `Publish (${selectedIds.size})`}
-            </Button>
+            <div className="flex items-center gap-1.5">
+              <Button
+                size="sm"
+                className="gap-1.5 bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/20"
+                onClick={() => setConfirmAction('publish')}
+                disabled={isBusy}
+                title="Publish selected drafts (⌘↵)"
+              >
+                {isBulkPublishing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                {isBulkPublishing && publishProgress
+                  ? `Publishing ${publishProgress.current}/${publishProgress.total}…`
+                  : `Publish (${selectedIds.size})`}
+              </Button>
+              <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded border border-gray-700 bg-gray-800/60 text-[10px] text-gray-500 font-mono select-none">
+                ⌘↵
+              </kbd>
+            </div>
           </div>
         )}
 
@@ -543,7 +563,7 @@ export default function DraftsPage() {
                   placeholder="Search drafts..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-gray-950/50 border border-gray-800/60 rounded-lg py-2 pl-9 pr-4 text-sm focus:outline-none focus:border-blue-500/50 placeholder:text-gray-700"
+                  className="w-full bg-gray-950/50 border border-gray-800/60 rounded-lg py-2 pl-9 pr-4 text-sm focus:outline-none focus:border-blue-500/50 placeholder:text-gray-500"
                 />
                 {searchQuery && (
                   <button onClick={() => setSearchQuery("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-400 p-0.5">
@@ -647,32 +667,59 @@ export default function DraftsPage() {
           <div className="bg-gray-900/30 border border-gray-800/60 rounded-xl p-16 text-center">
             {debouncedSearch ? (
               <>
-                <Search className="w-10 h-10 text-gray-700 mx-auto mb-3" />
+                <Search className="w-10 h-10 text-gray-600 mx-auto mb-3" />
                 <p className="text-gray-400 font-medium">No matching drafts</p>
-                <p className="text-gray-600 text-sm mt-1">No drafts match &ldquo;{debouncedSearch}&rdquo;.</p>
+                <p className="text-gray-500 text-sm mt-1">No drafts match &ldquo;{debouncedSearch}&rdquo;.</p>
                 <Button variant="ghost" size="sm" className="mt-4 text-gray-500" onClick={() => setSearchQuery("")}>Clear search</Button>
               </>
             ) : statusFilter !== "ALL" && statusFilter !== "ALL_INCL_PUBLISHED" ? (
               <>
-                <Search className="w-10 h-10 text-gray-700 mx-auto mb-3" />
+                <Search className="w-10 h-10 text-gray-600 mx-auto mb-3" />
                 <p className="text-gray-400 font-medium">No drafts with this status</p>
                 <Button variant="ghost" size="sm" className="mt-4 text-gray-500" onClick={() => setStatusFilter("ALL")}>Clear filter</Button>
               </>
             ) : publishedDrafts.length > 0 ? (
               <>
-                <CheckCircle2 className="w-10 h-10 text-emerald-700 mx-auto mb-3" />
+                <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto mb-3" />
                 <p className="text-gray-400 font-medium">All drafts published</p>
-                <p className="text-gray-600 text-sm mt-1">{publishedDrafts.length} campaign{publishedDrafts.length > 1 ? "s" : ""} live on Meta.</p>
+                <p className="text-gray-500 text-sm mt-1">{publishedDrafts.length} campaign{publishedDrafts.length > 1 ? "s" : ""} live on Meta.</p>
                 <Button variant="outline" size="sm" className="mt-4 text-emerald-400 border-emerald-500/30" onClick={() => setStatusFilter("PUBLISHED")}>View published</Button>
               </>
             ) : (
               <>
-                <FolderOpen className="w-10 h-10 text-gray-700 mx-auto mb-3" />
-                <p className="text-gray-400 font-medium">No drafts yet</p>
-                <p className="text-gray-600 text-sm mt-1">Duplicate campaigns from Explorer or use Wide Create to generate a structure.</p>
-                <div className="flex items-center justify-center gap-3 mt-4">
-                  <a href="/explorer"><Button variant="outline" size="sm" className="text-gray-300 border-gray-700"><FolderTree className="w-3.5 h-3.5 mr-1.5" />Explorer</Button></a>
-                  <a href="/wide-create"><Button variant="outline" size="sm" className="text-gray-300 border-gray-700"><Grid3X3 className="w-3.5 h-3.5 mr-1.5" />Wide Create</Button></a>
+                <Layers className="w-10 h-10 text-gray-600 mx-auto mb-4" />
+                <p className="text-gray-300 font-semibold text-base">No drafts yet</p>
+                <p className="text-gray-500 text-sm mt-1.5 max-w-xs mx-auto">
+                  Drafts let you edit campaign structures before publishing to Meta.
+                </p>
+                <div className="mt-5 inline-flex flex-col items-start gap-0 text-left">
+                  {[
+                    { n: 1, text: <>Open <strong className="text-gray-400 font-medium">Explorer</strong> and select campaigns</> },
+                    { n: 2, text: <>Click <strong className="text-gray-400 font-medium">Save as Draft</strong> in the action panel</> },
+                    { n: 3, text: <>Edit the draft here, then <strong className="text-gray-400 font-medium">Publish</strong> when ready</> },
+                  ].map((step, i) => (
+                    <div key={step.n} className="flex flex-col items-center w-full">
+                      <div className="flex items-center gap-2.5">
+                        <span className="w-4 h-4 rounded-full bg-gray-800 border border-gray-700/60 flex items-center justify-center text-[9px] font-bold text-gray-400 shrink-0">
+                          {step.n}
+                        </span>
+                        <span className="text-xs text-gray-500">{step.text}</span>
+                      </div>
+                      {i < 2 && <div className="w-px h-3 bg-gray-800 my-0.5 ml-[7px] self-start" />}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center justify-center gap-3 mt-5">
+                  <a href="/explorer">
+                    <Button variant="outline" size="sm" className="text-gray-300 border-gray-700 hover:border-gray-600">
+                      <FolderTree className="w-3.5 h-3.5 mr-1.5" />Open Explorer
+                    </Button>
+                  </a>
+                  <a href="/wide-create">
+                    <Button variant="outline" size="sm" className="text-gray-300 border-gray-700 hover:border-gray-600">
+                      <Grid3X3 className="w-3.5 h-3.5 mr-1.5" />Wide Create
+                    </Button>
+                  </a>
                 </div>
               </>
             )}
@@ -686,7 +733,7 @@ export default function DraftsPage() {
                 <Card
                   key={draft.id}
                   className={cn(
-                    "bg-gray-900/40 border-gray-800/60 hover:border-gray-700 transition-all duration-200 card-glow opacity-0 animate-fade-in-up",
+                    "bg-gray-900/40 border-gray-800/60 hover:border-gray-700 transition-all duration-200 card-glow animate-fade-in-up",
                     isSelected && "border-blue-500/40 ring-1 ring-blue-500/20 bg-blue-500/5",
                     `stagger-${Math.min(index + 1, 6)}`
                   )}

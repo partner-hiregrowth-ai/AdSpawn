@@ -137,9 +137,9 @@ export default function ProfilesPage() {
                   </div>
                 ) : (
                   <div className="text-center py-8 mb-6">
-                    <User className="w-10 h-10 text-gray-700 mx-auto mb-3" />
+                    <User className="w-10 h-10 text-gray-600 mx-auto mb-3" />
                     <p className="text-gray-400 font-medium text-sm">No profiles yet</p>
-                    <p className="text-gray-600 text-xs mt-1">Create your first profile to get started.</p>
+                    <p className="text-gray-500 text-xs mt-1">Create your first profile to get started.</p>
                   </div>
                 )}
 
@@ -150,7 +150,7 @@ export default function ProfilesPage() {
                       placeholder="New profile name..."
                       value={newName}
                       onChange={(e) => setNewName(e.target.value)}
-                      className="flex-1 bg-gray-950/50 border border-gray-800/60 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500/50 placeholder:text-gray-700 transition-colors"
+                      className="flex-1 bg-gray-950/50 border border-gray-800/60 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500/50 placeholder:text-gray-500 transition-colors"
                       required
                     />
                     <Button

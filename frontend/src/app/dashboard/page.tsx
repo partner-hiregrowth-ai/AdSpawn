@@ -3,7 +3,7 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CreditCard, Globe, RefreshCcw, Loader2, ArrowRight } from "lucide-react";
+import { CreditCard, Globe, RefreshCcw, Loader2, ArrowRight, X } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { useEffect, useState } from "react";
 import { adAccountApi } from "@/services/api";
@@ -16,6 +16,18 @@ export default function DashboardPage() {
   const router = useRouter();
   const { setAdAccounts, adAccounts, setSelectedAccount } = useAppStore();
   const [loading, setLoading] = useState(false);
+  const [showBanner, setShowBanner] = useState(false);
+
+  useEffect(() => {
+    if (!localStorage.getItem('adspawn-onboarded')) {
+      setShowBanner(true);
+    }
+  }, []);
+
+  const dismissBanner = () => {
+    localStorage.setItem('adspawn-onboarded', '1');
+    setShowBanner(false);
+  };
 
   const fetchAccounts = async () => {
     setLoading(true);
@@ -42,6 +54,42 @@ export default function DashboardPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
+        {showBanner && (
+          <div className="bg-blue-500/5 border border-blue-500/15 rounded-xl p-4 flex items-start gap-4">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-blue-400 mb-3">How AdSpawn works</p>
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-5">
+                {[
+                  { n: 1, label: "Select an account", desc: "Pick any ad account on this page" },
+                  { n: 2, label: "Browse in Explorer", desc: "Find campaigns, ad sets, and ads" },
+                  { n: 3, label: "Duplicate or convert", desc: "Save as draft — always starts PAUSED" },
+                ].map((step, i, arr) => (
+                  <div key={step.n} className="flex items-start gap-2.5 sm:contents">
+                    <div className="flex items-start gap-2.5">
+                      <span className="w-5 h-5 rounded-full bg-blue-500/15 text-blue-400 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                        {step.n}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-gray-300">{step.label}</p>
+                        <p className="text-[11px] text-gray-500 mt-0.5">{step.desc}</p>
+                      </div>
+                    </div>
+                    {i < arr.length - 1 && (
+                      <ArrowRight className="w-3.5 h-3.5 text-gray-700 shrink-0 mt-1 hidden sm:block" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <button
+              onClick={dismissBanner}
+              className="p-1 text-gray-600 hover:text-gray-400 rounded transition-colors shrink-0 mt-0.5"
+              aria-label="Dismiss workflow guide"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
         <div className="flex flex-wrap items-start gap-3">
           <div className="flex-1 min-w-0">
             <h2 className="text-2xl font-bold text-gray-100">Ad Accounts</h2>
@@ -84,9 +132,9 @@ export default function DashboardPage() {
           </div>
         ) : adAccounts.length === 0 ? (
           <div className="bg-gray-900/50 border border-gray-800/60 rounded-xl p-16 text-center">
-            <CreditCard className="w-10 h-10 text-gray-700 mx-auto mb-3" />
+            <CreditCard className="w-10 h-10 text-gray-600 mx-auto mb-3" />
             <p className="text-gray-400 font-medium">No ad accounts found</p>
-            <p className="text-gray-600 text-sm mt-1">Make sure your Facebook user has access to ad accounts.</p>
+            <p className="text-gray-500 text-sm mt-1">Make sure your Facebook user has access to ad accounts.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -97,7 +145,7 @@ export default function DashboardPage() {
                 role="button"
                 aria-label={`Select ${account.name}`}
                 className={cn(
-                  "border-gray-800/60 bg-gray-900/50 hover:bg-gray-900/80 hover:border-blue-500/30 transition-all duration-200 cursor-pointer group card-glow opacity-0 animate-fade-in-up",
+                  "border-gray-800/60 bg-gray-900/50 hover:bg-gray-900/80 hover:border-blue-500/30 transition-all duration-200 cursor-pointer group card-glow animate-fade-in-up",
                   "focus-visible:ring-2 focus-visible:ring-blue-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-950",
                   `stagger-${Math.min(index + 1, 6)}`
                 )}
