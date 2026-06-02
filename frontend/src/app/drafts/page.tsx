@@ -26,6 +26,7 @@ export default function DraftsPage() {
   const [isBulkPublishing, setIsBulkPublishing] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [publishProgress, setPublishProgress] = useState<{ current: number; total: number } | null>(null);
+  const [publishedBanner, setPublishedBanner] = useState<{ count: number } | null>(null);
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<'delete' | 'bulkDelete' | 'publish' | null>(null);
@@ -132,17 +133,33 @@ export default function DraftsPage() {
     const targetId = id || deleteTargetId;
     if (!targetId) return;
     const prev = drafts;
+    // Optimistic remove immediately
     setDrafts(d => d.filter(x => x.id !== targetId));
     setSelectedIds(s => { const next = new Set(s); next.delete(targetId); return next; });
+    setConfirmAction(null);
+    setDeleteTargetId(null);
+
+    // Give the user 5 seconds to undo before the API call fires
+    let cancelled = false;
+    const undoId = toast("Draft removed", {
+      duration: 5000,
+      action: {
+        label: "Undo",
+        onClick: () => {
+          cancelled = true;
+          setDrafts(prev);
+        },
+      },
+    });
+
+    await new Promise(r => setTimeout(r, 5000));
+    if (cancelled) { toast.dismiss(undoId as string); return; }
+
     try {
       await draftApi.deleteCampaign(targetId);
-      toast.success("Draft deleted");
     } catch (error: any) {
       toast.error(extractApiError(error, "Failed to delete draft"));
       setDrafts(prev);
-    } finally {
-      setConfirmAction(null);
-      setDeleteTargetId(null);
     }
   };
 
@@ -225,7 +242,10 @@ export default function DraftsPage() {
       }
       const succeeded = results.filter((r) => r.success).length;
       const failed = results.filter((r) => !r.success);
-      if (succeeded > 0) toast.success(`${succeeded} campaign${succeeded > 1 ? "s" : ""} published`);
+      if (succeeded > 0) {
+        setPublishedBanner({ count: succeeded });
+        setTimeout(() => setPublishedBanner(null), 8000);
+      }
       failed.forEach((r) => toast.error(r.error || "Unknown error"));
       setSelectedIds(new Set());
       fetchDrafts();
@@ -354,6 +374,26 @@ export default function DraftsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-5">
+        {publishedBanner && (
+          <div className="flex items-center gap-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-3">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-emerald-300">
+                {publishedBanner.count} campaign{publishedBanner.count > 1 ? "s" : ""} published to Meta
+              </p>
+              <p className="text-xs text-emerald-700 mt-0.5">
+                All created PAUSED — activate on Meta Ads Manager when you&apos;re ready to go live.
+              </p>
+            </div>
+            <button
+              onClick={() => setPublishedBanner(null)}
+              className="text-emerald-700 hover:text-emerald-500 transition-colors shrink-0"
+              aria-label="Dismiss"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
         <div className="flex flex-wrap items-start gap-3">
           <div className="flex-1 min-w-0">
             <h1 className="text-2xl font-bold text-gray-100">Internal Drafts</h1>

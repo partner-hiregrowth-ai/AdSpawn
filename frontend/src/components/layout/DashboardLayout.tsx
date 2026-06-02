@@ -3,6 +3,8 @@
 import { Navbar } from "./Navbar";
 import { Sidebar } from "./Sidebar";
 import { ErrorBoundary } from "./ErrorBoundary";
+import { CommandPalette } from "./CommandPalette";
+import { ShortcutsModal } from "./ShortcutsModal";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore, useAppHydration } from "@/store/useAppStore";
@@ -56,6 +58,8 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">
+      <CommandPalette />
+      <ShortcutsModal />
       <Navbar />
       <div className="flex relative">
         {mobileSidebarOpen && (

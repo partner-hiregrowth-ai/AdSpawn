@@ -23,6 +23,7 @@ import {
   AlertTriangle,
   Loader2,
   X,
+  Check,
 } from "lucide-react";
 import { cn, extractApiError } from "@/lib/utils";
 
@@ -225,11 +226,11 @@ export default function WideCreatePage() {
                       : "text-gray-600 border border-gray-800 cursor-default"
                   }`}
                 >
-                  <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                    isActive ? "bg-blue-600 text-white" :
-                    isDone ? "bg-green-600/80 text-white" : "bg-gray-800 text-gray-600"
+                  <span className={`w-5 h-5 rounded-full flex items-center justify-center ${
+                    isActive ? "bg-blue-600 text-white text-[10px] font-bold" :
+                    isDone ? "bg-green-600/80 text-white" : "bg-gray-800 text-gray-600 text-[10px] font-bold"
                   }`}>
-                    {isDone ? "✓" : n}
+                    {isDone ? <Check className="w-3 h-3" /> : n}
                   </span>
                   {label}
                 </button>

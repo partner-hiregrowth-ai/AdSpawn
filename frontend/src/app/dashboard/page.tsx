@@ -45,11 +45,23 @@ export default function DashboardPage() {
     fetchAccounts();
   }, []);
 
+  const getRecentAccountIds = (): string[] => {
+    try { return JSON.parse(localStorage.getItem('adspawn-recent-accounts') || '[]'); } catch { return []; }
+  };
+
   const handleSelectAccount = (account: AdAccount) => {
     setSelectedAccount(account);
-    toast.success(`Selected ${account.name}`);
+    // Persist to recently-used list (max 3, deduped, most-recent first)
+    const prev = getRecentAccountIds().filter(id => id !== account.id);
+    localStorage.setItem('adspawn-recent-accounts', JSON.stringify([account.id, ...prev].slice(0, 3)));
     router.push("/explorer");
   };
+
+  const recentAccounts = !loading
+    ? getRecentAccountIds()
+        .map(id => adAccounts.find(a => a.id === id))
+        .filter((a): a is AdAccount => !!a)
+    : [];
 
   return (
     <DashboardLayout>
@@ -106,6 +118,25 @@ export default function DashboardPage() {
             Refresh
           </Button>
         </div>
+
+        {recentAccounts.length > 0 && (
+          <div>
+            <p className="text-xs font-medium text-gray-600 mb-2">Recent</p>
+            <div className="flex flex-wrap gap-2">
+              {recentAccounts.map(account => (
+                <button
+                  key={account.id}
+                  onClick={() => handleSelectAccount(account)}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-900/50 border border-gray-800/60 hover:border-blue-500/30 hover:bg-gray-900/80 transition-all text-sm text-gray-300 hover:text-white group"
+                >
+                  <CreditCard className="w-3.5 h-3.5 text-gray-600 group-hover:text-blue-400 transition-colors shrink-0" />
+                  <span className="truncate max-w-[200px]">{account.name}</span>
+                  <ArrowRight className="w-3 h-3 text-gray-700 group-hover:text-blue-400 transition-all shrink-0" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

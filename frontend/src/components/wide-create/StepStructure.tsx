@@ -407,7 +407,7 @@ function AdSetNode({
             </button>
             <button
               onClick={() => store.removeAdSet(campaignId, adSet.id)}
-              className="p-1 rounded text-gray-700 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+              className="p-1 rounded text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-colors"
               title="Remove ad set"
             >
               <Trash2 className="w-3 h-3" />
@@ -473,7 +473,7 @@ function AdNode({
             <EditButton active={editing || hasOverride} onClick={() => setEditing((v) => !v)} size="sm" />
             <button
               onClick={() => store.removeAd(campaignId, adSetId, ad.id)}
-              className="p-1 rounded text-gray-700 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+              className="p-1 rounded text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-colors"
               aria-label="Remove ad"
             >
               <Trash2 className="w-2.5 h-2.5" />

@@ -2,7 +2,7 @@
 
 import { useAppStore, Profile } from "@/store/useAppStore";
 import { usePathname, useRouter } from "next/navigation";
-import { User, LogOut, ChevronRight, Menu, Users, ChevronDown, CreditCard } from "lucide-react";
+import { User, LogOut, ChevronRight, Menu, Users, ChevronDown, CreditCard, Search } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,6 +62,15 @@ export const Navbar = () => {
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        <button
+          onClick={() => window.dispatchEvent(new Event("adspawn:open-palette"))}
+          className="hidden sm:flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-gray-800/30 border border-gray-700/30 hover:bg-gray-800/60 hover:border-gray-700/60 transition-colors text-gray-600 hover:text-gray-400"
+          title="Open command palette (⌘K) · Keyboard shortcuts (?)"
+          aria-label="Open command palette"
+        >
+          <Search className="w-3 h-3" />
+          <span className="text-[10px] font-mono text-gray-700">⌘K</span>
+        </button>
         {profile && profiles.length > 0 && (
           <DropdownMenu>
             <DropdownMenuTrigger

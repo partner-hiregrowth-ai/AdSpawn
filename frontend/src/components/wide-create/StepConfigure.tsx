@@ -801,7 +801,7 @@ function OverrideTreeView({
                                       </button>
                                       <button
                                         onClick={() => store.removeAdSet(campaign.id, adSet.id)}
-                                        className="p-1 rounded text-gray-700 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+                                        className="p-1 rounded text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
                                         title="Remove ad set"
                                       >
                                         <Trash2 className="w-3 h-3" />
@@ -840,7 +840,7 @@ function OverrideTreeView({
                                                   </div>
                                                   <button
                                                     onClick={() => store.removeAd(campaign.id, adSet.id, ad.id)}
-                                                    className="p-1 rounded text-gray-700 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
+                                                    className="p-1 rounded text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
                                                     title="Remove ad"
                                                   >
                                                     <Trash2 className="w-2.5 h-2.5" />

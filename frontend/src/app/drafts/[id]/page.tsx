@@ -22,6 +22,20 @@ import { MetaForm } from "@/components/meta/MetaForm";
 import { OBJECTIVE_LABELS } from "@/lib/meta-schema";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+const FIELD_LABELS: Record<string, string> = {
+  bid_amount: "Bid amount", daily_budget: "Daily budget", lifetime_budget: "Lifetime budget",
+  optimization_goal: "Optimization goal", billing_event: "Billing event", name: "Name",
+  status: "Status", start_time: "Start time", end_time: "End time", targeting: "Targeting",
+  promoted_object: "Promoted object", attribution_spec: "Attribution spec",
+  destination_type: "Destination type", pixel_id: "Pixel ID", page_id: "Page ID",
+  objective: "Objective", budget_remaining: "Budget remaining", budget_rebalance_flag: "Budget rebalance",
+  is_adset_budget_sharing_enabled: "Adset budget sharing", special_ad_categories: "Special ad categories",
+  custom_event_type: "Custom event type", application_id: "Application ID",
+  adset_budget_optimization: "Adset budget optimization", spend_cap: "Spend cap",
+};
+
+const friendlyField = (field: string) => FIELD_LABELS[field] ?? field.replace(/_/g, " ");
+
 function toDateTimeLocal(v: string | undefined): string {
   if (!v) return "";
   const s = String(v);
@@ -64,7 +78,7 @@ function ValidationIssuesPanel({ issues }: { issues: { field: string; message: s
             {errors.map((err, idx) => (
               <li key={idx} className="flex gap-2">
                 <span className="text-red-500/60 shrink-0">•</span>
-                <span><span className="font-mono text-red-300/70">{err.field}</span> — {err.message}</span>
+                <span><span className="font-semibold text-red-300/80 capitalize">{friendlyField(err.field)}</span> — {err.message}</span>
               </li>
             ))}
           </ul>
@@ -80,7 +94,7 @@ function ValidationIssuesPanel({ issues }: { issues: { field: string; message: s
             {warnings.map((err, idx) => (
               <li key={idx} className="flex gap-2">
                 <span className="text-amber-500/60 shrink-0">•</span>
-                <span><span className="font-mono text-amber-300/70">{err.field}</span> — {err.message}</span>
+                <span><span className="font-semibold text-amber-300/80 capitalize">{friendlyField(err.field)}</span> — {err.message}</span>
               </li>
             ))}
           </ul>
@@ -96,7 +110,7 @@ function ValidationIssuesPanel({ issues }: { issues: { field: string; message: s
             {infos.map((err, idx) => (
               <li key={idx} className="flex gap-2">
                 <span className="text-blue-500/60 shrink-0">•</span>
-                <span><span className="font-mono text-blue-300/70">{err.field}</span> — {err.message}</span>
+                <span><span className="font-semibold text-blue-300/80 capitalize">{friendlyField(err.field)}</span> — {err.message}</span>
               </li>
             ))}
           </ul>
@@ -191,7 +205,7 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
   const [isValidating, setIsValidating] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [isCleaning, setIsCleaning] = useState(false);
-  const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(false);
+  const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(true);
   const [validationResults, setValidationResults] = useState<any>(null);
   const draftStorageKey = `adspawn-draft-edits:${params.id}`;
   const [editCache, _setEditCache] = useState<Map<string, any>>(() => {
