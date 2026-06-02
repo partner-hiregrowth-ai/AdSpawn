@@ -323,6 +323,9 @@ export class WideCreationService {
           const adPath = `${campaignPath}.adSets[${ai}].ads[${adi}]`;
           const adLabel = `${campaignLabel} > ${syntheticAdSets[ai]?.name || `Ad Set ${ai + 1}`} > ${syntheticAdSets[ai]?.ads[adi]?.name || `Ad ${adi + 1}`}`;
           for (const err of adErrs) {
+            // Creative is intentionally absent at template/draft-creation time — skip it here.
+            // The DraftValidationEngine enforces it at publish time.
+            if (err.field === 'creative') continue;
             const entry = { path: adPath, field: err.field, message: err.message, entityLabel: adLabel };
             if (err.severity === 'error') errors.push(entry);
             else warnings.push(entry);

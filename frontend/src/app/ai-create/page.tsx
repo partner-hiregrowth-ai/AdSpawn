@@ -99,12 +99,21 @@ function MessageBubble({ msg }: { msg: Message }) {
   );
 }
 
+// ─── Example prompts ─────────────────────────────────────────────────────────
+
+const EXAMPLES = [
+  "Traffic campaign for my restaurant website, 500 baht/day, 2 ad sets",
+  "Brand awareness for a new product launch, 1,000 baht/day",
+  "Lead generation campaign, page ID 123456789, 300 baht/day",
+  "App install campaign for app ID 987654321, 800 baht/day, 3 ad sets",
+];
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const WELCOME_MESSAGE: Message = {
   id: "welcome",
   role: "assistant",
-  content: "Hi! I'm AdSpawn AI. Tell me about the campaign you want to run — your goal, audience, and budget — and I'll set up the drafts for you.",
+  content: "Hi! I'm AdSpawn AI.\n\nDescribe your campaign in one message — include your goal, budget (THB), and number of ad sets if you want more than one — and I'll create the drafts instantly, no back-and-forth needed.\n\nFor Sales/Leads/App campaigns, also include your pixel ID, page ID, or app ID.",
 };
 
 export default function AiCreatePage() {
@@ -221,17 +230,35 @@ export default function AiCreatePage() {
           <div ref={bottomRef} />
         </div>
 
+        {/* Example chips — only shown before the user has typed anything */}
+        {messages.length === 1 && !isLoading && (
+          <div className="shrink-0 pb-3">
+            <p className="text-[11px] text-gray-600 mb-2">Try an example:</p>
+            <div className="flex flex-wrap gap-2">
+              {EXAMPLES.map((ex) => (
+                <button
+                  key={ex}
+                  onClick={() => setInput(ex)}
+                  className="text-[11px] text-gray-400 bg-gray-800/60 hover:bg-gray-700/60 border border-gray-700/50 hover:border-gray-600/50 rounded-lg px-3 py-1.5 transition-colors text-left"
+                >
+                  {ex}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Input area */}
         <div className="shrink-0 pt-4 border-t border-gray-800/60">
           <div className="flex gap-2 items-end">
             <textarea
               ref={textareaRef}
-              rows={1}
+              rows={2}
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               disabled={isLoading}
-              placeholder="Describe your campaign goal…"
+              placeholder="e.g. Traffic campaign for my website, 500 baht/day, 2 ad sets"
               className="flex-1 bg-gray-900 border border-gray-700/60 rounded-xl px-4 py-3 text-sm text-gray-100 placeholder:text-gray-600 resize-none outline-none focus:border-gray-600 transition-colors disabled:opacity-50"
             />
             <Button
