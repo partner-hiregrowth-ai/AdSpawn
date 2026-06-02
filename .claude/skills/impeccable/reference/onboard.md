@@ -163,7 +163,7 @@ Projects help you organize your work and collaborate with your team.
 **Help patterns**:
 - `?` icon near complex features
 - "Learn more" links in tooltips
-- Keyboard shortcut hints (`⌘K` shown on search box)
+- Keyboard shortcut hints (`Ctrl+K` shown on search box)
 
 ## Empty State Design
 

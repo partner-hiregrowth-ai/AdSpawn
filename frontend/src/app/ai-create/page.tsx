@@ -112,17 +112,12 @@ const EXAMPLES = [
 const WELCOME_MESSAGE: Message = {
   id: "welcome",
   role: "assistant",
-  content: `Hi! I'm AdSpawn AI. Describe your campaign in one message and I'll create the drafts instantly.
+  content: `Hi! Tell me what campaign you want and I'll create the drafts in one shot.
 
-You can include any of these:
-• Campaign name — e.g. "Summer Sale 2025"
-• Goal — traffic, awareness, engagement, leads, sales, or app installs
-• Budget — e.g. "500 baht/day"
-• Number of campaigns, ad sets, and ads — e.g. "3 campaigns, 2 ad sets each"
-• Creative ID — e.g. "creative ID 9876543210" (or leave blank to add in Drafts)
-• Pixel ID (Sales) · Page ID (Leads) · App ID + Store URL (App)
+Include: goal · name · budget (THB/day) · ad sets · ads · creative ID (optional)
+Sales needs pixel ID · Leads needs page ID · App needs app ID + store URL
 
-Defaults when not specified: 1 campaign · 1 ad set · 1 ad · 300 THB/day · Thailand targeting`,
+Unspecified fields default to: 1 campaign, 1 ad set, 1 ad, 300 THB/day, Thailand.`,
 };
 
 export default function AiCreatePage() {
@@ -132,6 +127,14 @@ export default function AiCreatePage() {
   const [isLoading, setIsLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const chipRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const focusChip = (idx: number) => {
+    const el = chipRefs.current[idx];
+    if (!el) return;
+    el.focus();
+    el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  };
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -195,10 +198,36 @@ export default function AiCreatePage() {
     }
   }, [input, isLoading, messages, selectedAccount]);
 
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
+    }
+    if (e.key === "ArrowDown" && messages.length === 1 && chipRefs.current[0]) {
+      e.preventDefault();
+      focusChip(0);
+    }
+  };
+
+  const handleChipKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, idx: number, ex: string) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (idx < EXAMPLES.length - 1) focusChip(idx + 1);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (idx === 0) {
+        textareaRef.current?.focus();
+        textareaRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      } else {
+        focusChip(idx - 1);
+      }
+    } else if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      setInput(ex);
+      textareaRef.current?.focus();
+    } else if (e.key === "Escape") {
+      textareaRef.current?.focus();
     }
   };
 
@@ -242,13 +271,15 @@ export default function AiCreatePage() {
         {/* Example chips — only shown before the user has typed anything */}
         {messages.length === 1 && !isLoading && (
           <div className="shrink-0 pb-3">
-            <p className="text-[11px] text-gray-600 mb-2">Try an example:</p>
-            <div className="flex flex-wrap gap-2">
-              {EXAMPLES.map((ex) => (
+            <p className="text-[11px] text-gray-600 mb-2">Try an example <span className="text-gray-700">(↑↓ to navigate, Enter to select)</span>:</p>
+            <div className="flex flex-col gap-1.5">
+              {EXAMPLES.map((ex, idx) => (
                 <button
                   key={ex}
-                  onClick={() => setInput(ex)}
-                  className="text-[11px] text-gray-400 bg-gray-800/60 hover:bg-gray-700/60 border border-gray-700/50 hover:border-gray-600/50 rounded-lg px-3 py-1.5 transition-colors text-left"
+                  ref={el => { chipRefs.current[idx] = el; }}
+                  onClick={() => { setInput(ex); textareaRef.current?.focus(); }}
+                  onKeyDown={e => handleChipKeyDown(e, idx, ex)}
+                  className="text-[11px] text-gray-400 bg-gray-800/60 hover:bg-gray-700/60 focus:bg-gray-700/60 border border-gray-700/50 hover:border-gray-600/50 focus:border-violet-500/50 focus:outline-none rounded-lg px-3 py-2 transition-colors text-left"
                 >
                   {ex}
                 </button>
@@ -267,7 +298,7 @@ export default function AiCreatePage() {
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               disabled={isLoading}
-              placeholder='e.g. Traffic campaign "Summer Sale", 500 baht/day, 2 ad sets, 2 ads each'
+              placeholder="Describe your campaign — goal, name, budget, ad sets…"
               className="flex-1 bg-gray-900 border border-gray-700/60 rounded-xl px-4 py-3 text-sm text-gray-100 placeholder:text-gray-600 resize-none outline-none focus:border-gray-600 transition-colors disabled:opacity-50"
             />
             <Button
@@ -283,9 +314,11 @@ export default function AiCreatePage() {
               }
             </Button>
           </div>
-          <p className="text-[10px] text-gray-700 mt-2 text-center">
-            AI creates PAUSED drafts only. Add creative in the Drafts editor before publishing.
-          </p>
+          <div className="flex items-center justify-end mt-2">
+            <kbd className="text-[10px] text-gray-600 bg-gray-800/60 border border-gray-700/50 rounded px-1.5 py-0.5 font-mono whitespace-nowrap shrink-0">
+              Ctrl+K to navigate
+            </kbd>
+          </div>
         </div>
       </div>
     </DashboardLayout>

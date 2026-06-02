@@ -24,6 +24,7 @@ export function CommandPalette() {
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const filtered = query.trim()
     ? COMMANDS.filter(c =>
@@ -66,9 +67,19 @@ export function CommandPalette() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Escape")   { e.preventDefault(); close(); }
-    if (e.key === "ArrowDown"){ e.preventDefault(); setActiveIndex(i => Math.min(i + 1, filtered.length - 1)); }
-    if (e.key === "ArrowUp")  { e.preventDefault(); setActiveIndex(i => Math.max(i - 1, 0)); }
+    if (e.key === "Escape") { e.preventDefault(); close(); }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const next = Math.min(activeIndex + 1, filtered.length - 1);
+      setActiveIndex(next);
+      itemRefs.current[next]?.scrollIntoView({ block: "nearest" });
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const prev = Math.max(activeIndex - 1, 0);
+      setActiveIndex(prev);
+      itemRefs.current[prev]?.scrollIntoView({ block: "nearest" });
+    }
     if (e.key === "Enter" && filtered[activeIndex]) execute(filtered[activeIndex]);
   };
 
@@ -107,6 +118,7 @@ export function CommandPalette() {
             filtered.map((cmd, i) => (
               <button
                 key={cmd.id}
+                ref={el => { itemRefs.current[i] = el; }}
                 onClick={() => execute(cmd)}
                 onMouseEnter={() => setActiveIndex(i)}
                 className={cn(
@@ -151,7 +163,7 @@ export function CommandPalette() {
             <kbd className="font-mono border border-gray-700/60 bg-gray-800/40 px-1 rounded">Esc</kbd> close
           </span>
           <span className="ml-auto flex items-center gap-1">
-            <kbd className="font-mono border border-gray-700/60 bg-gray-800/40 px-1 rounded">⌘K</kbd> toggle
+            <kbd className="font-mono border border-gray-700/60 bg-gray-800/40 px-1 rounded">Ctrl+K</kbd> toggle
           </span>
         </div>
       </div>
