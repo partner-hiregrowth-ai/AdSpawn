@@ -10,29 +10,49 @@ import { useRouter } from "next/navigation";
 import { useAppStore, useAppHydration } from "@/store/useAppStore";
 import { useGlobalData } from "@/store/useGlobalData";
 
+type AuthState = "checking" | "authenticated" | "unauthenticated" | "needs_profile";
+
+function AuthLoadingSkeleton() {
+  return (
+    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+        <p className="text-gray-600 text-sm">Loading...</p>
+      </div>
+    </div>
+  );
+}
+
 export const DashboardLayout = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
   const appHydrated = useAppHydration();
   const { user, profile, mobileSidebarOpen, setMobileSidebarOpen } = useAppStore();
-  const [mounted, setMounted] = useState(false);
+  const [authState, setAuthState] = useState<AuthState>("checking");
 
-  // Use the optimized global data hook
   useGlobalData();
 
   useEffect(() => {
-    setMounted(true);
+    if (!appHydrated) return;
+
     const token = localStorage.getItem("token");
     if (!token && !user) {
-      router.push("/login");
+      setAuthState("unauthenticated");
+      router.replace("/login");
       return;
     }
+
     const savedProfileId = localStorage.getItem("profileId");
     if (!profile && !savedProfileId) {
-      router.push("/profiles");
+      setAuthState("needs_profile");
+      router.replace("/profiles");
+      return;
     }
-  }, [user, profile, router]);
 
-  if (!mounted || !appHydrated) return null;
+    setAuthState("authenticated");
+  }, [appHydrated, user, profile, router]);
+
+  if (!appHydrated || authState === "checking") return <AuthLoadingSkeleton />;
+  if (authState === "unauthenticated" || authState === "needs_profile") return <AuthLoadingSkeleton />;
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100">

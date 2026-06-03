@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { WideCreationService, WideCreationTemplate } from '../services/draft/WideCreationService';
 import { AuthRequest } from '../middleware/auth.middleware';
+import { prisma } from '../prisma';
 
 export class WideCreationController {
   static async validate(req: AuthRequest, res: Response) {
@@ -49,6 +50,26 @@ export class WideCreationController {
       }
 
       const result = await WideCreationService.generateFromTemplate(template, req.profileId!);
+
+      for (const campaignId of result.campaignIds) {
+        await prisma.duplicateJob.create({
+          data: {
+            userId: req.userId!,
+            profileId: req.profileId || null,
+            status: 'COMPLETED',
+            type: 'CAMPAIGN',
+            sourceId: template.adAccountId,
+            targetId: campaignId,
+            details: {
+              operation: 'WIDE_CREATE',
+              adAccountId: template.adAccountId,
+              templateName: template.name,
+              totalCreated: result.totalCreated,
+            },
+          },
+        });
+      }
+
       res.json(result);
     } catch (error: any) {
       console.error(`[WideCreation] Error in generate:`, error);

@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import useSWR from "swr";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { draftApi, adAccountApi, profileApi } from "@/services/api";
 import { useAppStore } from "@/store/useAppStore";
-import { Edit2, Trash2, Send, Layers, Loader2, X, Pencil, Play, Pause, Search, Download, Upload, CheckCircle2, AlertTriangle, FileText, FolderOpen, FolderTree, Grid3X3, MoreHorizontal, LayoutGrid, List, Share2, Eye, UserPlus } from "lucide-react";
+import { Edit2, Trash2, Send, Layers, Loader2, X, Pencil, Play, Pause, Search, Download, Upload, CheckCircle2, AlertTriangle, FileText, FolderTree, Grid3X3, MoreHorizontal, LayoutGrid, List, Share2, Eye, UserPlus } from "lucide-react";
 import { OBJECTIVE_LABELS } from "@/lib/meta-schema";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -17,11 +17,20 @@ import { toast } from "sonner";
 import { cn, extractApiError } from "@/lib/utils";
 import { BulkEditPanel } from "@/components/dashboard/BulkEditPanel";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { DraftCampaign, DraftShare } from "@/types";
+import { Profile } from "@/store/useAppStore";
 
 export default function DraftsPage() {
   const profileId = useAppStore((s) => s.profile?.id);
-  const [drafts, setDrafts] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { data: swrDrafts, isLoading, mutate: mutateDrafts } = useSWR<DraftCampaign[]>(
+    profileId ? "drafts-list" : null,
+    async () => {
+      const res = await draftApi.listCampaigns();
+      return res.data.items ?? res.data;
+    },
+    { revalidateOnFocus: false }
+  );
+  const drafts = swrDrafts ?? [];
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkPublishing, setIsBulkPublishing] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
@@ -40,20 +49,20 @@ export default function DraftsPage() {
   const [viewMode, setViewMode] = useState<'card' | 'table'>('table');
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [activeTab, setActiveTab] = useState<'mine' | 'shared'>('mine');
-  const [sharedDrafts, setSharedDrafts] = useState<any[]>([]);
+  const [sharedDrafts, setSharedDrafts] = useState<DraftShare[]>([]);
   const [loadingShared, setLoadingShared] = useState(false);
   const [showBulkShare, setShowBulkShare] = useState(false);
   const [bulkShareTargetIds, setBulkShareTargetIds] = useState<string[]>([]);
   const [bulkSharePermission, setBulkSharePermission] = useState("view");
   const [isBulkSharing, setIsBulkSharing] = useState(false);
-  const [bulkShareProfiles, setBulkShareProfiles] = useState<any[]>([]);
+  const [bulkShareProfiles, setBulkShareProfiles] = useState<Profile[]>([]);
 
   const fetchSharedWithMe = async () => {
     setLoadingShared(true);
     try {
       const response = await draftApi.getSharedWithMe();
       setSharedDrafts(response.data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error(extractApiError(error, "Failed to load shared drafts"));
     } finally {
       setLoadingShared(false);
@@ -66,7 +75,7 @@ export default function DraftsPage() {
     setBulkSharePermission("view");
     try {
       const res = await profileApi.list();
-      setBulkShareProfiles(res.data.filter((p: any) => p.id !== profileId));
+      setBulkShareProfiles(res.data.filter((p: Profile) => p.id !== profileId));
     } catch {
       toast.error("Failed to load profiles");
     }
@@ -80,29 +89,15 @@ export default function DraftsPage() {
       toast.success(`Shared ${selectedIds.size} draft${selectedIds.size > 1 ? 's' : ''} with ${bulkShareTargetIds.length} profile${bulkShareTargetIds.length > 1 ? 's' : ''} (${res.data.created} new)`);
       setShowBulkShare(false);
       setBulkShareTargetIds([]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(extractApiError(err, "Bulk share failed"));
     } finally {
       setIsBulkSharing(false);
     }
   };
 
-  const fetchDrafts = async () => {
-    try {
-      setIsLoading(true);
-      const response = await draftApi.listCampaigns();
-      setDrafts(response.data.items ?? response.data);
-    } catch (error: any) {
-      console.error("Failed to fetch drafts:", error);
-      toast.error(extractApiError(error, "Failed to load drafts"));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   useEffect(() => {
     setSelectedIds(new Set());
-    fetchDrafts();
     if (activeTab === 'shared') fetchSharedWithMe();
   }, [profileId]);
 
@@ -133,13 +128,11 @@ export default function DraftsPage() {
     const targetId = id || deleteTargetId;
     if (!targetId) return;
     const prev = drafts;
-    // Optimistic remove immediately
-    setDrafts(d => d.filter(x => x.id !== targetId));
+    mutateDrafts(drafts.filter(x => x.id !== targetId), false);
     setSelectedIds(s => { const next = new Set(s); next.delete(targetId); return next; });
     setConfirmAction(null);
     setDeleteTargetId(null);
 
-    // Give the user 5 seconds to undo before the API call fires
     let cancelled = false;
     const undoId = toast("Draft removed", {
       duration: 5000,
@@ -147,7 +140,7 @@ export default function DraftsPage() {
         label: "Undo",
         onClick: () => {
           cancelled = true;
-          setDrafts(prev);
+          mutateDrafts(prev, false);
         },
       },
     });
@@ -157,9 +150,10 @@ export default function DraftsPage() {
 
     try {
       await draftApi.deleteCampaign(targetId);
-    } catch (error: any) {
+      mutateDrafts();
+    } catch (error: unknown) {
       toast.error(extractApiError(error, "Failed to delete draft"));
-      setDrafts(prev);
+      mutateDrafts(prev, false);
     }
   };
 
@@ -189,8 +183,8 @@ export default function DraftsPage() {
       const response = await draftApi.bulkDeleteDrafts(ids);
       toast.success(`${response.data.deleted} draft${response.data.deleted !== 1 ? "s" : ""} deleted`);
       setSelectedIds(new Set());
-      fetchDrafts();
-    } catch (error: any) {
+      mutateDrafts();
+    } catch (error: unknown) {
       toast.error(extractApiError(error, "Bulk delete failed"));
     } finally {
       setIsBulkDeleting(false);
@@ -198,27 +192,27 @@ export default function DraftsPage() {
     }
   };
 
-  const handleActivateDraft = async (draft: any) => {
+  const handleActivateDraft = async (draft: DraftCampaign) => {
     if (!draft.metaId) return;
     setTogglingId(draft.id);
     try {
       await adAccountApi.bulkActivate([draft.metaId]);
       toast.success('Campaign activated on Meta');
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(extractApiError(err, 'Failed to activate'));
     } finally {
       setTogglingId(null);
     }
   };
 
-  const handlePauseDraft = async (draft: any) => {
+  const handlePauseDraft = async (draft: DraftCampaign) => {
     if (!draft.metaId) return;
     setTogglingId(draft.id);
     try {
       await adAccountApi.bulkPause([draft.metaId]);
       toast.success('Campaign paused on Meta');
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to pause');
+    } catch (err: unknown) {
+      toast.error(extractApiError(err, 'Failed to pause'));
     } finally {
       setTogglingId(null);
     }
@@ -241,8 +235,8 @@ export default function DraftsPage() {
       }
       failed.forEach((r) => toast.error(r.userMessage || r.error || "Unknown error"));
       setSelectedIds(new Set());
-      fetchDrafts();
-    } catch (err: any) {
+      mutateDrafts();
+    } catch (err: unknown) {
       toast.error(extractApiError(err, "Bulk publish failed"));
     } finally {
       setIsBulkPublishing(false);
@@ -263,7 +257,7 @@ export default function DraftsPage() {
       a.click();
       URL.revokeObjectURL(url);
       toast.success("Draft exported");
-    } catch (err: any) {
+    } catch (err: unknown) {
       toast.error(extractApiError(err, "Failed to export draft"));
     } finally {
       setExportingId(null);
@@ -287,8 +281,8 @@ export default function DraftsPage() {
         }
         await draftApi.importCampaign(exported);
         toast.success("Draft imported successfully");
-        fetchDrafts();
-      } catch (err: any) {
+        mutateDrafts();
+      } catch (err: unknown) {
         if (err instanceof SyntaxError) {
           toast.error("Invalid JSON file");
         } else {
@@ -480,7 +474,7 @@ export default function DraftsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {sharedDrafts.map((share: any) => {
+                    {sharedDrafts.map((share) => {
                       const draft = share.draftCampaign;
                       if (!draft) return null;
                       const canEdit = share.permission === 'edit';
@@ -997,7 +991,7 @@ export default function DraftsPage() {
         entityLevel="campaign"
         onSuccess={() => {
           setSelectedIds(new Set());
-          fetchDrafts();
+          mutateDrafts();
         }}
       />
       <ConfirmDialog
@@ -1072,7 +1066,7 @@ export default function DraftsPage() {
                   <p className="text-xs text-gray-600 py-3 text-center">No other profiles available.</p>
                 ) : (
                   <div className="max-h-40 overflow-y-auto space-y-1 border border-gray-800/60 rounded-lg p-2 bg-gray-950/30">
-                    {bulkShareProfiles.map((p: any) => (
+                    {bulkShareProfiles.map((p) => (
                       <label key={p.id} className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-gray-800/40 cursor-pointer transition-colors">
                         <input
                           type="checkbox"

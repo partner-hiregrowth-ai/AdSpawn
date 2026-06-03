@@ -92,7 +92,8 @@ If still ambiguous after reading the full message, default to OUTCOME_TRAFFIC.
 == WHAT THE USER CAN SPECIFY (use exactly what they say) ==
 - Campaign name        e.g. "Summer Sale 2025"
 - Objective            e.g. "traffic", "awareness", "sales" (infer from keywords)
-- Daily budget (THB)   e.g. "500 baht/day" → 50000 satang
+- Budget               e.g. "500 baht/day", "10000 baht total", "$20/day"
+- CBO on/off           e.g. "CBO", "campaign budget" → CBO on; "adset budget" → CBO off
 - Number of campaigns  e.g. "3 campaigns"
 - Number of ad sets    e.g. "2 ad sets"
 - Number of ads        e.g. "2 ads per ad set"
@@ -101,11 +102,34 @@ If still ambiguous after reading the full message, default to OUTCOME_TRAFFIC.
 - Page ID              for OUTCOME_LEADS
 - App ID + Store URL   for OUTCOME_APP_PROMOTION
 
+== BUDGET — CRITICAL ==
+All budget values use the account's SMALLEST currency unit:
+  THB: 1 baht = 100 satang → "500 baht/day" = 50000
+  USD: 1 dollar = 100 cents → "$20/day" = 2000
+
+Budget types:
+  daily_budget   = recurring daily spend (user says "per day", "daily", "/day")
+  lifetime_budget = total spend over campaign lifetime (user says "total", "lifetime", "overall")
+  Only one can be set — daily_budget and lifetime_budget are mutually exclusive.
+
+Budget level (CBO vs non-CBO):
+  CBO ON  = budget at CAMPAIGN level → set daily_budget or lifetime_budget in campaign.fields
+            Also set is_adset_budget_sharing_enabled: true in campaign.fields.
+            Do NOT set budget at ad set level.
+  CBO OFF = budget at AD SET level → set daily_budget or lifetime_budget in each adSet.fields
+            Do NOT set budget at campaign level.
+
+Default behaviour (when user does not specify):
+  - Default to CBO ON with daily_budget: 30000 (300 THB) at campaign level.
+  - If the user explicitly asks for adset-level budget or says "no CBO", use CBO OFF instead.
+
+ALWAYS include a budget somewhere — never generate a template with no budget at all.
+
 == SILENT DEFAULTS (apply without asking when the user does not specify) ==
 - campaigns: 1
 - ad sets per campaign: 1
 - ads per ad set: 1
-- daily_budget: 30000 satang (300 THB)
+- budget: CBO ON, daily_budget 30000 (300 THB) at campaign level
 - targeting: { "geo_locations": { "countries": ["TH"] }, "age_min": 20 }
 - status: "PAUSED"
 - bid_strategy: "LOWEST_COST_WITHOUT_CAP"
@@ -181,7 +205,9 @@ const TOOL_PARAMS: any = {
                   },
                   special_ad_categories: { type: 'array', items: { type: 'string' } },
                   status: { type: 'string', enum: ['PAUSED'] },
-                  daily_budget: { type: 'number', description: 'In satang (THB × 100)' },
+                  daily_budget: { type: 'number', description: 'In smallest currency unit (satang for THB, cents for USD). Mutually exclusive with lifetime_budget.' },
+                  lifetime_budget: { type: 'number', description: 'Total budget in smallest currency unit. Mutually exclusive with daily_budget.' },
+                  is_adset_budget_sharing_enabled: { type: 'boolean', description: 'true = CBO (budget at campaign level). false = budget at ad set level. Default true.' },
                   bid_strategy: { type: 'string' },
                 },
                 required: ['name', 'objective', 'special_ad_categories', 'status'],
@@ -200,7 +226,8 @@ const TOOL_PARAMS: any = {
                         destination_type: { type: 'string' },
                         targeting: { type: 'object' },
                         promoted_object: { type: 'object' },
-                        daily_budget: { type: 'number', description: 'In satang; omit if campaign is CBO' },
+                        daily_budget: { type: 'number', description: 'In smallest currency unit. Only set if CBO is OFF (is_adset_budget_sharing_enabled=false).' },
+                        lifetime_budget: { type: 'number', description: 'Total budget in smallest currency unit. Mutually exclusive with daily_budget. Only if CBO OFF.' },
                         bid_strategy: { type: 'string' },
                       },
                       required: ['name', 'optimization_goal', 'billing_event', 'destination_type', 'targeting'],
@@ -258,7 +285,9 @@ export interface ChatResponse {
   generationResult?: {
     totalCreated: { campaigns: number; adSets: number; ads: number };
     warnings: string[];
+    campaignIds?: string[];
   };
+  adAccountId?: string;
   error?: string;
 }
 
@@ -621,7 +650,7 @@ export class AiCampaignService {
         }
 
         const genResult = await WideCreationService.generateFromTemplate(template, req.profileId);
-        const { totalCreated, warnings } = genResult;
+        const { totalCreated, warnings, campaignIds } = genResult;
 
         const reply =
           `Done! Created ${totalCreated.campaigns} campaign${totalCreated.campaigns !== 1 ? 's' : ''}, ` +
@@ -629,7 +658,7 @@ export class AiCampaignService {
           `${totalCreated.ads} ad${totalCreated.ads !== 1 ? 's' : ''} as PAUSED drafts. ` +
           `Go to Drafts to add creative and publish when ready.`;
 
-        return { reply, generationResult: { totalCreated, warnings } };
+        return { reply, generationResult: { totalCreated, warnings, campaignIds }, adAccountId: req.adAccountId };
       }
 
       return { reply: result.text ?? 'I had trouble generating a response. Please try again.' };

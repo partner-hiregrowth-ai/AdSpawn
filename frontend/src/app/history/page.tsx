@@ -10,66 +10,57 @@ import {
   TableRow
 } from "@/components/ui/table";
 import { CheckCircle2, XCircle, Clock, ExternalLink, Loader2, Trash2, RefreshCw, User } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 import { duplicationApi } from "@/services/api";
 import { toast } from "sonner";
 import { format, formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn, extractApiError } from "@/lib/utils";
+import { HistoryJob, HistoryJobDetails } from "@/types";
 
-type OperationType = 'PUBLISH' | 'DRAFT_DUPLICATE' | 'CONVERSION' | 'DUPLICATE';
+type OperationType = 'PUBLISH' | 'DRAFT_DUPLICATE' | 'CONVERSION' | 'DUPLICATE' | 'AI_CREATE' | 'WIDE_CREATE';
 
-function getOperation(details: any): OperationType {
+function getOperation(details: HistoryJobDetails | null | undefined): OperationType {
   const op = details?.operation;
   if (op === 'PUBLISH') return 'PUBLISH';
   if (op === 'DRAFT_DUPLICATE') return 'DRAFT_DUPLICATE';
+  if (op === 'AI_CREATE') return 'AI_CREATE';
+  if (op === 'WIDE_CREATE') return 'WIDE_CREATE';
   if (details?.isConversion) return 'CONVERSION';
   return 'DUPLICATE';
 }
 
 const OPERATION_BADGE: Record<OperationType, { label: string; className: string }> = {
-  PUBLISH:        { label: 'PUBLISH',    className: 'bg-emerald-500/10 text-emerald-400' },
-  DRAFT_DUPLICATE:{ label: 'DRAFT DUP', className: 'bg-amber-500/10 text-amber-400' },
-  CONVERSION:     { label: 'CONVERSION', className: 'bg-blue-500/10 text-blue-400' },
-  DUPLICATE:      { label: 'DUPLICATE',  className: 'bg-violet-500/10 text-violet-400' },
+  PUBLISH:        { label: 'PUBLISH',     className: 'bg-emerald-500/10 text-emerald-400' },
+  DRAFT_DUPLICATE:{ label: 'DRAFT DUP',  className: 'bg-amber-500/10 text-amber-400' },
+  CONVERSION:     { label: 'CONVERSION',  className: 'bg-blue-500/10 text-blue-400' },
+  DUPLICATE:      { label: 'DUPLICATE',   className: 'bg-violet-500/10 text-violet-400' },
+  AI_CREATE:      { label: 'AI CREATE',   className: 'bg-pink-500/10 text-pink-400' },
+  WIDE_CREATE:    { label: 'WIDE CREATE', className: 'bg-cyan-500/10 text-cyan-400' },
 };
 
 export default function HistoryPage() {
-  const [history, setHistory] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: history, isLoading: loading, mutate } = useSWR<HistoryJob[]>("/duplicate/history");
   const [cleaning, setCleaning] = useState(false);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
-
-  useEffect(() => {
-    fetchHistory();
-  }, []);
-
-  const fetchHistory = async () => {
-    try {
-      const response = await duplicationApi.getHistory();
-      setHistory(response.data);
-    } catch (error: any) {
-      toast.error(extractApiError(error, "Couldn't load history. Check your connection and try Refresh."));
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const confirmDelete = async () => {
     if (!pendingDeleteId) return;
     const id = pendingDeleteId;
     const prev = history;
     setDeleting(true);
-    setHistory(h => h.filter(item => item.id !== id));
+    mutate(history?.filter(item => item.id !== id), false);
     try {
       await duplicationApi.deleteHistory(id);
       toast.success("History item deleted");
       setPendingDeleteId(null);
-    } catch (error: any) {
+      mutate();
+    } catch (error: unknown) {
       toast.error(extractApiError(error, "Couldn't delete that history item. It may have been removed already."));
-      setHistory(prev);
+      mutate(prev, false);
     } finally {
       setDeleting(false);
     }
@@ -81,13 +72,15 @@ export default function HistoryPage() {
       const response = await duplicationApi.cleanupHistory();
       const n = response.data.deletedCount;
       toast.success(n === 0 ? "All history items are still on Facebook — nothing to clean up." : `Removed ${n} item${n === 1 ? "" : "s"} that no longer exist on Facebook.`);
-      fetchHistory();
-    } catch (error: any) {
+      mutate();
+    } catch (error: unknown) {
       toast.error(extractApiError(error, "Couldn't sync with Facebook. Check your Facebook connection in Settings."));
     } finally {
       setCleaning(false);
     }
   };
+
+  const items = history ?? [];
 
   return (
     <DashboardLayout>
@@ -97,9 +90,9 @@ export default function HistoryPage() {
             <h2 className="text-2xl font-bold text-gray-100">History</h2>
             <p className="text-gray-500 mt-1 text-sm">
               Audit log of all actions — duplications, conversions, draft publishes.
-              {!loading && history.length > 0 && (
+              {!loading && items.length > 0 && (
                 <span className="ml-2 text-gray-600">
-                  Last: {formatDistanceToNow(new Date(history[0].createdAt), { addSuffix: true })}
+                  Last: {formatDistanceToNow(new Date(items[0].createdAt), { addSuffix: true })}
                 </span>
               )}
             </p>
@@ -109,13 +102,13 @@ export default function HistoryPage() {
               variant="outline"
               size="sm"
               onClick={handleCleanup}
-              disabled={cleaning || loading || history.length === 0}
+              disabled={cleaning || loading || items.length === 0}
               className="gap-1.5 border-gray-800 text-gray-400 hover:text-gray-200"
             >
               <RefreshCw className={cn("w-3.5 h-3.5", cleaning && "animate-spin")} />
               {cleaning ? "Syncing..." : "Sync with Facebook"}
             </Button>
-            <Button variant="ghost" size="sm" onClick={fetchHistory} className="text-gray-500">
+            <Button variant="ghost" size="sm" onClick={() => mutate()} className="text-gray-500">
               Refresh
             </Button>
           </div>
@@ -138,7 +131,7 @@ export default function HistoryPage() {
                 </div>
               ))}
             </div>
-          ) : history.length === 0 ? (
+          ) : items.length === 0 ? (
             <div className="p-16 text-center">
               <Clock className="w-10 h-10 text-gray-600 mx-auto mb-3" />
               <p className="text-gray-400 font-medium">No history yet</p>
@@ -160,7 +153,7 @@ export default function HistoryPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {history.map((job, index) => (
+                {items.map((job, index) => (
                   <TableRow
                     key={job.id}
                     className={cn(
@@ -197,7 +190,7 @@ export default function HistoryPage() {
                       {job.targetId ? (
                         <span className="flex items-center gap-1 text-blue-400 text-xs font-mono">
                           {job.targetId}
-                          {getOperation(job.details) !== 'DRAFT_DUPLICATE' && (
+                          {!(['DRAFT_DUPLICATE', 'AI_CREATE', 'WIDE_CREATE'] as OperationType[]).includes(getOperation(job.details)) && (
                             <ExternalLink className="w-2.5 h-2.5" />
                           )}
                         </span>

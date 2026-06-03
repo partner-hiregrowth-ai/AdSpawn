@@ -193,7 +193,11 @@ export class WideCreationService {
         errors.push({ path: campaignPath, field: 'name', message: 'Campaign name or naming pattern is required.', entityLabel: campaignLabel });
       }
 
-      const isCBO = !!(campaignFields.daily_budget || campaignFields.lifetime_budget);
+      const explicitCBOFlag = campaignFields.is_adset_budget_sharing_enabled;
+      const hasCampaignBudget = !!(campaignFields.daily_budget || campaignFields.lifetime_budget);
+      const isCBO = explicitCBOFlag === true || explicitCBOFlag === false
+        ? explicitCBOFlag
+        : hasCampaignBudget;
 
       // Build synthetic campaign for DraftValidationEngine
       const syntheticCampaignData = {
@@ -397,7 +401,31 @@ export class WideCreationService {
       if (resolvedCampaignFields.spend_cap) campaignPayload.spend_cap = resolvedCampaignFields.spend_cap;
       if (resolvedCampaignFields.buying_type) campaignPayload.buying_type = resolvedCampaignFields.buying_type;
 
-      const isCBO = !!(campaignPayload.daily_budget || campaignPayload.lifetime_budget);
+      // Determine CBO: explicit flag takes priority, then infer from budget placement
+      const explicitCBO = resolvedCampaignFields.is_adset_budget_sharing_enabled;
+      const hasCampaignBudget = !!(campaignPayload.daily_budget || campaignPayload.lifetime_budget);
+      const adSetsForBudgetCheck = campaignNode.adSets || [];
+      const adSetDefaults = template.defaults?.adSet;
+      const anyAdSetBudget = adSetsForBudgetCheck.some(as =>
+        as.fields.daily_budget || as.fields.lifetime_budget
+      ) || adSetDefaults?.daily_budget || adSetDefaults?.lifetime_budget;
+
+      let isCBO: boolean;
+      if (explicitCBO === true || explicitCBO === false) {
+        isCBO = explicitCBO;
+      } else if (hasCampaignBudget) {
+        isCBO = true;
+      } else if (anyAdSetBudget) {
+        isCBO = false;
+      } else {
+        // No budget anywhere — default to CBO with 30000
+        isCBO = true;
+        campaignPayload.daily_budget = 30000;
+      }
+
+      if (isCBO) {
+        campaignPayload.is_adset_budget_sharing_enabled = true;
+      }
 
       // Create draft campaign
       const draftCampaign = await prisma.draftCampaign.create({

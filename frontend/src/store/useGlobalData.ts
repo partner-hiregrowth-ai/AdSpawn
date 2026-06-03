@@ -1,13 +1,14 @@
 import useSWR from "swr";
 import { useEffect } from "react";
-import { useAppStore } from "./useAppStore";
+import { useAppStore, Profile } from "./useAppStore";
+import { Team, AdAccount } from "@/types";
 
 export function useGlobalData() {
   const { setTeam, setProfiles, setProfile, setAdAccounts, profile } = useAppStore();
 
-  const { data: teamData } = useSWR("/team");
-  const { data: profilesData } = useSWR("/profiles");
-  const { data: adAccountsData } = useSWR("/adaccounts");
+  const { data: teamData } = useSWR<Team>("/team");
+  const { data: profilesData } = useSWR<Profile[]>("/profiles");
+  const { data: adAccountsData } = useSWR<AdAccount[]>("/adaccounts");
 
   useEffect(() => {
     if (teamData) setTeam(teamData);
@@ -18,7 +19,7 @@ export function useGlobalData() {
       setProfiles(profilesData);
       const savedId = localStorage.getItem("profileId");
       if (savedId && !profile) {
-        const found = profilesData.find((p: any) => p.id === savedId);
+        const found = profilesData.find((p) => p.id === savedId);
         if (found) setProfile(found);
       }
     }

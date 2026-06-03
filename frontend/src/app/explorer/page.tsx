@@ -6,6 +6,7 @@ import { useAppStore } from "@/store/useAppStore";
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { adAccountApi, duplicationApi, draftApi } from "@/services/api";
 import { Campaign, AdSet, Ad } from "@/types";
+import { OptimizedField } from "@/lib/meta-schema";
 import {
   RefreshCw, FolderTree, PanelRightClose, PanelRightOpen,
 } from "lucide-react";
@@ -54,8 +55,12 @@ export default function ExplorerPage() {
 
   // Optimization state (shared)
   const [optimizing, setOptimizing] = useState(false);
-  const [optimizationData, setOptimizationData] = useState<any>(null);
-  const [overrides, setOverrides] = useState<Record<string, any>>({});
+  interface LocalOptData {
+    campaign?: { sourceId?: string; fields?: OptimizedField[]; payload?: Record<string, unknown> };
+    adSets?: { sourceId?: string; fields?: OptimizedField[]; payload?: Record<string, unknown> }[];
+  }
+  const [optimizationData, setOptimizationData] = useState<LocalOptData | null>(null);
+  const [overrides, setOverrides] = useState<Record<string, unknown>>({});
 
   // Action state
   const [duplicating, setDuplicating] = useState(false);
@@ -125,7 +130,7 @@ export default function ExplorerPage() {
     for (const [cid, asList] of Object.entries(adSetsRef.current)) {
       for (const as of asList) {
         if (as.name.toLowerCase().includes(q)) toExpandC.add(cid);
-        if ((adsRef.current[as.id] || []).some((ad: any) => ad.name.toLowerCase().includes(q))) {
+        if ((adsRef.current[as.id] || []).some((ad) => ad.name.toLowerCase().includes(q))) {
           toExpandC.add(cid);
           toExpandAS.add(as.id);
         }
@@ -152,8 +157,8 @@ export default function ExplorerPage() {
         case 'status': va = a.status; vb = b.status; break;
         case 'objective': va = a.objective; vb = b.objective; break;
         case 'budget':
-          va = parseFloat((a as any).daily_budget || (a as any).lifetime_budget || '0');
-          vb = parseFloat((b as any).daily_budget || (b as any).lifetime_budget || '0');
+          va = parseFloat(a.daily_budget || a.lifetime_budget || '0');
+          vb = parseFloat(b.daily_budget || b.lifetime_budget || '0');
           break;
         case 'created_time':
           va = a.created_time || '';
@@ -172,7 +177,7 @@ export default function ExplorerPage() {
     try {
       const response = await adAccountApi.getCampaigns(selectedAccount!.id);
       setCampaigns(response.data);
-    } catch (err: any) { toast.error(extractApiError(err, "Failed to fetch campaigns")); }
+    } catch (err: unknown) { toast.error(extractApiError(err, "Failed to fetch campaigns")); }
     finally { setLoading(false); }
   };
 
@@ -247,17 +252,17 @@ export default function ExplorerPage() {
       const item = selectedItemsList[0];
       const resp = await duplicationApi.optimizeDuplicate({ type: item.type, id: item.id, overrides });
       setOptimizationData(resp.data);
-    } catch (err: any) { toast.error(extractApiError(err, "Failed to analyze fields")); }
+    } catch (err: unknown) { toast.error(extractApiError(err, "Failed to analyze fields")); }
     finally { setOptimizing(false); }
   };
 
-  const handleFieldChange = (entityKey: string, field: string, value: any) => {
+  const handleFieldChange = (entityKey: string, field: string, value: unknown) => {
     setOverrides(prev => ({ ...prev, [`${entityKey}.${field}`]: value }));
     if (!optimizationData) return;
     const updated = { ...optimizationData };
-    const entity = entityKey === "campaign" ? updated.campaign : updated.adSets?.find((s: any) => s.sourceId === entityKey);
+    const entity = entityKey === "campaign" ? updated.campaign : updated.adSets?.find((s) => s.sourceId === entityKey);
     if (!entity) return;
-    const f = entity.fields?.find((fld: any) => fld.field === field);
+    const f = entity.fields?.find((fld) => fld.field === field);
     if (f) { f.newValue = value; f.action = "transformed"; }
     if (entity.payload) entity.payload[field] = value;
     setOptimizationData(updated);
@@ -283,7 +288,7 @@ export default function ExplorerPage() {
       setPanelOpen(false);
       resetOptimization();
       fetchCampaigns();
-    } catch (err: any) { toast.error(extractApiError(err, "Couldn't start the duplicate job. Check your Facebook connection and try again.")); }
+    } catch (err: unknown) { toast.error(extractApiError(err, "Couldn't start the duplicate job. Check your Facebook connection and try again.")); }
     finally { setDuplicating(false); }
   };
 
@@ -306,8 +311,9 @@ export default function ExplorerPage() {
         } else {
           totalRequested += numCopies;
           if (!firstErr) {
-            firstErr = (r.reason as any)?.response?.data?.error
-              || (r.reason as any)?.message
+            const reason = r.reason as { response?: { data?: { error?: string } }; message?: string };
+          firstErr = reason?.response?.data?.error
+              || reason?.message
               || "unknown error";
           }
         }
@@ -340,7 +346,7 @@ export default function ExplorerPage() {
         type: item.type, id: item.id, targetObjective, newName: convertName,
       });
       setOptimizationData(resp.data);
-    } catch (err: any) { toast.error(extractApiError(err, "Failed to analyze conversion")); }
+    } catch (err: unknown) { toast.error(extractApiError(err, "Failed to analyze conversion")); }
     finally { setOptimizing(false); }
   };
 
@@ -359,7 +365,7 @@ export default function ExplorerPage() {
       setPanelOpen(false);
       resetOptimization();
       fetchCampaigns();
-    } catch (err: any) { toast.error(extractApiError(err, "Failed to convert")); }
+    } catch (err: unknown) { toast.error(extractApiError(err, "Failed to convert")); }
     finally { setConverting(false); }
   };
 
@@ -385,7 +391,8 @@ export default function ExplorerPage() {
     setDeleting(true);
     try {
       const response = await adAccountApi.bulkDelete(allIds);
-      const successIds = new Set(response.data.results.filter((r: any) => r.success).map((r: any) => r.id));
+      const results: { id: string; success: boolean }[] = response.data.results;
+      const successIds = new Set(results.filter((r) => r.success).map((r) => r.id));
       toast.success(`${response.data.deleted} item${response.data.deleted !== 1 ? 's' : ''} deleted`);
 
       setSelectedItems(new Map());
@@ -406,7 +413,7 @@ export default function ExplorerPage() {
           return next;
         });
       }
-    } catch (err: any) { toast.error(extractApiError(err, "Delete failed")); }
+    } catch (err: unknown) { toast.error(extractApiError(err, "Delete failed")); }
     finally { setDeleting(false); setConfirmAction(null); }
   };
 
@@ -416,7 +423,8 @@ export default function ExplorerPage() {
     setActivating(true);
     try {
       const response = await adAccountApi.bulkActivate(allIds);
-      const successIds = new Set(response.data.results.filter((r: any) => r.success).map((r: any) => r.id));
+      const activateResults: { id: string; success: boolean }[] = response.data.results;
+      const successIds = new Set(activateResults.filter((r) => r.success).map((r) => r.id));
       toast.success(`${response.data.activated} item${response.data.activated !== 1 ? 's' : ''} activated`);
 
       setSelectedItems(new Map());
@@ -433,7 +441,7 @@ export default function ExplorerPage() {
         for (const key in next) next[key] = next[key].map(ad => successIds.has(ad.id) ? { ...ad, status: 'ACTIVE' } : ad);
         return next;
       });
-    } catch (err: any) { toast.error(extractApiError(err, "Activate failed")); }
+    } catch (err: unknown) { toast.error(extractApiError(err, "Activate failed")); }
     finally { setActivating(false); setConfirmAction(null); }
   };
 
@@ -443,7 +451,8 @@ export default function ExplorerPage() {
     setPausing(true);
     try {
       const response = await adAccountApi.bulkPause(allIds);
-      const successIds = new Set(response.data.results.filter((r: any) => r.success).map((r: any) => r.id));
+      const pauseResults: { id: string; success: boolean }[] = response.data.results;
+      const successIds = new Set(pauseResults.filter((r) => r.success).map((r) => r.id));
       toast.success(`${response.data.paused} item${response.data.paused !== 1 ? 's' : ''} paused`);
 
       setSelectedItems(new Map());
@@ -460,7 +469,7 @@ export default function ExplorerPage() {
         for (const key in next) next[key] = next[key].map(ad => successIds.has(ad.id) ? { ...ad, status: 'PAUSED' } : ad);
         return next;
       });
-    } catch (err: any) { toast.error(extractApiError(err, "Pause failed")); }
+    } catch (err: unknown) { toast.error(extractApiError(err, "Pause failed")); }
     finally { setPausing(false); setConfirmAction(null); }
   };
 
@@ -476,9 +485,9 @@ export default function ExplorerPage() {
 
   // ─── Inline editor ───
 
-  const allOptFields = optimizationData ? [
+  const allOptFields: OptimizedField[] = optimizationData ? [
     ...(optimizationData.campaign?.fields || []),
-    ...(optimizationData.adSets || []).flatMap((s: any) => s.fields || []),
+    ...(optimizationData.adSets || []).flatMap((s) => s.fields || []),
   ] : [];
 
   // ─── Render ───

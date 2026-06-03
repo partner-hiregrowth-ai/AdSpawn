@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { userApi, teamApi } from "@/services/api";
-import { Team, TeamMember } from "@/types";
+import { Team, TokenStatus, UserStats, UserProfile } from "@/types";
 import { useAppStore } from "@/store/useAppStore";
 import { toast } from "sonner";
 import { cn, extractApiError } from "@/lib/utils";
@@ -28,95 +29,29 @@ import {
   UserMinus,
 } from "lucide-react";
 
-interface TokenStatus {
-  valid: boolean;
-  expiresAt: string | null;
-  scopes: string[];
-  message?: string;
-}
-
-interface Stats {
-  draftCount: number;
-  publishedCount: number;
-  jobCount: number;
-  accountCount: number;
-}
-
-interface Profile {
-  id: string;
-  facebookId: string;
-  name: string | null;
-  email: string | null;
-  createdAt: string;
-}
-
 export default function SettingsPage() {
   const { user: storeUser } = useAppStore();
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loadingProfile, setLoadingProfile] = useState(true);
-  const [tokenStatus, setTokenStatus] = useState<TokenStatus | null>(null);
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [loadingToken, setLoadingToken] = useState(true);
-  const [loadingStats, setLoadingStats] = useState(true);
+
+  const { data: profile, isLoading: loadingProfile } = useSWR<UserProfile>("/user/profile");
+  const { data: tokenStatus, isLoading: loadingToken, mutate: mutateToken } = useSWR<TokenStatus>(
+    "/user/token-status",
+    { onError: () => ({ valid: false, expiresAt: null, scopes: [], message: "Failed to check" }) }
+  );
+  const { data: stats, isLoading: loadingStats } = useSWR<UserStats>("/user/stats");
+  const { data: team, isLoading: loadingTeam, mutate: mutateTeam } = useSWR<Team>("/team");
+
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [team, setTeam] = useState<Team | null>(null);
-  const [loadingTeam, setLoadingTeam] = useState(true);
   const [regenerating, setRegenerating] = useState(false);
   const [removingMember, setRemovingMember] = useState<string | null>(null);
-
-  const fetchProfile = async () => {
-    setLoadingProfile(true);
-    try {
-      const res = await userApi.getProfile();
-      setProfile(res.data);
-    } catch {
-      // fall back to store user if API fails
-    } finally {
-      setLoadingProfile(false);
-    }
-  };
-
-  const fetchTokenStatus = async () => {
-    setLoadingToken(true);
-    try {
-      const res = await userApi.getTokenStatus();
-      setTokenStatus(res.data);
-    } catch (err) {
-      setTokenStatus({ valid: false, expiresAt: null, scopes: [], message: "Failed to check" });
-    } finally {
-      setLoadingToken(false);
-    }
-  };
-
-  const fetchStats = async () => {
-    setLoadingStats(true);
-    try {
-      const res = await userApi.getStats();
-      setStats(res.data);
-    } catch (err: any) {
-      toast.error(extractApiError(err, "Couldn't load your stats. Refresh the page or check your connection."));
-    } finally {
-      setLoadingStats(false);
-    }
-  };
-
-  const fetchTeam = async () => {
-    setLoadingTeam(true);
-    try {
-      const res = await teamApi.getTeam();
-      setTeam(res.data);
-    } catch { }
-    finally { setLoadingTeam(false); }
-  };
 
   const handleRegenerateInvite = async () => {
     setRegenerating(true);
     try {
       const res = await teamApi.regenerateInvite();
-      setTeam(prev => prev ? { ...prev, inviteCode: res.data.inviteCode } : prev);
+      mutateTeam(team ? { ...team, inviteCode: res.data.inviteCode } : undefined, false);
       toast.success("Invite code regenerated");
-    } catch (err: any) { toast.error(extractApiError(err, "Failed to regenerate invite code")); }
+    } catch (err: unknown) { toast.error(extractApiError(err, "Failed to regenerate invite code")); }
     finally { setRegenerating(false); }
   };
 
@@ -124,18 +59,11 @@ export default function SettingsPage() {
     setRemovingMember(memberId);
     try {
       await teamApi.removeMember(memberId);
-      setTeam(prev => prev ? { ...prev, members: prev.members.filter(m => m.id !== memberId), memberCount: prev.memberCount - 1 } : prev);
+      mutateTeam(team ? { ...team, members: team.members.filter(m => m.id !== memberId), memberCount: team.memberCount - 1 } : undefined, false);
       toast.success("Member removed");
-    } catch (err: any) { toast.error(extractApiError(err, "Failed to remove member")); }
+    } catch (err: unknown) { toast.error(extractApiError(err, "Failed to remove member")); }
     finally { setRemovingMember(null); }
   };
-
-  useEffect(() => {
-    fetchProfile();
-    fetchTokenStatus();
-    fetchStats();
-    fetchTeam();
-  }, []);
 
   const user = profile || storeUser;
 
@@ -307,7 +235,7 @@ export default function SettingsPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={fetchTokenStatus}
+                onClick={() => mutateToken()}
                 disabled={loadingToken}
                 className="h-7 text-xs text-gray-500 gap-1.5"
               >

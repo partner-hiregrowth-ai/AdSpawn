@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { AiCampaignService, ChatMessage } from '../services/AiCampaignService';
+import { prisma } from '../prisma';
 
 export class AiCreateController {
   static async chat(req: AuthRequest, res: Response) {
@@ -15,6 +16,26 @@ export class AiCreateController {
         adAccountId,
         profileId: req.profileId,
       });
+
+      if (result.generationResult?.campaignIds?.length) {
+        for (const campaignId of result.generationResult.campaignIds) {
+          await prisma.duplicateJob.create({
+            data: {
+              userId: req.userId!,
+              profileId: req.profileId || null,
+              status: 'COMPLETED',
+              type: 'CAMPAIGN',
+              sourceId: adAccountId,
+              targetId: campaignId,
+              details: {
+                operation: 'AI_CREATE',
+                adAccountId,
+                totalCreated: result.generationResult.totalCreated,
+              },
+            },
+          });
+        }
+      }
 
       res.json(result);
     } catch (error: any) {

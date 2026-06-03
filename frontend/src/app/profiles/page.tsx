@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Layers, Plus, Loader2, Trash2, ArrowRight, User } from "lucide-react";
 import { toast } from "sonner";
 import { profileApi } from "@/services/api";
+import { extractApiError } from "@/lib/utils";
 import { useAppStore, Profile } from "@/store/useAppStore";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
@@ -48,8 +49,8 @@ export default function ProfilesPage() {
       setNewName("");
       toast.success("Profile created");
       await fetchProfiles();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to create profile");
+    } catch (err: unknown) {
+      toast.error(extractApiError(err, "Failed to create profile"));
     } finally {
       setIsCreating(false);
     }
@@ -61,8 +62,8 @@ export default function ProfilesPage() {
       await profileApi.delete(deleteTarget.id);
       toast.success("Profile deleted");
       await fetchProfiles();
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to delete profile");
+    } catch (err: unknown) {
+      toast.error(extractApiError(err, "Failed to delete profile"));
     } finally {
       setDeleteTarget(null);
     }
