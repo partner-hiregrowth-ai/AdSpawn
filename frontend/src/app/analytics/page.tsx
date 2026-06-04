@@ -449,11 +449,11 @@ export default function AnalyticsPage() {
                               {campaign.objective}
                             </span>
                           </div>
-                          <div className="flex items-center gap-4 shrink-0 ml-3">
-                            <span className="text-xs text-gray-500">
+                          <div className="flex items-center gap-2 sm:gap-4 shrink-0 ml-3">
+                            <span className="text-xs text-gray-500 hidden sm:inline">
                               CTR {formatPercent(campaign.ctr)}
                             </span>
-                            <span className="text-sm font-medium text-gray-200 w-24 text-right">
+                            <span className="text-sm font-medium text-gray-200 text-right">
                               {formatCurrency(campaign.spend, currency)}
                             </span>
                           </div>

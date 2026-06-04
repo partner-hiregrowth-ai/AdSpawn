@@ -454,8 +454,8 @@ export default function DraftsPage() {
                 <p className="text-gray-500 text-sm mt-1">When other profiles share drafts with you, they&apos;ll appear here.</p>
               </div>
             ) : (
-              <div className="bg-gray-900/30 border border-gray-800/60 rounded-xl overflow-hidden">
-                <table className="w-full">
+              <div className="bg-gray-900/30 border border-gray-800/60 rounded-xl overflow-x-auto">
+                <table className="w-full min-w-[580px]">
                   <thead className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur-sm">
                     <tr className="border-b border-gray-800/60">
                       <th className="text-left text-[11px] font-medium text-gray-500 uppercase tracking-wider px-4 py-3">Name</th>
@@ -851,8 +851,8 @@ export default function DraftsPage() {
             })}
           </div>
         ) : (
-          <div className="bg-gray-900/30 border border-gray-800/60 rounded-xl overflow-hidden">
-            <table className="w-full">
+          <div className="bg-gray-900/30 border border-gray-800/60 rounded-xl overflow-x-auto">
+            <table className="w-full min-w-[640px]">
               <thead className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur-sm">
                 <tr className="border-b border-gray-800/60">
                   <th className="w-10 px-3 py-3">

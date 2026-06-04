@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { toast } from 'sonner';
+import { useAppStore } from '@/store/useAppStore';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -19,19 +19,11 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-let tokenWarningShown = false;
-
 api.interceptors.response.use(
   (response) => {
     const expiryWarning = response.headers['x-token-expiry-warning'];
-    if (expiryWarning && !tokenWarningShown) {
-      tokenWarningShown = true;
-      const expiresAt = new Date(expiryWarning);
-      const daysLeft = Math.ceil((expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-      toast.warning(`Your Facebook session expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'}. Please log in again soon.`, {
-        duration: 10000,
-        id: 'token-expiry-warning',
-      });
+    if (expiryWarning) {
+      useAppStore.getState().setTokenExpiresAt(expiryWarning);
     }
     return response;
   },

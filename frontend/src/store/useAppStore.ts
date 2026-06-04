@@ -20,6 +20,7 @@ interface AppState {
   sidebarCollapsed: boolean;
   mobileSidebarOpen: boolean;
   draftName: string | null;
+  tokenExpiresAt: string | null;
   setUser: (user: User | null) => void;
   setTeam: (team: Team | null) => void;
   setProfile: (profile: Profile | null) => void;
@@ -30,6 +31,7 @@ interface AppState {
   toggleMobileSidebar: () => void;
   setMobileSidebarOpen: (v: boolean) => void;
   setDraftName: (name: string | null) => void;
+  setTokenExpiresAt: (v: string | null) => void;
 }
 
 const storeCreator: StateCreator<AppState, [['zustand/persist', unknown]]> = (set) => ({
@@ -42,6 +44,7 @@ const storeCreator: StateCreator<AppState, [['zustand/persist', unknown]]> = (se
   sidebarCollapsed: false,
   mobileSidebarOpen: false,
   draftName: null,
+  tokenExpiresAt: null,
   setUser: (user) => set({ user }),
   setTeam: (team) => set({ team }),
   setProfile: (profile) => {
@@ -61,6 +64,7 @@ const storeCreator: StateCreator<AppState, [['zustand/persist', unknown]]> = (se
   toggleMobileSidebar: () => set((state) => ({ mobileSidebarOpen: !state.mobileSidebarOpen })),
   setMobileSidebarOpen: (v) => set({ mobileSidebarOpen: v }),
   setDraftName: (draftName) => set({ draftName }),
+  setTokenExpiresAt: (tokenExpiresAt) => set({ tokenExpiresAt }),
 });
 
 export const useAppStore = create<AppState>()(
