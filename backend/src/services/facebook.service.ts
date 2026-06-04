@@ -513,4 +513,57 @@ export class FacebookService {
     });
     return resp.data.id;
   }
+
+  async getAccountInsights(adAccountId: string, datePreset?: string, since?: string, until?: string) {
+    const params: any = {
+      fields: 'spend,impressions,clicks,ctr,cpc,cpm,actions,cost_per_action_type',
+    };
+    if (since && until) {
+      params.time_range = JSON.stringify({ since, until });
+    } else {
+      params.date_preset = datePreset || 'last_7d';
+    }
+    const response = await this.withRetry(
+      () => this.client.get(`/${adAccountId}/insights`, { params }),
+      `getAccountInsights(${adAccountId})`
+    );
+    return response.data.data?.[0] || null;
+  }
+
+  async getAccountInsightsTimeSeries(adAccountId: string, datePreset?: string, since?: string, until?: string) {
+    const params: any = {
+      fields: 'spend,impressions,clicks',
+      time_increment: 1,
+      limit: 90,
+    };
+    if (since && until) {
+      params.time_range = JSON.stringify({ since, until });
+    } else {
+      params.date_preset = datePreset || 'last_7d';
+    }
+    const response = await this.withRetry(
+      () => this.client.get(`/${adAccountId}/insights`, { params }),
+      `getAccountInsightsTimeSeries(${adAccountId})`
+    );
+    return response.data.data || [];
+  }
+
+  async getCampaignInsights(adAccountId: string, datePreset?: string, since?: string, until?: string, limit = 10) {
+    const params: any = {
+      fields: 'campaign_id,campaign_name,objective,spend,impressions,clicks,ctr,cpc,cpm',
+      level: 'campaign',
+      sort: ['spend_descending'],
+      limit,
+    };
+    if (since && until) {
+      params.time_range = JSON.stringify({ since, until });
+    } else {
+      params.date_preset = datePreset || 'last_7d';
+    }
+    const response = await this.withRetry(
+      () => this.client.get(`/${adAccountId}/insights`, { params }),
+      `getCampaignInsights(${adAccountId})`
+    );
+    return response.data.data || [];
+  }
 }

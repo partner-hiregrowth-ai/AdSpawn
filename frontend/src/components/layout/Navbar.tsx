@@ -16,6 +16,7 @@ const pageTitles: Record<string, string> = {
   "/explorer": "Explorer",
   "/drafts": "Drafts",
   "/wide-create": "Wide Create",
+  "/analytics": "Analytics",
   "/history": "History",
   "/settings": "Settings",
 };

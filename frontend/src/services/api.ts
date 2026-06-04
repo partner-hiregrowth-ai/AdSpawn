@@ -106,6 +106,16 @@ export const aiCreateApi = {
   ) => api.post('/ai-create/chat', { messages, adAccountId }),
 };
 
+export const activityApi = {
+  getTeamActivity: (params?: { scope?: string; filter?: string; page?: number; pageSize?: number }) =>
+    api.get('/activity', { params }),
+};
+
+export const analyticsApi = {
+  getAccountAnalytics: (adAccountId: string, params?: { datePreset?: string; since?: string; until?: string }) =>
+    api.get(`/analytics/${adAccountId}`, { params }),
+};
+
 export const draftApi = {
   duplicateToDraft: (campaignId: string, count?: number) =>
     api.post('/drafts/duplicate', count && count > 1 ? { campaignId, count } : { campaignId }),

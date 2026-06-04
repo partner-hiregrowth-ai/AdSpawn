@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   Layers,
-  History,
   FolderTree,
   PanelLeftClose,
   PanelLeftOpen,
@@ -13,6 +12,8 @@ import {
   Grid3X3,
   Settings,
   Sparkles,
+  BarChart3,
+  History,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/useAppStore";
@@ -23,7 +24,8 @@ const menuItems = [
   { icon: Layers, label: "Drafts", href: "/drafts", desc: "Edit campaign drafts and publish to Meta" },
   { icon: Grid3X3,   label: "Wide Create", href: "/wide-create", desc: "Build bulk campaign structures from scratch across multiple objectives" },
   { icon: Sparkles,  label: "AI Create",   href: "/ai-create",  desc: "Describe your campaign in plain language — AI builds the drafts" },
-  { icon: History,   label: "History",     href: "/history",    desc: "Log of all duplication and conversion jobs" },
+  { icon: BarChart3,  label: "Analytics",   href: "/analytics",  desc: "Spend, impressions, clicks, and performance metrics" },
+  { icon: History,     label: "History",     href: "/history",    desc: "Your actions and team-wide audit log" },
   { icon: Settings, label: "Settings", href: "/settings", desc: "Account, team, and connection settings" },
 ];
 

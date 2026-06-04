@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   LayoutDashboard, FolderTree, Layers, Grid3X3,
-  History, Settings, Search, Sparkles,
+  Settings, Search, Sparkles, BarChart3, History,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -14,7 +14,8 @@ const COMMANDS = [
   { id: "drafts",      label: "Go to Drafts",       icon: Layers,          href: "/drafts",      desc: "Edit and publish campaign drafts" },
   { id: "wide-create", label: "Go to Wide Create",  icon: Grid3X3,   href: "/wide-create", desc: "Build bulk campaign structures" },
   { id: "ai-create",   label: "Go to AI Create",    icon: Sparkles,  href: "/ai-create",   desc: "Describe your campaign — AI builds the drafts" },
-  { id: "history",     label: "Go to History",      icon: History,   href: "/history",     desc: "Duplication and conversion job log" },
+  { id: "analytics",   label: "Go to Analytics",    icon: BarChart3, href: "/analytics",   desc: "Spend, performance, and campaign metrics" },
+  { id: "history",     label: "Go to History",      icon: History,   href: "/history",     desc: "Your actions and team audit log" },
   { id: "settings",    label: "Go to Settings",     icon: Settings,        href: "/settings",    desc: "Account, team, and connection settings" },
 ];
 

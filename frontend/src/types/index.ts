@@ -93,6 +93,7 @@ export interface DraftShare {
 export interface HistoryJobDetails {
   operation?: 'PUBLISH' | 'DRAFT_DUPLICATE' | 'AI_CREATE' | 'WIDE_CREATE' | string;
   isConversion?: boolean;
+  savedAsDraft?: boolean;
   adAccountId?: string;
   templateName?: string;
   totalCreated?: { campaigns: number; adSets: number; ads: number };
@@ -131,6 +132,28 @@ export interface UserProfile {
   createdAt: string;
 }
 
+export interface ActivityItem {
+  id: string;
+  userId: string;
+  status: string;
+  type: string;
+  sourceId: string;
+  targetId?: string | null;
+  createdAt: string;
+  details?: HistoryJobDetails | null;
+  error?: string | null;
+  user: { id: string; name: string | null; email: string | null };
+  profile?: { id: string; name: string } | null;
+}
+
+export interface ActivityFeed {
+  items: ActivityItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 export interface OptimizationEntity {
   sourceId?: string;
   fields?: Array<{
@@ -165,4 +188,41 @@ export interface TargetingSpec {
   flexible_spec?: Record<string, unknown>[];
   exclusions?: Record<string, unknown>;
   [key: string]: unknown;
+}
+
+export interface InsightsSummary {
+  spend: string;
+  impressions: string;
+  clicks: string;
+  ctr: string;
+  cpc: string;
+  cpm: string;
+  actions?: Array<{ action_type: string; value: string }>;
+  cost_per_action_type?: Array<{ action_type: string; value: string }>;
+}
+
+export interface InsightsTimeSeriesPoint {
+  date_start: string;
+  date_stop: string;
+  spend: string;
+  impressions: string;
+  clicks: string;
+}
+
+export interface CampaignInsight {
+  campaign_id: string;
+  campaign_name: string;
+  objective: string;
+  spend: string;
+  impressions: string;
+  clicks: string;
+  ctr: string;
+  cpc: string;
+  cpm: string;
+}
+
+export interface AccountAnalytics {
+  summary: InsightsSummary | null;
+  timeSeries: InsightsTimeSeriesPoint[];
+  topCampaigns: CampaignInsight[];
 }

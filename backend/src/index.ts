@@ -62,6 +62,8 @@ import uploadRoutes from './routes/upload.routes';
 import teamRoutes from './routes/team.routes';
 import profileRoutes from './routes/profile.routes';
 import aiCreateRoutes from './routes/aiCreate.routes';
+import analyticsRoutes from './routes/analytics.routes';
+import activityRoutes from './routes/activity.routes';
 
 app.use('/api/auth', authRoutes);
 app.use('/api/adaccounts', adAccountRoutes);
@@ -74,6 +76,8 @@ app.use('/api/uploads', uploadRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/profiles', profileRoutes);
 app.use('/api/ai-create', aiCreateRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/activity', activityRoutes);
 
 // Catch-all for 404s
 app.use((req, res) => {
