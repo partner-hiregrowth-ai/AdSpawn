@@ -274,6 +274,84 @@ export class DraftController {
     }
   }
 
+  static async bulkPublishStream(req: Request, res: Response) {
+    const { campaignIds } = req.body as { campaignIds: string[] };
+    const authReq = req as AuthRequest;
+
+    if (!Array.isArray(campaignIds) || campaignIds.length === 0) {
+      return res.status(400).json({ error: 'campaignIds must be a non-empty array' });
+    }
+
+    const campaigns = await prisma.draftCampaign.findMany({
+      where: { id: { in: campaignIds }, profileId: authReq.profileId },
+      select: { id: true, name: true, objective: true },
+    });
+    const campaignMap = new Map(campaigns.map(c => [c.id, c]));
+
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+
+    const send = (data: Record<string, unknown>) => {
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    const init = campaignIds.map(id => {
+      const c = campaignMap.get(id);
+      return { id, name: c?.name ?? id, objective: c?.objective ?? '', found: !!c };
+    });
+    send({ type: 'init', campaigns: init, total: campaignIds.length });
+
+    for (const id of campaignIds) {
+      if (!campaignMap.has(id)) {
+        send({ type: 'result', id, status: 'failed', error: 'Draft not found' });
+        continue;
+      }
+
+      send({ type: 'progress', id, status: 'publishing' });
+
+      try {
+        const result = await DraftPublishService.publishCampaign(id, authReq.userAccessToken!);
+        send({ type: 'result', id, status: 'success', metaCampaignId: result.metaCampaignId });
+        await prisma.duplicateJob.create({
+          data: {
+            userId: authReq.userId!,
+            profileId: authReq.profileId || null,
+            status: 'COMPLETED',
+            type: 'CAMPAIGN',
+            sourceId: id,
+            targetId: result.metaCampaignId,
+            details: { operation: 'PUBLISH' },
+          },
+        });
+      } catch (error: any) {
+        if (isFacebookAuthError(error.message)) {
+          send({ type: 'auth_error', id, error: error.message });
+          send({ type: 'done' });
+          return res.end();
+        }
+        const userMessage = error instanceof PublishError ? error.userMessage : error.message;
+        send({ type: 'result', id, status: 'failed', error: userMessage });
+        prisma.duplicateJob.create({
+          data: {
+            userId: authReq.userId!,
+            profileId: authReq.profileId || null,
+            status: 'FAILED',
+            type: 'CAMPAIGN',
+            sourceId: id,
+            details: { operation: 'PUBLISH', error: userMessage },
+          },
+        }).catch(() => {});
+      }
+    }
+
+    send({ type: 'done' });
+    res.end();
+  }
+
   static async deleteCampaign(req: Request, res: Response) {
     try {
       const id = req.params.id as string;

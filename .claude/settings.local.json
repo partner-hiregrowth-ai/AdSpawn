@@ -64,7 +64,9 @@
       "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({**d.get\\('dependencies',{}\\), **d.get\\('devDependencies',{}\\)}, indent=2\\)\\)\")",
       "Bash(fuser -k 5000/tcp)",
       "Bash(netstat -tlnp)",
-      "Bash(xargs -I{} sh -c 'echo \"=== {} ===\" && head -30 \"{}\"')"
+      "Bash(xargs -I{} sh -c 'echo \"=== {} ===\" && head -30 \"{}\"')",
+      "Bash(lsof -ti:5000)",
+      "Bash(xargs -r kill -9)"
     ]
   }
 }

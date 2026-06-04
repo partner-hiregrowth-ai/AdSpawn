@@ -16,6 +16,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { cn, extractApiError } from "@/lib/utils";
 import { BulkEditPanel } from "@/components/dashboard/BulkEditPanel";
+import { BulkPublishModal } from "@/components/dashboard/BulkPublishModal";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { DraftCampaign, DraftShare } from "@/types";
 import { Profile } from "@/store/useAppStore";
@@ -32,13 +33,13 @@ export default function DraftsPage() {
   );
   const drafts = swrDrafts ?? [];
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [isBulkPublishing, setIsBulkPublishing] = useState(false);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
-  const [publishProgress, setPublishProgress] = useState<{ current: number; total: number } | null>(null);
   const [publishedBanner, setPublishedBanner] = useState<{ count: number } | null>(null);
+  const [showPublishModal, setShowPublishModal] = useState(false);
+  const [publishModalIds, setPublishModalIds] = useState<string[]>([]);
   const [showBulkEdit, setShowBulkEdit] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
-  const [confirmAction, setConfirmAction] = useState<'delete' | 'bulkDelete' | 'publish' | null>(null);
+  const [confirmAction, setConfirmAction] = useState<'delete' | 'bulkDelete' | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -111,18 +112,17 @@ export default function DraftsPage() {
   }, [searchQuery]);
 
   useEffect(() => {
-    const busy = isBulkPublishing || isBulkDeleting;
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-        if (selectedIds.size > 0 && !busy) {
+        if (selectedIds.size > 0 && !isBulkDeleting) {
           e.preventDefault();
-          setConfirmAction('publish');
+          openPublishModal();
         }
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [selectedIds.size, isBulkPublishing, isBulkDeleting]);
+  }, [selectedIds.size, isBulkDeleting]);
 
   const handleDelete = async (id?: string) => {
     const targetId = id || deleteTargetId;
@@ -218,31 +218,24 @@ export default function DraftsPage() {
     }
   };
 
-  const handleBulkPublish = async () => {
+  const openPublishModal = () => {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
-    setIsBulkPublishing(true);
-    setPublishProgress({ current: 0, total: ids.length });
-    try {
-      const res = await draftApi.bulkPublishDrafts(ids);
-      const results: { id: string; success: boolean; error?: string; userMessage?: string }[] = res.data.results;
-      setPublishProgress({ current: ids.length, total: ids.length });
-      const succeeded = results.filter((r) => r.success).length;
-      const failed = results.filter((r) => !r.success);
-      if (succeeded > 0) {
-        setPublishedBanner({ count: succeeded });
-        setTimeout(() => setPublishedBanner(null), 8000);
-      }
-      failed.forEach((r) => toast.error(r.userMessage || r.error || "Unknown error"));
-      setSelectedIds(new Set());
-      mutateDrafts();
-    } catch (err: unknown) {
-      toast.error(extractApiError(err, "Bulk publish failed"));
-    } finally {
-      setIsBulkPublishing(false);
-      setPublishProgress(null);
-      setConfirmAction(null);
+    setPublishModalIds(ids);
+    setShowPublishModal(true);
+    setConfirmAction(null);
+  };
+
+  const handlePublishComplete = (succeeded: number, failed: number) => {
+    if (succeeded > 0) {
+      setPublishedBanner({ count: succeeded });
+      setTimeout(() => setPublishedBanner(null), 8000);
     }
+    if (failed > 0 && succeeded === 0) {
+      toast.error(`All ${failed} publish${failed > 1 ? "es" : ""} failed`);
+    }
+    setSelectedIds(new Set());
+    mutateDrafts();
   };
 
   const handleExport = async (id: string, name: string) => {
@@ -358,7 +351,7 @@ export default function DraftsPage() {
 
   const publishableDrafts = filteredDrafts.filter((d) => d.status !== "PUBLISHING" && d.status !== "PUBLISHED");
   const allSelected = publishableDrafts.length > 0 && selectedIds.size === publishableDrafts.length;
-  const isBusy = isBulkPublishing || isBulkDeleting;
+  const isBusy = isBulkDeleting;
 
   return (
     <DashboardLayout>
@@ -565,17 +558,15 @@ export default function DraftsPage() {
               <Button
                 size="sm"
                 className="gap-1.5 bg-blue-600 hover:bg-blue-700 shadow-lg shadow-blue-600/20"
-                onClick={() => setConfirmAction('publish')}
+                onClick={openPublishModal}
                 disabled={isBusy}
-                title="Publish selected drafts (⌘↵)"
+                title="Publish selected drafts (Ctrl+↵)"
               >
-                {isBulkPublishing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                {isBulkPublishing && publishProgress
-                  ? `Publishing ${publishProgress.current}/${publishProgress.total}…`
-                  : `Publish (${selectedIds.size})`}
+                <Send className="w-3.5 h-3.5" />
+                Publish ({selectedIds.size})
               </Button>
               <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded border border-gray-700 bg-gray-800/60 text-[10px] text-gray-500 font-mono select-none">
-                ⌘↵
+                Ctrl+↵
               </kbd>
             </div>
           </div>
@@ -1013,31 +1004,12 @@ export default function DraftsPage() {
         onConfirm={handleBulkDelete}
         isLoading={isBulkDeleting}
       />
-      <ConfirmDialog
-        open={confirmAction === 'publish'}
-        onOpenChange={() => setConfirmAction(null)}
-        title="Publish to Meta"
-        description={
-          <div className="space-y-2">
-            <p>Publish {selectedIds.size} draft{selectedIds.size !== 1 ? "s" : ""} to Meta? All will be created in PAUSED status.</p>
-            <ul className="text-xs text-gray-400 space-y-1 max-h-36 overflow-y-auto border border-gray-800 rounded-md p-2 bg-gray-950/40">
-              {Array.from(selectedIds).map(id => {
-                const d = drafts.find(x => x.id === id);
-                return d ? (
-                  <li key={id} className="flex items-center gap-2 truncate">
-                    <span className="w-1 h-1 rounded-full bg-gray-600 shrink-0" />
-                    <span className="truncate text-gray-300">{d.name}</span>
-                    <span className="text-gray-600 shrink-0">{OBJECTIVE_LABELS[d.objective] || d.objective}</span>
-                  </li>
-                ) : null;
-              })}
-            </ul>
-          </div>
-        }
-        confirmLabel="Publish"
-        variant="warning"
-        onConfirm={handleBulkPublish}
-        isLoading={isBulkPublishing}
+      <BulkPublishModal
+        open={showPublishModal}
+        campaignIds={publishModalIds}
+        drafts={drafts.map(d => ({ id: d.id, name: d.name, objective: d.objective }))}
+        onClose={() => setShowPublishModal(false)}
+        onComplete={handlePublishComplete}
       />
       {showBulkShare && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowBulkShare(false)}>

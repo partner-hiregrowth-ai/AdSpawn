@@ -28,6 +28,7 @@ router.patch('/adsets/:id', validateBody(updateEntitySchema), DraftController.up
 router.patch('/ads/:id', validateBody(updateEntitySchema), DraftController.updateAd);
 
 router.post('/campaigns/bulk-publish', bulkLimiter, validateBody(bulkPublishSchema), DraftController.bulkPublishDrafts);
+router.post('/campaigns/bulk-publish-stream', bulkLimiter, validateBody(bulkPublishSchema), DraftController.bulkPublishStream);
 router.post('/campaigns/bulk-update', bulkLimiter, validateBody(bulkUpdateSchema), DraftController.bulkUpdateCampaigns);
 router.post('/campaigns/bulk-delete', bulkLimiter, validateBody(bulkDeleteSchema), DraftController.bulkDeleteDrafts);
 router.post('/bulk-edit/schema', DraftController.bulkEditSchema);
