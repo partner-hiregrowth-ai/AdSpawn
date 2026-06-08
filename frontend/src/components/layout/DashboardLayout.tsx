@@ -84,7 +84,7 @@ export const DashboardLayout = ({ children }: { children: React.ReactNode }) => 
   if (authState === "unauthenticated" || authState === "needs_profile") return <AuthLoadingSkeleton />;
 
   return (
-    <div className="min-h-screen bg-gray-950 text-gray-100">
+    <div className="dark min-h-screen bg-gray-950 text-gray-100">
       <CommandPalette />
       <ShortcutsModal />
       <Navbar />

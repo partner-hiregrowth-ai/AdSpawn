@@ -31,7 +31,10 @@ export default function DraftsPage() {
     },
     { revalidateOnFocus: false }
   );
-  const drafts = swrDrafts ?? [];
+  // The backend returns both owned and shared drafts in one query.
+  // My Drafts tab must only show drafts this profile owns.
+  const allDrafts = swrDrafts ?? [];
+  const drafts = allDrafts.filter(d => !d.profileId || d.profileId === profileId);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [publishedBanner, setPublishedBanner] = useState<{ count: number } | null>(null);

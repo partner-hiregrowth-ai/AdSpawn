@@ -19,6 +19,18 @@ import { useRouter } from "next/navigation";
 import { cn, extractApiError } from "@/lib/utils";
 import Link from "next/link";
 import { MetaForm } from "@/components/meta/MetaForm";
+import { AwarenessCampaignForm } from "@/components/campaign/AwarenessCampaignForm";
+import { AwarenessAdSetForm } from "@/components/campaign/AwarenessAdSetForm";
+import { AwarenessAdForm } from "@/components/campaign/AwarenessAdForm";
+import { TrafficCampaignForm } from "@/components/campaign/TrafficCampaignForm";
+import { TrafficAdSetForm } from "@/components/campaign/TrafficAdSetForm";
+import { TrafficAdForm } from "@/components/campaign/TrafficAdForm";
+import { EngagementCampaignForm } from "@/components/campaign/EngagementCampaignForm";
+import { EngagementAdSetForm } from "@/components/campaign/EngagementAdSetForm";
+import { EngagementAdForm } from "@/components/campaign/EngagementAdForm";
+import { LeadsCampaignForm } from "@/components/campaign/LeadsCampaignForm";
+import { LeadsAdSetForm } from "@/components/campaign/LeadsAdSetForm";
+import { LeadsAdForm } from "@/components/campaign/LeadsAdForm";
 import { OBJECTIVE_LABELS } from "@/lib/meta-schema";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -205,7 +217,7 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
   const [isValidating, setIsValidating] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [isCleaning, setIsCleaning] = useState(false);
-  const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(true);
+  const [isAutoSaveEnabled, setIsAutoSaveEnabled] = useState(false);
   const [validationResults, setValidationResults] = useState<any>(null);
   const draftStorageKey = `adspawn-draft-edits:${params.id}`;
   const [editCache, _setEditCache] = useState<Map<string, any>>(() => {
@@ -421,7 +433,7 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
     try {
       await draftApi.publishDraft(params.id);
       toast.success("Published! Your campaign is live on Meta (paused, ready for review).");
-      router.push("/drafts");
+      await fetchDraft(true);
     } catch (err: any) {
       toast.error(extractApiError(err, "Publishing failed. Check the error details and try again."));
     }
@@ -775,17 +787,28 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
 
           <div className="flex-1 overflow-y-auto min-w-0">
             {editData ? (
-              <div className="space-y-5 max-w-2xl">
-                <div className="flex flex-wrap justify-between items-center gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-gray-800/50 text-gray-500 uppercase tracking-wide">
+              <div className="space-y-4 max-w-2xl">
+                {/* Top bar: level pill + save */}
+                <div className="flex items-center justify-between gap-3 py-1">
+                  <div className="flex items-center gap-2.5">
+                    <span className={cn(
+                      "text-[10px] font-bold px-2.5 py-1 rounded-md uppercase tracking-widest",
+                      selectedNode?.type === "CAMPAIGN" ? "bg-blue-500/15 text-blue-300 border border-blue-500/30" :
+                      selectedNode?.type === "ADSET"    ? "bg-purple-500/15 text-purple-300 border border-purple-500/30" :
+                                                          "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                    )}>
                       {selectedNode?.type}
                     </span>
-                    {editData.metaId && <span className="text-[10px] text-gray-600 font-mono">Meta: {editData.metaId}</span>}
+                    {editData.metaId && (
+                      <span className="text-[10px] text-gray-600 font-mono bg-gray-800/40 px-2 py-0.5 rounded">
+                        Meta: {editData.metaId}
+                      </span>
+                    )}
                   </div>
-                  <Button size="sm" className="gap-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200"
+                  <Button size="sm" className="gap-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200"
                     onClick={handleSave} disabled={isSaving}>
-                    {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Save
+                    {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                    {isSaving ? "Saving…" : "Save"}
                   </Button>
                 </div>
 
@@ -794,29 +817,123 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
                 )}
 
                 <Tabs defaultValue="form" className="w-full">
-                  <TabsList className="bg-gray-900/50 border border-gray-800/60 h-9 w-full">
-                    <TabsTrigger value="form" className="text-xs flex-1">Form</TabsTrigger>
-                    <TabsTrigger value="summary" className="text-xs flex-1">Summary</TabsTrigger>
-                    <TabsTrigger value="json" className="text-xs flex-1">Raw JSON</TabsTrigger>
+                  <TabsList className="bg-gray-800/50 border border-gray-700/50 h-9 w-full p-0.5 gap-0.5">
+                    <TabsTrigger value="form" className="text-xs flex-1 data-active:bg-white/10 data-active:text-white text-gray-500 hover:text-gray-300">Form</TabsTrigger>
+                    <TabsTrigger value="summary" className="text-xs flex-1 data-active:bg-white/10 data-active:text-white text-gray-500 hover:text-gray-300">Summary</TabsTrigger>
+                    <TabsTrigger value="json" className="text-xs flex-1 data-active:bg-white/10 data-active:text-white text-gray-500 hover:text-gray-300">Raw JSON</TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="form" keepMounted className="mt-4">
-                    <MetaForm
-                      key={selectedNode?.id}
-                      entityType={
-                        selectedNode?.type === "CAMPAIGN" ? "campaign" :
-                        selectedNode?.type === "ADSET" ? "adSet" : "ad"
-                      }
-                      initialValues={editData.data || {}}
-                      context={{
-                        objective: campaignObjective,
-                        buyingType: editData.data?.buying_type || "AUCTION",
-                        isCBO,
-                        hasMetaId: !!editData.metaId,
-                      }}
-                      adAccountId={adAccountId}
-                      onChange={(values) => commitEdit(values)}
-                    />
+                    {selectedNode?.type === "CAMPAIGN" && campaignObjective === "OUTCOME_AWARENESS" ? (
+                      <AwarenessCampaignForm
+                        key={selectedNode?.id}
+                        initialValues={editData.data || {}}
+                        onChange={(values) => commitEdit(values)}
+                      />
+                    ) : selectedNode?.type === "ADSET" && campaignObjective === "OUTCOME_AWARENESS" ? (
+                      <AwarenessAdSetForm
+                        key={selectedNode?.id}
+                        initialValues={editData.data || {}}
+                        campaignBudget={
+                          isCBO
+                            ? (draft?.data?.daily_budget ?? draft?.data?.lifetime_budget)
+                            : undefined
+                        }
+                        onChange={(values) => commitEdit(values)}
+                      />
+                    ) : selectedNode?.type === "AD" && campaignObjective === "OUTCOME_AWARENESS" ? (
+                      <AwarenessAdForm
+                        key={selectedNode?.id}
+                        initialValues={editData.data || {}}
+                        onChange={(values) => commitEdit(values)}
+                      />
+                    ) : selectedNode?.type === "CAMPAIGN" && campaignObjective === "OUTCOME_TRAFFIC" ? (
+                      <TrafficCampaignForm
+                        key={selectedNode?.id}
+                        initialValues={editData.data || {}}
+                        onChange={(values) => commitEdit(values)}
+                      />
+                    ) : selectedNode?.type === "ADSET" && campaignObjective === "OUTCOME_TRAFFIC" ? (
+                      <TrafficAdSetForm
+                        key={selectedNode?.id}
+                        initialValues={editData.data || {}}
+                        campaignBudget={
+                          isCBO
+                            ? (draft?.data?.daily_budget ?? draft?.data?.lifetime_budget)
+                            : undefined
+                        }
+                        onChange={(values) => commitEdit(values)}
+                      />
+                    ) : selectedNode?.type === "AD" && campaignObjective === "OUTCOME_TRAFFIC" ? (
+                      <TrafficAdForm
+                        key={selectedNode?.id}
+                        initialValues={editData.data || {}}
+                        onChange={(values) => commitEdit(values)}
+                      />
+                    ) : selectedNode?.type === "CAMPAIGN" && campaignObjective === "OUTCOME_ENGAGEMENT" ? (
+                      <EngagementCampaignForm
+                        key={selectedNode?.id}
+                        initialValues={editData.data || {}}
+                        onChange={(values) => commitEdit(values)}
+                      />
+                    ) : selectedNode?.type === "ADSET" && campaignObjective === "OUTCOME_ENGAGEMENT" ? (
+                      <EngagementAdSetForm
+                        key={selectedNode?.id}
+                        initialValues={editData.data || {}}
+                        campaignBudget={
+                          isCBO
+                            ? (draft?.data?.daily_budget ?? draft?.data?.lifetime_budget)
+                            : undefined
+                        }
+                        onChange={(values) => commitEdit(values)}
+                      />
+                    ) : selectedNode?.type === "AD" && campaignObjective === "OUTCOME_ENGAGEMENT" ? (
+                      <EngagementAdForm
+                        key={selectedNode?.id}
+                        initialValues={editData.data || {}}
+                        onChange={(values) => commitEdit(values)}
+                      />
+                    ) : selectedNode?.type === "CAMPAIGN" && campaignObjective === "OUTCOME_LEADS" ? (
+                      <LeadsCampaignForm
+                        key={selectedNode?.id}
+                        initialValues={editData.data || {}}
+                        onChange={(values) => commitEdit(values)}
+                      />
+                    ) : selectedNode?.type === "ADSET" && campaignObjective === "OUTCOME_LEADS" ? (
+                      <LeadsAdSetForm
+                        key={selectedNode?.id}
+                        initialValues={editData.data || {}}
+                        campaignBudget={
+                          isCBO
+                            ? (draft?.data?.daily_budget ?? draft?.data?.lifetime_budget)
+                            : undefined
+                        }
+                        onChange={(values) => commitEdit(values)}
+                      />
+                    ) : selectedNode?.type === "AD" && campaignObjective === "OUTCOME_LEADS" ? (
+                      <LeadsAdForm
+                        key={selectedNode?.id}
+                        initialValues={editData.data || {}}
+                        onChange={(values) => commitEdit(values)}
+                      />
+                    ) : (
+                      <MetaForm
+                        key={selectedNode?.id}
+                        entityType={
+                          selectedNode?.type === "CAMPAIGN" ? "campaign" :
+                          selectedNode?.type === "ADSET" ? "adSet" : "ad"
+                        }
+                        initialValues={editData.data || {}}
+                        context={{
+                          objective: campaignObjective,
+                          buyingType: editData.data?.buying_type || "AUCTION",
+                          isCBO,
+                          hasMetaId: !!editData.metaId,
+                        }}
+                        adAccountId={adAccountId}
+                        onChange={(values) => commitEdit(values)}
+                      />
+                    )}
                   </TabsContent>
 
                   <TabsContent value="summary" className="mt-4">

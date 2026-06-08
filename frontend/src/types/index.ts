@@ -78,6 +78,7 @@ export interface DraftCampaign {
   objective: string;
   status: DraftStatus;
   metaId?: string | null;
+  profileId?: string | null;
   createdAt: string;
   updatedAt: string;
   _count?: { adSets: number };
