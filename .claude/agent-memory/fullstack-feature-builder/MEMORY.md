@@ -1,6 +1,0 @@
-- [Targeting fields are schema-driven arrays](project_targeting-schema-rendering.md) — region/city/postal/detailed/custom-audience UI comes from MetaFormSchemaEngine, not hand-written form code
-- [ArrayField React-key focus-loss pitfall](feedback_arrayfield-react-key-focus.md) — never key schema array items off item content; id/key/name are user-editable in targeting arrays
-- [tracking_specs object requirement](project_tracking-specs-object-requirement.md) — Meta error 100/1634005; sanitizeTrackingSpecs drops action.type-only specs at publish time
-- [Dynamic Creative ad set inline-creative rule](project_dynamic-creative-adset-creative-id.md) — Meta error 100/1885702; DC ads need an INLINE asset_feed_spec creative on the ad (no creative_id, no pre-created adcreative, no object_story_spec)
-- [Validation severity + frontend coupling](project_validation-severity-frontend-coupling.md) — severity now error|warning|info; only 'error' blocks publish; drafts panel filters by exact severity string so new severities must be rendered
-- [Wide Create per-item overrides](project_wide-create-node-overrides.md) — nodeOverrides map keyed by position-based nodeId, merged over node.fields in toTemplate; backend already respects explicit fields.name (no change)

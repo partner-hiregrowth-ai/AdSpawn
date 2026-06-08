@@ -61,3 +61,10 @@ Thumbs.db
 **/.vercel
 
 certificates
+
+# Documentation & Developer Tools
+.obsidian/
+wiki/
+.claude/
+.impeccable/
+agent/
