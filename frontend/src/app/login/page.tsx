@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { LogIn, Loader2, Copy, Shield, Zap, Layers } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { authApi } from "@/services/api";
 import { useAppStore } from "@/store/useAppStore";
 import { useState, useEffect, Suspense } from "react";
@@ -177,7 +178,7 @@ function LoginContent() {
               </div>
 
               <p className="mt-5 text-[11px] text-gray-700 leading-relaxed text-center">
-                By continuing, you agree to our Terms of Service and Privacy Policy.
+                By continuing, you agree to our <a href="#" className="hover:text-gray-500 underline underline-offset-2 transition-colors">Terms of Service</a> and <Link href="/privacy" className="hover:text-gray-500 underline underline-offset-2 transition-colors">Privacy Policy</Link>.
               </p>
             </div>
           </div>
