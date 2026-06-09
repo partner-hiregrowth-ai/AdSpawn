@@ -31,8 +31,6 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const { setUser } = useAppStore();
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [fbSdkReady, setFbSdkReady] = useState(false);
-  const [fbSdkError, setFbSdkError] = useState<string | null>(null);
 
   useEffect(() => {
     if (searchParams.get("reason") === "token_expired") {
@@ -40,29 +38,14 @@ function LoginContent() {
     }
   }, [searchParams]);
 
-  // Subscribe to fbReady once on mount — no await, no broken user-activation chain
-  useEffect(() => {
-    if (!window.fbReady) return;
-    window.fbReady
-      .then(() => setFbSdkReady(true))
-      .catch((e: Error) => {
-        if (e?.message === "FB_APP_ID_MISSING") {
-          setFbSdkError("Facebook App ID is not configured in this deployment.");
-        } else {
-          setFbSdkError("Facebook SDK failed to initialize.");
-        }
-      });
-  }, []);
-
-  // FB.login() is called synchronously inside the click handler so the
-  // browser treats it as a direct user gesture (no await breaking activation).
   const handleFacebookLogin = () => {
-    if (fbSdkError) {
-      toast.error(fbSdkError);
+    const appId = process.env.NEXT_PUBLIC_FB_APP_ID;
+    if (!appId || appId === "your_facebook_app_id") {
+      toast.error("Facebook App ID is not configured. Please check your .env.local file.");
       return;
     }
-    if (!fbSdkReady || !window.FB) {
-      toast.error("Facebook SDK is still loading. Please wait a moment and try again.");
+    if (!window.FB) {
+      toast.error("Facebook SDK not loaded. This is often caused by AdBlockers or a slow connection.");
       return;
     }
     setIsLoggingIn(true);
@@ -175,14 +158,14 @@ function LoginContent() {
 
               <Button
                 onClick={handleFacebookLogin}
-                disabled={isLoggingIn || !fbSdkReady}
-                className="w-full bg-[#1877F2] hover:bg-[#1568d3] text-white h-12 text-sm font-semibold gap-2.5 rounded-xl transition-all duration-150 hover:shadow-lg hover:shadow-blue-600/25 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+                disabled={isLoggingIn}
+                className="w-full bg-[#1877F2] hover:bg-[#1568d3] text-white h-12 text-sm font-semibold gap-2.5 rounded-xl transition-all duration-150 hover:shadow-lg hover:shadow-blue-600/25 active:scale-[0.98]"
               >
-                {(isLoggingIn || !fbSdkReady)
+                {isLoggingIn
                   ? <Loader2 className="w-4 h-4 animate-spin" />
                   : <FacebookIcon className="w-4 h-4" />
                 }
-                {isLoggingIn ? "Connecting..." : !fbSdkReady ? "Loading..." : "Continue with Facebook"}
+                {isLoggingIn ? "Connecting..." : "Continue with Facebook"}
               </Button>
 
               <div className="mt-4 flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05]">

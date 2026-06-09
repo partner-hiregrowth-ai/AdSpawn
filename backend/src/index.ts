@@ -9,6 +9,10 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Required when deployed behind a reverse proxy (Vercel, Railway, Render, etc.)
+// so that req.ip is populated from X-Forwarded-For instead of being undefined.
+app.set('trust proxy', 1);
+
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
