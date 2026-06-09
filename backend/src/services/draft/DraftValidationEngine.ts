@@ -95,7 +95,7 @@ export class DraftValidationEngine {
     }
 
     if (data.bid_strategy && BID_CAP_STRATEGIES.has(data.bid_strategy)) {
-      if (!data.bid_amount && !data.bid_constraints) {
+      if (!data.bid_amount) {
         errors.push({
           field: 'bid_strategy',
           message: `${labelBid(data.bid_strategy)} requires a bid amount. Set a bid amount or switch to Highest Volume.`,
@@ -290,7 +290,7 @@ export class DraftValidationEngine {
     }
 
     if (!isCBO && data.bid_strategy && BID_CAP_STRATEGIES.has(data.bid_strategy)) {
-      if (!data.bid_amount && !data.bid_constraints) {
+      if (!data.bid_amount) {
         errors.push({
           field: 'bid_amount',
           message: `${labelBid(data.bid_strategy)} strategy requires a bid amount. Set a bid amount or switch to Highest Volume.`,

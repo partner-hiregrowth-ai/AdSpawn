@@ -673,22 +673,23 @@ export function SalesAdSetForm({
           {/* Dataset (Pixel) — REQUIRED for OUTCOME_SALES */}
           <FieldRow label="Dataset" required hint="Track actions that people take on your website.">
             <Select
-              value={pixelId || "dev_pixel"}
+              value={pixelId || ""}
               onValueChange={(v) => {
                 if (!v) return;
-                const id = v === "dev_pixel" ? "1163649662554293" : v;
-                setPixelId(id);
-                emit({ pixelId: id });
+                setPixelId(v);
+                emit({ pixelId: v });
               }}
             >
               <SelectTrigger className={cn(
                 "w-full bg-gray-800/30 border-gray-700/40 text-sm text-gray-200 focus:ring-0 transition-colors",
                 pixelIdHasError ? "border-red-500/70" : "focus:border-blue-500/50"
               )}>
-                <span className="truncate">{pixelId ? "Dev Pixel" : "Select a dataset"}</span>
+                <span className="truncate">{pixelId ? `Pixel: ${pixelId}` : "Select a dataset"}</span>
               </SelectTrigger>
               <SelectContent className="bg-gray-900 border-gray-800">
-                <SelectItem value="dev_pixel" className="text-xs text-gray-300">Dev Pixel</SelectItem>
+                {pixelId && (
+                  <SelectItem value={pixelId} className="text-xs text-gray-300">Pixel: {pixelId}</SelectItem>
+                )}
               </SelectContent>
             </Select>
             {pixelIdHasError && (
@@ -1038,15 +1039,16 @@ export function SalesAdSetForm({
           <InfoBox>
             <div className="font-semibold text-blue-300">Build trust with your audience by completing verification</div>
             <p className="text-blue-200/60 mt-0.5">Verification helps people know who is behind the ads they see.</p>
-            <button
-              type="button"
-              onClick={() => toast.info("Ad transparency verification is managed in Meta Business Manager.", { description: "Go to Business Settings → Security Centre → Start verification." })}
+            <a
+              href="https://business.facebook.com/accountquality"
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 mt-2 text-[11px] font-semibold text-blue-400 hover:text-blue-300 transition-colors"
             >
               <ShieldCheck className="w-3.5 h-3.5" />
               Start verification
               <ExternalLink className="w-3 h-3" />
-            </button>
+            </a>
           </InfoBox>
         </SectionBody>
       </SectionCard>

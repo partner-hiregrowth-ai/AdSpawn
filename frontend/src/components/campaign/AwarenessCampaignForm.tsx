@@ -12,6 +12,7 @@ import {
   SlidersHorizontal,
   CalendarRange,
   Info,
+  X,
 } from "lucide-react";
 
 // ─── Toggle ───────────────────────────────────────────────────────────────────
@@ -132,6 +133,29 @@ function StaticField({ value }: { value: string }) {
     </div>
   );
 }
+
+// ─── Info Box ─────────────────────────────────────────────────────────────────
+
+function InfoBox({ children, onDismiss }: { children: React.ReactNode; onDismiss?: () => void }) {
+  return (
+    <div className="flex gap-3 p-3.5 rounded-lg bg-blue-500/5 border border-l-2 border-blue-500/20 border-l-blue-500/60">
+      <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+      <div className="text-xs text-blue-200/80 space-y-1 flex-1">{children}</div>
+      {onDismiss && (
+        <button type="button" onClick={onDismiss} className="text-blue-400/60 hover:text-blue-300 transition-colors shrink-0">
+          <X className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ─── Buying Types ─────────────────────────────────────────────────────────────
+
+const BUYING_TYPES = [
+  { value: "AUCTION", label: "Auction" },
+  { value: "RESERVED", label: "Reservation" },
+];
 
 // ─── Currency Input ───────────────────────────────────────────────────────────
 
@@ -270,19 +294,19 @@ export function AwarenessCampaignForm({ initialValues, onChange }: AwarenessCamp
   );
 
   const [hasBudgetSchedule, setHasBudgetSchedule] = useState(
-    !!(initialValues.start_time || initialValues.end_time)
+    !!(initialValues.start_time || initialValues.stop_time)
   );
   const [startDate, setStartDate] = useState<string>(
     initialValues.start_time ? initialValues.start_time.slice(0, 10) : ""
   );
   const [endDate, setEndDate] = useState<string>(
-    initialValues.end_time ? initialValues.end_time.slice(0, 10) : ""
+    initialValues.stop_time ? initialValues.stop_time.slice(0, 10) : ""
   );
   const [startTime, setStartTime] = useState<string>(
     initialValues.start_time ? initialValues.start_time.slice(11, 16) : "00:00"
   );
   const [endTime, setEndTime] = useState<string>(
-    initialValues.end_time ? initialValues.end_time.slice(11, 16) : "23:59"
+    initialValues.stop_time ? initialValues.stop_time.slice(11, 16) : "23:59"
   );
   const [increaseType, setIncreaseType] = useState<string>("value");
   const [increaseAmount, setIncreaseAmount] = useState<number>(3750);
@@ -295,6 +319,8 @@ export function AwarenessCampaignForm({ initialValues, onChange }: AwarenessCamp
   const [specialCategories, setSpecialCategories] = useState<string[]>(
     Array.isArray(initialValues.special_ad_categories) ? initialValues.special_ad_categories : []
   );
+
+  const [buyingType, setBuyingType] = useState<string>(initialValues.buying_type ?? "AUCTION");
 
   // ── Sync from parent — but NOT when the change originated from this component ──
   // When emit() fires, the parent bounces updated values back through initialValues.
@@ -318,19 +344,20 @@ export function AwarenessCampaignForm({ initialValues, onChange }: AwarenessCamp
     setBudgetType(initialValues.lifetime_budget ? "lifetime_budget" : "daily_budget");
     setBudgetAmount(initialValues.daily_budget ?? initialValues.lifetime_budget ?? 15000);
     setBidStrategy(initialValues.bid_strategy ?? "LOWEST_COST_WITHOUT_CAP");
-    const hasSchedule = !!(initialValues.start_time || initialValues.end_time);
+    const hasSchedule = !!(initialValues.start_time || initialValues.stop_time);
     setHasBudgetSchedule(hasSchedule);
     if (initialValues.start_time) {
       setStartDate(initialValues.start_time.slice(0, 10));
       setStartTime(initialValues.start_time.slice(11, 16));
     }
-    if (initialValues.end_time) {
-      setEndDate(initialValues.end_time.slice(0, 10));
-      setEndTime(initialValues.end_time.slice(11, 16));
+    if (initialValues.stop_time) {
+      setEndDate(initialValues.stop_time.slice(0, 10));
+      setEndTime(initialValues.stop_time.slice(11, 16));
     }
     setSpecialCategories(
       Array.isArray(initialValues.special_ad_categories) ? initialValues.special_ad_categories : []
     );
+    setBuyingType(initialValues.buying_type ?? "AUCTION");
   }, [initialValues]);
 
   // ── Propagate changes up ──
@@ -344,7 +371,7 @@ export function AwarenessCampaignForm({ initialValues, onChange }: AwarenessCamp
         ...initialValues,
         name,
         objective: "OUTCOME_AWARENESS",
-        buying_type: "AUCTION",
+        buying_type: "buyingType" in overrides ? overrides.buyingType : buyingType,
         bid_strategy: bidStrategy,
         special_ad_categories: specialCategories,
         ...overrides,
@@ -371,11 +398,11 @@ export function AwarenessCampaignForm({ initialValues, onChange }: AwarenessCamp
         if (endDate || overrides.endDate) {
           const d = overrides.endDate ?? endDate;
           const t = overrides.endTime ?? endTime;
-          values.end_time = `${d}T${t}`;
+          values.stop_time = `${d}T${t}`;
         }
       } else {
         delete values.start_time;
-        delete values.end_time;
+        delete values.stop_time;
       }
 
       // Clean internal-only keys
@@ -389,12 +416,14 @@ export function AwarenessCampaignForm({ initialValues, onChange }: AwarenessCamp
       delete values.endTime;
       delete values.increaseType;
       delete values.increaseAmount;
+      delete values.buyingType;
 
       onChangeRef.current(values);
     },
     [
       initialValues,
       name,
+      buyingType,
       bidStrategy,
       specialCategories,
       isCBO,
@@ -447,12 +476,28 @@ export function AwarenessCampaignForm({ initialValues, onChange }: AwarenessCamp
 
           <div className="grid grid-cols-2 gap-3">
             <FieldRow label="Buying type">
-              <StaticField value="Auction" />
+              <Select value={buyingType} onValueChange={(v) => {
+                if (v) { setBuyingType(v); emit({ buyingType: v }); }
+              }}>
+                <SelectTrigger className="w-full bg-gray-800/30 border-gray-700/40 text-sm text-gray-200 focus:border-blue-500/50">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-gray-900 border-gray-800">
+                  {BUYING_TYPES.map((bt) => (
+                    <SelectItem key={bt.value} value={bt.value} className="text-xs text-gray-300">{bt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </FieldRow>
             <FieldRow label="Campaign objective">
               <StaticField value="Awareness" />
             </FieldRow>
           </div>
+          {buyingType === "RESERVED" && (
+            <InfoBox>
+              Reservation campaigns use reach &amp; frequency buying. Budget and scheduling are confirmed at booking time.
+            </InfoBox>
+          )}
         </SectionBody>
       </SectionCard>
 

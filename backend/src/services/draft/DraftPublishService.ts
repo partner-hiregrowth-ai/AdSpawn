@@ -334,14 +334,6 @@ export class DraftPublishService {
           );
         }
 
-        await withDbRetry(
-          () => prisma.draftAdSet.update({
-            where: { id: adSet.id },
-            data: { status: DraftStatus.PUBLISHED },
-          }),
-          'draftAdSet.update(PUBLISHED)',
-        );
-
         for (const ad of adSet.ads) {
           await withDbRetry(
             () => prisma.draftAd.update({
@@ -395,6 +387,14 @@ export class DraftPublishService {
             'draftAd.update(PUBLISHED)',
           );
         }
+
+        await withDbRetry(
+          () => prisma.draftAdSet.update({
+            where: { id: adSet.id },
+            data: { status: DraftStatus.PUBLISHED },
+          }),
+          'draftAdSet.update(PUBLISHED)',
+        );
       }
 
       await withDbRetry(
@@ -533,6 +533,7 @@ export class DraftPublishService {
 
     if (isCBO) {
       if (campaignData.daily_budget && campaignData.lifetime_budget) {
+        console.warn('[DraftPublishService] Campaign has both daily_budget and lifetime_budget set; using daily_budget', { campaignId: campaignData.id });
         campaignPayload.daily_budget = String(campaignData.daily_budget);
       } else if (campaignData.daily_budget) {
         campaignPayload.daily_budget = String(campaignData.daily_budget);
@@ -782,6 +783,7 @@ export class DraftPublishService {
       const adSetLifetimeBudget = Number(adSetData.lifetime_budget) || 0;
       if (adSetDailyBudget > 0 && adSetLifetimeBudget > 0) {
         // Both set — pick daily, lifetime requires end_time which may be missing
+        console.warn('[DraftPublishService] Ad set has both daily_budget and lifetime_budget set; using daily_budget', { adSetId: adSet.id });
         adSetPayload.daily_budget = String(adSetDailyBudget);
       } else if (adSetDailyBudget > 0) {
         adSetPayload.daily_budget = String(adSetDailyBudget);

@@ -238,11 +238,10 @@ function SelectIdentitiesModal({ onClose, onDone }: { onClose: () => void; onDon
                 </FieldRow>
               </div>
               <div className="flex items-end">
-                <button type="button"
-                  onClick={() => toast.info("Connect an Instagram account in Meta Business Settings.")}
-                  className="h-9 px-3 text-xs font-medium rounded-lg border border-gray-700 text-blue-400 hover:bg-gray-800/40 transition-colors whitespace-nowrap">
+                <a href="https://business.facebook.com/settings/instagram-accounts" target="_blank" rel="noopener noreferrer"
+                  className="h-9 px-3 text-xs font-medium rounded-lg border border-gray-700 text-blue-400 hover:bg-gray-800/40 transition-colors whitespace-nowrap inline-flex items-center">
                   Connect profile
-                </button>
+                </a>
               </div>
             </div>
             <InfoBox>
@@ -459,7 +458,9 @@ export function LeadsAdForm({ initialValues, onChange }: LeadsAdFormProps) {
   const [urlTouched, setUrlTouched] = useState(false);
 
   // 7 – Ad creative
+  const [creativeId, setCreativeId] = useState<string>(initialValues.creative?.creative_id ?? initialValues.creative?.id ?? "");
   const [showMockupModal, setShowMockupModal] = useState(false);
+  const [postId, setPostId] = useState<string>(initialValues.creative?.object_story_id ?? "");
 
   // 8 – Creative testing
   const [showCreativeMockup, setShowCreativeMockup] = useState(false);
@@ -485,12 +486,16 @@ export function LeadsAdForm({ initialValues, onChange }: LeadsAdFormProps) {
     prevInitialRef.current = initialValues;
     if (isInternalChange.current) { isInternalChange.current = false; return; }
     setAdName(initialValues.name ?? "New Leads Ad");
+    setCreativeId(initialValues.creative?.creative_id ?? initialValues.creative?.id ?? "");
   }, [initialValues]);
 
   const emit = useCallback((overrides: Record<string, any> = {}) => {
     isInternalChange.current = true;
-    onChangeRef.current({ ...initialValues, name: adName, ...overrides });
-  }, [initialValues, adName]);
+    const values: Record<string, any> = { ...initialValues, name: adName, ...overrides };
+    const cid = overrides.hasOwnProperty("creative") ? overrides.creative?.creative_id : creativeId;
+    if (cid?.trim()) { values.creative = { creative_id: cid.trim() }; } else { delete values.creative; }
+    onChangeRef.current(values);
+  }, [initialValues, adName, creativeId]);
 
   const urlHasError = urlTouched && !websiteUrl.trim() && destination === "Website";
 
@@ -507,16 +512,9 @@ export function LeadsAdForm({ initialValues, onChange }: LeadsAdFormProps) {
         <SectionHeader title="Ad" />
         <SectionBody>
           <FieldRow label="Ad name" required>
-            <div className="flex gap-2">
-              <Input value={adName} onChange={(e) => { setAdName(e.target.value); emit({ name: e.target.value }); }}
-                placeholder="New Leads Ad"
-                className="flex-1 bg-gray-800/30 border-gray-700/40 text-sm text-gray-200 placeholder-gray-600 focus:border-blue-500/50 focus:ring-0" />
-              <button type="button"
-                onClick={() => toast.info("Template creation is available in Meta Ads Manager.")}
-                className="h-9 px-3 text-xs font-medium rounded-lg border border-gray-700 text-gray-400 hover:bg-gray-800/40 transition-colors whitespace-nowrap">
-                Create template
-              </button>
-            </div>
+            <Input value={adName} onChange={(e) => { setAdName(e.target.value); emit({ name: e.target.value }); }}
+              placeholder="New Leads Ad"
+              className="w-full bg-gray-800/30 border-gray-700/40 text-sm text-gray-200 placeholder-gray-600 focus:border-blue-500/50 focus:ring-0" />
           </FieldRow>
         </SectionBody>
       </SectionCard>
@@ -571,10 +569,10 @@ export function LeadsAdForm({ initialValues, onChange }: LeadsAdFormProps) {
               </FieldRow>
             </div>
             <div className="flex items-end">
-              <button type="button" onClick={() => toast.info("Connect an Instagram account in Meta Business Settings.")}
-                className="h-9 px-3 text-xs font-medium rounded-lg border border-gray-700 text-blue-400 hover:bg-gray-800/40 transition-colors whitespace-nowrap">
+              <a href="https://business.facebook.com/settings/instagram-accounts" target="_blank" rel="noopener noreferrer"
+                className="h-9 px-3 text-xs font-medium rounded-lg border border-gray-700 text-blue-400 hover:bg-gray-800/40 transition-colors whitespace-nowrap inline-flex items-center">
                 Connect profile
-              </button>
+              </a>
             </div>
           </div>
           <FieldRow label="Threads profile">
@@ -725,11 +723,14 @@ export function LeadsAdForm({ initialValues, onChange }: LeadsAdFormProps) {
                 <span className="font-semibold text-blue-300">Boost an existing post</span>
                 <p>Select a post from your Facebook Page to boost directly as a leads ad. The post&apos;s original content will be used as the ad creative.</p>
               </InfoBox>
-              <button type="button"
-                onClick={() => toast.info("Select a post to boost from your Facebook Page.")}
-                className="h-9 px-4 text-xs font-medium rounded-lg border border-gray-700 text-gray-300 hover:bg-gray-800/40 transition-colors">
-                Select post to boost
-              </button>
+              <FieldRow label="Post ID" hint="Enter the post ID or URL of the post you want to boost.">
+                <Input
+                  value={postId}
+                  onChange={(e) => { setPostId(e.target.value); emit({ creative: { ...(creativeId.trim() ? { creative_id: creativeId.trim() } : {}), object_story_id: e.target.value.trim() || undefined } }); }}
+                  placeholder="e.g. 123456789_987654321"
+                  className="bg-gray-800/30 border-gray-700/40 text-xs text-gray-200 placeholder-gray-600 focus:border-blue-500/50 focus:ring-0 font-mono"
+                />
+              </FieldRow>
               <label className="flex items-start gap-2.5 cursor-pointer">
                 <input type="checkbox" checked={multiAdvertiser} onChange={(e) => setMultiAdvertiser(e.target.checked)}
                   className="mt-0.5 w-4 h-4 rounded border border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-500/30 focus:outline-none" />
@@ -752,14 +753,6 @@ export function LeadsAdForm({ initialValues, onChange }: LeadsAdFormProps) {
               <Input placeholder="http://www.example.com/page"
                 className="bg-gray-800/30 border-gray-700/40 text-sm text-gray-200 placeholder-gray-600 focus:border-blue-500/50 focus:ring-0" />
             </FieldRow>
-            <div className="flex items-center justify-between py-2 border border-gray-800/40 rounded-lg px-3">
-              <div className="text-xs text-gray-400">
-                <span className="text-gray-600 mr-1">Ad sources (0/1):</span>
-                Turned off: Site links
-              </div>
-              <button type="button" onClick={() => toast.info("Site links can be configured in Ads Manager.")}
-                className="text-[11px] font-medium text-blue-400 hover:text-blue-300 transition-colors">Edit</button>
-            </div>
           </SectionBody>
         </SectionCard>
       )}
@@ -812,8 +805,6 @@ export function LeadsAdForm({ initialValues, onChange }: LeadsAdFormProps) {
             <div className="px-4 py-3 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] text-gray-600">Turned off</span>
-                <button type="button" onClick={() => toast.info("Personalized destinations can be configured in Ads Manager.")}
-                  className="text-[11px] font-medium text-blue-400 hover:text-blue-300 transition-colors">Edit</button>
               </div>
               <ul className="text-[11px] text-gray-500 space-y-1 pl-3">
                 <li className="list-disc">Optimize website destination</li>
@@ -828,22 +819,27 @@ export function LeadsAdForm({ initialValues, onChange }: LeadsAdFormProps) {
       <SectionCard>
         <SectionHeader title="Ad creative" description="Select and optimize your ad text, media and enhancements." />
         <SectionBody>
-          <button type="button"
-            onClick={() => toast.info("Ad creative setup is available in the full Meta Ads Manager editor.")}
-            className="h-9 px-4 text-xs font-medium rounded-lg border border-gray-700 text-gray-300 hover:bg-gray-800/40 transition-colors flex items-center gap-1.5">
-            Set up creative <ChevronDown className="w-3.5 h-3.5" />
-          </button>
-
-          <InfoBox>Please specify an image to run with this ad.</InfoBox>
+          <FieldRow label="Creative ID" hint="Reference an existing creative. Required when your FB App is in Development mode.">
+            <Input
+              value={creativeId}
+              onChange={(e) => { setCreativeId(e.target.value); emit({ creative: e.target.value.trim() ? { creative_id: e.target.value.trim() } : null }); }}
+              placeholder="e.g. 120209859739520186"
+              className="bg-gray-800/30 border-gray-700/40 text-xs text-gray-200 placeholder-gray-600 focus:border-blue-500/50 focus:ring-0 font-mono"
+            />
+          </FieldRow>
+          {!creativeId.trim() && <InfoBox>Please specify an image or enter a Creative ID to run with this ad.</InfoBox>}
 
           {(adSetup === "existing" || adSetup === "boost") && (
             <div className="space-y-3">
-              <button type="button"
-                onClick={() => toast.info("Select an existing post from your Facebook Page.")}
-                className="h-9 px-4 text-xs font-medium rounded-lg border border-gray-700 text-gray-300 hover:bg-gray-800/40 transition-colors">
-                Select post
-              </button>
-              <p className="text-[11px] text-gray-500">Select a post to publish a partnership ad.</p>
+              <FieldRow label="Post ID" hint="Enter the post ID or URL to use as an existing post.">
+                <Input
+                  value={postId}
+                  onChange={(e) => { setPostId(e.target.value); emit({ creative: { ...(creativeId.trim() ? { creative_id: creativeId.trim() } : {}), object_story_id: e.target.value.trim() || undefined } }); }}
+                  placeholder="e.g. 123456789_987654321"
+                  className="bg-gray-800/30 border-gray-700/40 text-xs text-gray-200 placeholder-gray-600 focus:border-blue-500/50 focus:ring-0 font-mono"
+                />
+              </FieldRow>
+              <p className="text-[11px] text-gray-500">Enter a post ID to publish a partnership ad.</p>
             </div>
           )}
 
@@ -891,10 +887,6 @@ export function LeadsAdForm({ initialValues, onChange }: LeadsAdFormProps) {
             <InfoBox>
               <span>Select languages to add translations for your ad creative.</span>
             </InfoBox>
-            <button type="button" onClick={() => toast.info("Language targeting is available in the full Meta Ads Manager.")}
-              className="text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1.5">
-              <Plus className="w-3.5 h-3.5" /> Add language
-            </button>
           </SectionBody>
         )}
       </SectionCard>

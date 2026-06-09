@@ -1152,15 +1152,16 @@ export function EngagementAdSetForm({
           <InfoBox>
             <div className="font-semibold text-blue-300">Build trust with your audience by completing verification</div>
             <p className="text-blue-200/60 mt-0.5">Verification helps people know who is behind the ads they see.</p>
-            <button
-              type="button"
-              onClick={() => toast.info("Ad transparency verification is managed in Meta Business Manager.", { description: "Go to Business Settings → Security Centre → Start verification." })}
+            <a
+              href="https://business.facebook.com/accountquality"
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 mt-2 text-[11px] font-semibold text-blue-400 hover:text-blue-300 transition-colors"
             >
               <ShieldCheck className="w-3.5 h-3.5" />
               Start verification
               <ExternalLink className="w-3 h-3" />
-            </button>
+            </a>
           </InfoBox>
         </SectionBody>
       </SectionCard>

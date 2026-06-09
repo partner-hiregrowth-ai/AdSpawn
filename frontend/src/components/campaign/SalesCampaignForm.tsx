@@ -453,10 +453,6 @@ export function SalesCampaignForm({ initialValues, onChange }: SalesCampaignForm
                 </div>
               </div>
             </div>
-            <button type="button"
-              className="w-full h-9 text-xs font-medium rounded-lg border border-gray-700 text-gray-300 hover:bg-gray-800/40 transition-colors">
-              Add products
-            </button>
           </div>
         </SectionBody>
       </SectionCard>

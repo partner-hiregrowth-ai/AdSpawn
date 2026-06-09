@@ -4,11 +4,11 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { useAppStore } from "@/store/useAppStore";
-import { aiCreateApi } from "@/services/api";
+import { aiCreateApi, uploadApi } from "@/services/api";
 import { extractApiError } from "@/lib/utils";
 import Link from "next/link";
 import {
-  Sparkles, Send, Loader2, AlertTriangle, CheckCircle2,
+  Sparkles, Send, Loader2, AlertTriangle, CheckCircle2, Plus, X, Image as ImageIcon, Video, FileText
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -18,6 +18,16 @@ interface GenerationResult {
   warnings: string[];
 }
 
+interface FileAttachment {
+  id: string;
+  file: File;
+  type: 'image' | 'video' | 'file';
+  status: 'uploading' | 'ready' | 'error';
+  url: string;
+  metaId?: string; // hash for images, id for videos
+  error?: string;
+}
+
 interface Message {
   id: string;
   role: "user" | "assistant";
@@ -25,11 +35,53 @@ interface Message {
   isLoading?: boolean;
   generationResult?: GenerationResult;
   isError?: boolean;
+  attachments?: FileAttachment[];
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
+function FilePreview({ attachment, onRemove }: { attachment: FileAttachment, onRemove: (id: string) => void }) {
+  const isImage = attachment.type === 'image';
+  const isVideo = attachment.type === 'video';
+
+  return (
+    <div className="relative group w-20 h-20 bg-gray-900 border border-gray-700/60 rounded-xl overflow-hidden shrink-0">
+      {attachment.status === 'uploading' && (
+        <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-10">
+          <Loader2 className="w-4 h-4 text-violet-400 animate-spin" />
+        </div>
+      )}
+      {attachment.status === 'error' && (
+        <div className="absolute inset-0 bg-red-900/40 flex items-center justify-center z-10" title={attachment.error}>
+          <AlertTriangle className="w-4 h-4 text-red-400" />
+        </div>
+      )}
+      
+      {isImage ? (
+        <img src={attachment.url} alt="preview" className="w-full h-full object-cover" />
+      ) : isVideo ? (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-violet-500/10">
+          <Video className="w-6 h-6 text-violet-400" />
+          <span className="text-[9px] text-violet-400 font-medium mt-1 uppercase">Video</span>
+        </div>
+      ) : (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-gray-800">
+          <FileText className="w-6 h-6 text-gray-400" />
+        </div>
+      )}
+
+      <button
+        onClick={() => onRemove(attachment.id)}
+        className="absolute top-1 right-1 p-0.5 bg-black/60 hover:bg-black/80 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
+      >
+        <X className="w-3 h-3" />
+      </button>
+    </div>
+  );
+}
+
 function LoadingDots() {
+// ... existing LoadingDots component
   return (
     <div className="flex items-center gap-1 py-1">
       {[0, 1, 2].map(i => (
@@ -125,9 +177,62 @@ export default function AiCreatePage() {
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<FileAttachment[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const chipRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const { selectedAccount } = useAppStore.getState();
+    if (!selectedAccount) return;
+
+    const newAttachments: FileAttachment[] = files.map(file => ({
+      id: crypto.randomUUID(),
+      file,
+      type: file.type.startsWith('image/') ? 'image' : file.type.startsWith('video/') ? 'video' : 'file',
+      status: 'uploading',
+      url: URL.createObjectURL(file),
+    }));
+
+    setSelectedFiles(prev => [...prev, ...newAttachments]);
+
+    // Reset input so the same file can be selected again
+    e.target.value = '';
+
+    // Trigger uploads
+    for (const att of newAttachments) {
+      try {
+        let res;
+        if (att.type === 'image') {
+          res = await uploadApi.uploadImage(att.file, selectedAccount.adaccount_id || selectedAccount.id);
+          const hash = res.data.hash;
+          setSelectedFiles(prev => prev.map(f => f.id === att.id ? { ...f, status: 'ready', metaId: hash } : f));
+        } else if (att.type === 'video') {
+          res = await uploadApi.uploadVideo(att.file, selectedAccount.adaccount_id || selectedAccount.id);
+          const videoId = res.data.videoId;
+          setSelectedFiles(prev => prev.map(f => f.id === att.id ? { ...f, status: 'ready', metaId: videoId } : f));
+        } else {
+          setSelectedFiles(prev => prev.map(f => f.id === att.id ? { ...f, status: 'error', error: 'Unsupported file type' } : f));
+        }
+      } catch (err: any) {
+        const msg = extractApiError(err, "Upload failed");
+        setSelectedFiles(prev => prev.map(f => f.id === att.id ? { ...f, status: 'error', error: msg } : f));
+      }
+    }
+  };
+
+  const removeFile = (id: string) => {
+    setSelectedFiles(prev => {
+      const filtered = prev.filter(f => f.id !== id);
+      const removed = prev.find(f => f.id === id);
+      if (removed) URL.revokeObjectURL(removed.url);
+      return filtered;
+    });
+  };
 
   const focusChip = (idx: number) => {
     const el = chipRefs.current[idx];
@@ -159,17 +264,33 @@ export default function AiCreatePage() {
       return;
     }
 
-    const userMsg: Message = { id: crypto.randomUUID(), role: "user", content: text };
+    // Build final message content with attachment info
+    let finalContent = text;
+    const readyAttachments = selectedFiles.filter(f => f.status === 'ready' && f.metaId);
+    
+    if (readyAttachments.length > 0) {
+      const attachmentContext = readyAttachments.map(f => 
+        f.type === 'image' ? `[IMAGE_HASH: ${f.metaId}]` : `[VIDEO_ID: ${f.metaId}]`
+      ).join(' ');
+      finalContent = `${text}\n\nUser attached these files: ${attachmentContext}. Use these identifiers for the ad creative if applicable.`;
+    }
+
+    const userMsg: Message = { 
+      id: crypto.randomUUID(), 
+      role: "user", 
+      content: text, // Show the original text in UI
+      attachments: [...selectedFiles] 
+    };
     const loadingId = crypto.randomUUID();
     const loadingMsg: Message = { id: loadingId, role: "assistant", content: "", isLoading: true };
 
     setMessages(prev => [...prev, userMsg, loadingMsg]);
     setInput("");
+    setSelectedFiles([]); // Clear after sending
     setIsLoading(true);
 
     // Build API payload: filter out loading bubbles, keep last 10 conversation turns
-    const apiMessages = [...messages, userMsg]
-      .filter(m => !m.isLoading && (m.role === "user" || m.role === "assistant"))
+    const apiMessages = [...messages.filter(m => !m.isLoading), { ...userMsg, content: finalContent }]
       .map(m => ({ role: m.role as "user" | "assistant", content: m.content }))
       .slice(-10);
 
@@ -290,7 +411,34 @@ export default function AiCreatePage() {
 
         {/* Input area */}
         <div className="shrink-0 pt-4 border-t border-gray-800/60">
+          {selectedFiles.length > 0 && (
+            <div className="flex gap-2 overflow-x-auto pb-3 no-scrollbar">
+              {selectedFiles.map(file => (
+                <FilePreview key={file.id} attachment={file} onRemove={removeFile} />
+              ))}
+            </div>
+          )}
+
           <div className="flex gap-2 items-end">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              multiple
+              accept="image/*,video/*"
+              className="hidden"
+            />
+            <Button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isLoading}
+              size="icon"
+              variant="outline"
+              className="h-11 w-11 shrink-0 bg-gray-900 border-gray-700/60 hover:bg-gray-800 text-gray-400 rounded-xl"
+              aria-label="Attach file"
+            >
+              <Plus className="w-5 h-5" />
+            </Button>
+
             <textarea
               ref={textareaRef}
               rows={2}
@@ -303,7 +451,7 @@ export default function AiCreatePage() {
             />
             <Button
               onClick={sendMessage}
-              disabled={isLoading || !input.trim()}
+              disabled={isLoading || (!input.trim() && selectedFiles.filter(f => f.status === 'ready').length === 0)}
               size="icon"
               className="h-11 w-11 shrink-0 bg-violet-600 hover:bg-violet-700 text-white rounded-xl shadow-lg shadow-violet-600/20"
               aria-label="Send message"
@@ -314,7 +462,10 @@ export default function AiCreatePage() {
               }
             </Button>
           </div>
-          <div className="flex items-center justify-end mt-2">
+          <div className="flex items-center justify-between mt-2">
+            <p className="text-[10px] text-gray-600">
+              {selectedFiles.length > 0 && `${selectedFiles.length} file(s) attached`}
+            </p>
             <kbd className="text-[10px] text-gray-600 bg-gray-800/60 border border-gray-700/50 rounded px-1.5 py-0.5 font-mono whitespace-nowrap shrink-0">
               Ctrl+K to navigate
             </kbd>

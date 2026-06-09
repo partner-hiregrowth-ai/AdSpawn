@@ -102,6 +102,16 @@ If still ambiguous after reading the full message, default to OUTCOME_TRAFFIC.
 - Page ID              for OUTCOME_LEADS
 - App ID + Store URL   for OUTCOME_APP_PROMOTION
 
+== CREATIVE — PLACING IMAGES & VIDEOS ==
+You can now place images and videos. Use these fields in the ad's creative object:
+- primary_text: The main ad caption (message)
+- headline: The ad headline (name)
+- description: Supporting text below the headline
+- image_url: A direct URL to an image to use for the ad
+- video_id: A Meta Video ID if the user provides one
+- link_url: The destination website URL (default to https://example.com if not specified)
+- call_to_action_type: The button text (e.g. SHOP_NOW, LEARN_MORE, SIGN_UP, CONTACT_US)
+
 == BUDGET — CRITICAL ==
 All budget values use the account's SMALLEST currency unit:
   THB: 1 baht = 100 satang → "500 baht/day" = 50000
@@ -137,7 +147,7 @@ ALWAYS include a budget somewhere — never generate a template with no budget a
 - ad set name: "<campaign name> - Ad Set <n>"
 - ad name: "<campaign name> - Ad <n>"
 - special_ad_categories: ["NONE"]
-- creative: omit (user adds it in the Drafts editor) unless creative_id is provided
+- creative: omit (user adds it in the Drafts editor) unless creative_id or creative details are provided
 
 == WHEN TO ASK (only these cases) ==
 1. OUTCOME_LEADS and page_id is missing → ask for page_id only.
@@ -243,9 +253,16 @@ const TOOL_PARAMS: any = {
                               name: { type: 'string' },
                               creative: {
                                 type: 'object',
-                                description: 'Optional. Set creative_id if the user provides an existing Meta creative ID.',
+                                description: 'Optional. Define ad creative content.',
                                 properties: {
                                   creative_id: { type: 'string', description: 'Existing Meta creative ID' },
+                                  primary_text: { type: 'string', description: 'Main ad text / caption' },
+                                  headline: { type: 'string', description: 'Ad headline' },
+                                  description: { type: 'string', description: 'Link description (appears below headline)' },
+                                  image_url: { type: 'string', description: 'Direct URL to an image' },
+                                  image_hash: { type: 'string', description: 'Meta Image Hash if known' },
+                                  video_id: { type: 'string', description: 'Meta Video ID if known' },
+                                  link_url: { type: 'string', description: 'Destination website URL' },
                                 },
                               },
                             },
@@ -266,6 +283,64 @@ const TOOL_PARAMS: any = {
   },
   required: ['template'],
 };
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Transforms simplified AI creative fields into Meta's object_story_spec format.
+ */
+function transformAiCreative(aiCreative: any, objective: string, pageId?: string): any {
+  if (!aiCreative || Object.keys(aiCreative).length === 0) return undefined;
+  if (aiCreative.creative_id) return { creative_id: aiCreative.creative_id };
+
+  const oss: any = {};
+  if (pageId) oss.page_id = pageId;
+  
+  const link = aiCreative.link_url || 'https://example.com';
+
+  if (aiCreative.video_id) {
+    oss.video_data = {
+      video_id: aiCreative.video_id,
+      message: aiCreative.primary_text,
+    };
+  } else if (aiCreative.image_url || aiCreative.image_hash) {
+    // Determine if it's a Link ad or Photo ad based on objective
+    // Most objectives use link_data for better tracking and CTA
+    if (objective === 'OUTCOME_AWARENESS' && !aiCreative.link_url) {
+      oss.photo_data = {
+        image_hash: aiCreative.image_hash,
+        picture: aiCreative.image_url,
+        caption: aiCreative.primary_text,
+      };
+    } else {
+      oss.link_data = {
+        message: aiCreative.primary_text,
+        link: link,
+        name: aiCreative.headline,
+        description: aiCreative.description,
+        picture: aiCreative.image_url,
+        image_hash: aiCreative.image_hash,
+      };
+      if (aiCreative.call_to_action_type) {
+        oss.link_data.call_to_action = { type: aiCreative.call_to_action_type };
+      }
+    }
+  } else if (aiCreative.primary_text || aiCreative.headline) {
+    // Text-only link ad
+    oss.link_data = {
+      message: aiCreative.primary_text,
+      link: link,
+      name: aiCreative.headline,
+      description: aiCreative.description,
+    };
+    if (aiCreative.call_to_action_type) {
+      oss.link_data.call_to_action = { type: aiCreative.call_to_action_type };
+    }
+  }
+
+  return Object.keys(oss).length > 0 ? { object_story_spec: oss } : undefined;
+}
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -607,6 +682,24 @@ export class AiCampaignService {
       if (result.toolInput) {
         const template = result.toolInput.template as WideCreationTemplate;
         template.adAccountId = req.adAccountId;
+
+        // Apply creative transformations across the template tree
+        for (const campaign of template.campaigns) {
+          const objective = campaign.fields?.objective || 'OUTCOME_TRAFFIC';
+          if (campaign.adSets) {
+            for (const adSet of campaign.adSets) {
+              // Heuristic for page_id: check adset promoted_object or adset fields
+              const pageId = adSet.fields?.promoted_object?.page_id || adSet.fields?.page_id;
+              if (adSet.ads) {
+                for (const ad of adSet.ads) {
+                  if (ad.fields?.creative) {
+                    ad.fields.creative = transformAiCreative(ad.fields.creative, objective, pageId);
+                  }
+                }
+              }
+            }
+          }
+        }
 
         const validation = await WideCreationService.validateTemplate(template);
 

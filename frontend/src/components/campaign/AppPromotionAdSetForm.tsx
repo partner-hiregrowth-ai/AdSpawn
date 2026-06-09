@@ -525,7 +525,6 @@ function BrandSafetySection() {
 
 const APP_DESTINATION_LOCATIONS = [
   { value: "APP", label: "App" },
-  { value: "UNDEFINED", label: "Default" },
 ];
 
 const APP_PERFORMANCE_GOALS = [
@@ -657,7 +656,9 @@ export function AppPromotionAdSetForm({
 
   // Section 2: App
   const [conversionLocation, setConversionLocation] = useState(
-    initialValues.destination_type ?? "APP"
+    (initialValues.destination_type && initialValues.destination_type !== "UNDEFINED")
+      ? initialValues.destination_type
+      : "APP"
   );
   const [performanceGoal, setPerformanceGoal] = useState(
     initialValues.optimization_goal ?? "APP_INSTALLS"
@@ -717,7 +718,7 @@ export function AppPromotionAdSetForm({
         name: overrides.name ?? name,
         optimization_goal: effectiveGoal,
         billing_event: effectiveBilling,
-        destination_type: effectiveLoc,
+        destination_type: effectiveLoc === "UNDEFINED" ? "APP" : effectiveLoc,
       };
 
       // promoted_object: include only when both application_id and object_store_url are non-empty
@@ -759,8 +760,10 @@ export function AppPromotionAdSetForm({
     }
 
     setName(initialValues.name ?? "New App Promotion Ad Set");
-    if (initialValues.destination_type) {
+    if (initialValues.destination_type && initialValues.destination_type !== "UNDEFINED") {
       setConversionLocation(initialValues.destination_type);
+    } else {
+      setConversionLocation("APP");
     }
     if (initialValues.optimization_goal) setPerformanceGoal(initialValues.optimization_goal);
     if (initialValues.billing_event) setBillingEvent(initialValues.billing_event);
@@ -1079,7 +1082,7 @@ export function AppPromotionAdSetForm({
                     <div className="space-y-1.5">
                       <Label className="text-xs text-gray-400">Age</Label>
                       <div className="flex items-center gap-1.5">
-                        <Input type="number" defaultValue={18} min={13} max={65}
+                        <Input type="number" defaultValue={20} min={13} max={65}
                           className="w-16 h-8 bg-gray-800/30 border-gray-700/40 text-xs text-gray-200 focus:border-blue-500/50 focus:ring-0 text-center px-2" />
                         <span className="text-xs text-gray-500">–</span>
                         <Input type="number" defaultValue={65} min={13} max={65}
@@ -1131,7 +1134,7 @@ export function AppPromotionAdSetForm({
                     <div className="space-y-1.5">
                       <Label className="text-xs text-gray-400">Age range</Label>
                       <div className="flex items-center gap-1.5">
-                        <Input type="number" defaultValue={18} min={13} max={65}
+                        <Input type="number" defaultValue={20} min={13} max={65}
                           className="w-16 h-8 bg-gray-800/30 border-gray-700/40 text-xs text-gray-200 focus:border-blue-500/50 focus:ring-0 text-center px-2" />
                         <span className="text-xs text-gray-500">–</span>
                         <Input type="number" defaultValue={65} min={13} max={65}
@@ -1185,15 +1188,16 @@ export function AppPromotionAdSetForm({
           <InfoBox>
             <div className="font-semibold text-blue-300">Build trust with your audience by completing verification</div>
             <p className="text-blue-200/60 mt-0.5">Verification helps people know who is behind the ads they see.</p>
-            <button
-              type="button"
-              onClick={() => toast.info("Ad transparency verification is managed in Meta Business Manager.", { description: "Go to Business Settings → Security Centre → Start verification." })}
+            <a
+              href="https://business.facebook.com/accountquality"
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 mt-2 text-[11px] font-semibold text-blue-400 hover:text-blue-300 transition-colors"
             >
               <ShieldCheck className="w-3.5 h-3.5" />
               Start verification
               <ExternalLink className="w-3 h-3" />
-            </button>
+            </a>
           </InfoBox>
         </SectionBody>
       </SectionCard>

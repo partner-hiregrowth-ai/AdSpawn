@@ -521,11 +521,11 @@ function BrandSafetySection() {
 // ─── Traffic constants ────────────────────────────────────────────────────────
 
 const TRAFFIC_CONVERSION_LOCATIONS = [
-  { value: "Website", label: "Website", destinationType: "WEBSITE" },
-  { value: "App", label: "App", destinationType: "APP" },
-  { value: "Messenger", label: "Messenger", destinationType: "MESSENGER" },
-  { value: "WhatsApp", label: "WhatsApp", destinationType: "WHATSAPP" },
-  { value: "Instagram Direct", label: "Instagram Direct", destinationType: "INSTAGRAM_DIRECT" },
+  { value: "WEBSITE", label: "Website" },
+  { value: "APP", label: "App" },
+  { value: "MESSENGER", label: "Messenger" },
+  { value: "WHATSAPP", label: "WhatsApp" },
+  { value: "INSTAGRAM_DIRECT", label: "Instagram Direct" },
 ] as const;
 
 type TrafficConversionLocationValue = typeof TRAFFIC_CONVERSION_LOCATIONS[number]["value"];
@@ -664,15 +664,10 @@ export function TrafficAdSetForm({
 
   // Section 2: Traffic
   const [conversionLocation, setConversionLocation] = useState<TrafficConversionLocationValue>(
-    "Website"
+    (initialValues.destination_type as TrafficConversionLocationValue) ?? "WEBSITE"
   );
   const [performanceGoal, setPerformanceGoal] = useState("LINK_CLICKS");
   const [billingEvent, setBillingEvent] = useState("IMPRESSIONS");
-
-  // The destination_type is derived from the conversion location
-  const getDestinationType = (loc: TrafficConversionLocationValue): string => {
-    return TRAFFIC_CONVERSION_LOCATIONS.find((l) => l.value === loc)?.destinationType ?? "WEBSITE";
-  };
 
   // Section 3: Dynamic creative
   const [dynamicCreative, setDynamicCreative] = useState(false);
@@ -715,7 +710,7 @@ export function TrafficAdSetForm({
         name: overrides.name ?? name,
         optimization_goal: effectiveGoal,
         billing_event: effectiveBilling,
-        destination_type: getDestinationType(effectiveLoc),
+        destination_type: effectiveLoc,
       };
 
       const sd = overrides.startDate ?? startDate;
@@ -747,6 +742,9 @@ export function TrafficAdSetForm({
     }
 
     setName(initialValues.name ?? "New Traffic Ad Set");
+    if (initialValues.destination_type) {
+      setConversionLocation((initialValues.destination_type as TrafficConversionLocationValue) ?? "WEBSITE");
+    }
     if (initialValues.start_time) {
       setStartDate(initialValues.start_time.slice(0, 10));
       setStartTime(initialValues.start_time.slice(11, 16));
@@ -804,7 +802,7 @@ export function TrafficAdSetForm({
                 {TRAFFIC_CONVERSION_LOCATIONS.map((loc) => (
                   <SelectItem key={loc.value} value={loc.value} className="text-xs text-gray-300">
                     {loc.label}
-                    {loc.value === "Website" && (
+                    {loc.value === "WEBSITE" && (
                       <span className="ml-1.5 text-[10px] text-gray-600">(default)</span>
                     )}
                   </SelectItem>
@@ -816,7 +814,7 @@ export function TrafficAdSetForm({
           {/* Destination type (derived, read-only display) */}
           <FieldRow label="Destination type" hint="Automatically set based on conversion location.">
             <div className="h-9 flex items-center px-3 rounded-lg bg-gray-800/30 border border-gray-700/40 text-sm text-gray-400 select-none">
-              {getDestinationType(conversionLocation)}
+              {conversionLocation}
             </div>
           </FieldRow>
 
@@ -1123,15 +1121,16 @@ export function TrafficAdSetForm({
           <InfoBox>
             <div className="font-semibold text-blue-300">Build trust with your audience by completing verification</div>
             <p className="text-blue-200/60 mt-0.5">Verification helps people know who is behind the ads they see.</p>
-            <button
-              type="button"
-              onClick={() => toast.info("Ad transparency verification is managed in Meta Business Manager.", { description: "Go to Business Settings → Security Centre → Start verification." })}
+            <a
+              href="https://business.facebook.com/accountquality"
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 mt-2 text-[11px] font-semibold text-blue-400 hover:text-blue-300 transition-colors"
             >
               <ShieldCheck className="w-3.5 h-3.5" />
               Start verification
               <ExternalLink className="w-3 h-3" />
-            </button>
+            </a>
           </InfoBox>
         </SectionBody>
       </SectionCard>

@@ -12,6 +12,7 @@ import {
   SlidersHorizontal,
   CalendarRange,
   Info,
+  X,
 } from "lucide-react";
 
 // ─── Toggle ───────────────────────────────────────────────────────────────────
@@ -133,6 +134,22 @@ function StaticField({ value }: { value: string }) {
   );
 }
 
+// ─── Info Box ─────────────────────────────────────────────────────────────────
+
+function InfoBox({ children, onDismiss }: { children: React.ReactNode; onDismiss?: () => void }) {
+  return (
+    <div className="flex gap-3 p-3.5 rounded-lg bg-blue-500/5 border border-l-2 border-blue-500/20 border-l-blue-500/60">
+      <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
+      <div className="text-xs text-blue-200/80 space-y-1 flex-1">{children}</div>
+      {onDismiss && (
+        <button type="button" onClick={onDismiss} className="text-blue-400/60 hover:text-blue-300 transition-colors shrink-0">
+          <X className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ─── Currency Input ───────────────────────────────────────────────────────────
 
 function CurrencyInput({
@@ -248,7 +265,7 @@ const INCREASE_TYPES = [
 
 const BUYING_TYPES = [
   { value: "AUCTION", label: "Auction" },
-  { value: "RESERVED", label: "Reach & Frequency" },
+  { value: "RESERVED", label: "Reservation" },
 ];
 
 const BUYING_TYPE_LABELS: Record<string, string> = Object.fromEntries(
@@ -486,6 +503,11 @@ export function EngagementCampaignForm({ initialValues, onChange }: EngagementCa
               <StaticField value="Engagement" />
             </FieldRow>
           </div>
+          {buyingType === "RESERVED" && (
+            <InfoBox>
+              Reservation campaigns use reach &amp; frequency buying. Budget and scheduling are confirmed at booking time.
+            </InfoBox>
+          )}
         </SectionBody>
       </SectionCard>
 

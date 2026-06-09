@@ -11,12 +11,10 @@ import {
   ChevronRight,
   Info,
   AlertTriangle,
-  Search,
   X,
   MapPin,
   ShieldCheck,
   Settings2,
-  Plus,
   ExternalLink,
 } from "lucide-react";
 
@@ -159,102 +157,6 @@ function InfoBox({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ─── Searchable dropdown ──────────────────────────────────────────────────────
-
-function SearchableDropdown({
-  placeholder,
-  options,
-  value,
-  onChange,
-  footer,
-  groupLabel,
-}: {
-  placeholder: string;
-  options: string[];
-  value: string;
-  onChange: (v: string) => void;
-  footer?: React.ReactNode;
-  groupLabel?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const filtered = options.filter((o) => o.toLowerCase().includes(query.toLowerCase()));
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between h-9 px-3 rounded-lg bg-gray-800/30 border border-gray-700/40 text-sm text-gray-200 hover:border-gray-600/60 transition-colors"
-      >
-        <span className={value ? "text-gray-200" : "text-gray-600"}>{value || placeholder}</span>
-        <ChevronDown className="w-4 h-4 text-gray-500 shrink-0" />
-      </button>
-
-      {open && (
-        <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-gray-900 border border-gray-700/60 rounded-lg shadow-xl overflow-hidden">
-          <div className="p-2 border-b border-gray-800/60">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
-              <input
-                autoFocus
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search..."
-                className="w-full pl-8 pr-3 h-8 bg-gray-800/50 border border-gray-700/40 rounded-md text-xs text-gray-200 placeholder-gray-600 outline-none focus:border-blue-500/50"
-              />
-            </div>
-          </div>
-          <div className="max-h-52 overflow-y-auto">
-            {groupLabel && filtered.length > 0 && (
-              <div className="px-3 py-1.5 text-[10px] font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-800/40 bg-gray-900/60">
-                {groupLabel}
-              </div>
-            )}
-            {filtered.length === 0 ? (
-              <div className="px-3 py-4 text-center text-xs text-gray-600">No results</div>
-            ) : (
-              filtered.map((opt) => (
-                <button
-                  key={opt}
-                  type="button"
-                  onClick={() => {
-                    onChange(opt);
-                    setOpen(false);
-                    setQuery("");
-                  }}
-                  className={cn(
-                    "w-full text-left px-3 py-2 text-xs transition-colors",
-                    opt === value
-                      ? "bg-blue-500/10 text-blue-300"
-                      : "text-gray-300 hover:bg-gray-800/60"
-                  )}
-                >
-                  <div className="flex items-center gap-2">
-                    {groupLabel && <div className="w-1.5 h-1.5 rounded-full bg-gray-500 shrink-0" />}
-                    {opt}
-                  </div>
-                </button>
-              ))
-            )}
-          </div>
-          {footer && <div className="border-t border-gray-800/60">{footer}</div>}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ─── Collapsible section ──────────────────────────────────────────────────────
 
 function Collapsible({
@@ -376,71 +278,18 @@ function PlacementModal({
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CONVERSION_LOCATIONS = {
-  Multiple: [
-    "Website and app",
-    "Website and in-store",
-    "Website/app/in-store",
-    "Website and calls",
-  ],
-  Single: ["Website", "App", "Message destinations", "Calls"],
-};
-
 const PERFORMANCE_GOALS = {
-  "Conversion goals": [
-    { value: "OFFSITE_CONVERSIONS", label: "Maximize number of conversions", recommended: true },
-    { value: "VALUE", label: "Maximize value of conversions" },
-  ],
-  "Other goals": [
-    { value: "LANDING_PAGE_VIEWS", label: "Maximize number of landing page views" },
-    { value: "LINK_CLICKS", label: "Maximize number of link clicks" },
-    { value: "REACH", label: "Maximize daily unique reach" },
+  "Awareness goals": [
+    { value: "REACH", label: "Maximize daily unique reach", recommended: true },
     { value: "IMPRESSIONS", label: "Maximize number of impressions" },
+    { value: "AD_RECALL_LIFT", label: "Maximize ad recall lift" },
+    { value: "THRUPLAY", label: "Maximize ThruPlay views" },
   ],
 };
 
 const PERFORMANCE_GOAL_LABELS: Record<string, string> = Object.fromEntries(
   Object.values(PERFORMANCE_GOALS).flat().map((g) => [g.value, g.label])
 );
-
-const CONVERSION_EVENTS = [
-  "Add payment info",
-  "Add to cart",
-  "Add to wishlist",
-  "Complete registration",
-  "Donate",
-  "Initiate checkout",
-  "Purchase",
-  "Search",
-  "Start trial",
-  "Subscribe",
-  "View content",
-  "Contact",
-  "Customize product",
-  "Find location",
-  "Lead",
-  "Schedule",
-  "Submit application",
-];
-
-const ATTRIBUTION_MODELS = [
-  {
-    value: "standard",
-    label: "Standard",
-    description: "Attribute conversions to ads using Meta's standard attribution model.",
-  },
-  {
-    value: "incremental",
-    label: "Incremental",
-    description: "Attribute only the conversions that would not have happened without the ad.",
-  },
-];
-
-const DATASETS = [
-  { id: "1163649662554293", label: "Dev Pixel" },
-  { id: "2274760773665404", label: "Prod Pixel" },
-  { id: "3385871884776515", label: "Mobile App SDK" },
-];
 
 // ─── Inventory filter radio options ──────────────────────────────────────────
 
@@ -463,106 +312,6 @@ const INVENTORY_OPTIONS = [
       "Exclude additional sensitive content. This lowers your reach and may increase costs.",
   },
 ];
-
-// ─── Dataset Dropdown ─────────────────────────────────────────────────────────
-
-type Dataset = { id: string; label: string };
-
-function DatasetDropdown({
-  selected,
-  onSelect,
-}: {
-  selected: Dataset;
-  onSelect: (d: Dataset) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-        setQuery("");
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const filtered = DATASETS.filter(
-    (d) =>
-      d.label.toLowerCase().includes(query.toLowerCase()) ||
-      d.id.includes(query)
-  );
-
-  return (
-    <FieldRow label="Dataset">
-      <div ref={ref} className="relative">
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          className="w-full h-9 flex items-center justify-between px-3 rounded-lg bg-gray-800/30 border border-gray-700/40 hover:border-gray-600/60 transition-colors"
-        >
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="w-2 h-2 rounded-full bg-gray-500 shrink-0" />
-            <span className="text-sm text-gray-200 truncate">{selected.label}</span>
-            <span className="text-[11px] text-gray-600 shrink-0">Dataset ID: {selected.id}</span>
-          </div>
-          <ChevronDown className="w-4 h-4 text-gray-500 shrink-0 ml-2" />
-        </button>
-
-        {open && (
-          <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-gray-900 border border-gray-700/60 rounded-lg shadow-xl overflow-hidden">
-            <div className="p-2 border-b border-gray-800/60">
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
-                <input
-                  autoFocus
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search datasets..."
-                  className="w-full pl-8 pr-3 h-8 bg-gray-800/50 border border-gray-700/40 rounded-md text-xs text-gray-200 placeholder-gray-600 outline-none focus:border-blue-500/50"
-                />
-              </div>
-            </div>
-            <div className="max-h-48 overflow-y-auto">
-              {filtered.length === 0 ? (
-                <div className="px-3 py-4 text-center text-xs text-gray-600">No datasets found</div>
-              ) : (
-                filtered.map((d) => (
-                  <button
-                    key={d.id}
-                    type="button"
-                    onClick={() => {
-                      onSelect(d);
-                      setOpen(false);
-                      setQuery("");
-                    }}
-                    className={cn(
-                      "w-full text-left px-3 py-2.5 transition-colors",
-                      d.id === selected.id
-                        ? "bg-blue-500/10"
-                        : "hover:bg-gray-800/60"
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-gray-500 shrink-0" />
-                      <span className={cn("text-xs", d.id === selected.id ? "text-blue-300 font-medium" : "text-gray-300")}>
-                        {d.label}
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-gray-600 pl-4 mt-0.5">Dataset ID: {d.id}</div>
-                  </button>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-    </FieldRow>
-  );
-}
 
 function InventoryFilterSubsection({
   title,
@@ -805,12 +554,7 @@ export function AwarenessAdSetForm({
   onChange,
 }: AwarenessAdSetFormProps) {
   const [name, setName] = useState<string>(initialValues.name ?? "New Awareness Ad Set");
-  const [conversionLocation, setConversionLocation] = useState("Website");
-  const [performanceGoal, setPerformanceGoal] = useState("OFFSITE_CONVERSIONS");
-  const [conversionEvent, setConversionEvent] = useState("");
-  const [selectedDataset, setSelectedDataset] = useState(DATASETS[0]);
-  const [attributionModel, setAttributionModel] = useState("standard");
-
+  const [performanceGoal, setPerformanceGoal] = useState(initialValues.optimization_goal ?? "REACH");
   const [dynamicCreative, setDynamicCreative] = useState(false);
 
   const [hasEndDate, setHasEndDate] = useState(!!(initialValues.end_time));
@@ -841,7 +585,11 @@ export function AwarenessAdSetForm({
         ...initialValues,
         name: overrides.name ?? name,
         optimization_goal: overrides.performanceGoal ?? performanceGoal,
+        billing_event: "IMPRESSIONS",
       };
+
+      // OUTCOME_AWARENESS only supports UNDEFINED destination_type — omit from payload
+      delete values.destination_type;
 
       const sd = overrides.startDate ?? startDate;
       const st = overrides.startTime ?? startTime;
@@ -866,6 +614,7 @@ export function AwarenessAdSetForm({
     if (initialValues === prevInitialRef.current) return;
     prevInitialRef.current = initialValues;
     setName(initialValues.name ?? "New Awareness Ad Set");
+    if (initialValues.optimization_goal) setPerformanceGoal(initialValues.optimization_goal);
     if (initialValues.start_time) {
       setStartDate(initialValues.start_time.slice(0, 10));
       setStartTime(initialValues.start_time.slice(11, 16));
@@ -899,43 +648,10 @@ export function AwarenessAdSetForm({
         </SectionBody>
       </SectionCard>
 
-      {/* ── 2. Conversion ── */}
+      {/* ── 2. Performance ── */}
       <SectionCard>
-        <SectionHeader title="Conversion" />
+        <SectionHeader title="Performance" />
         <SectionBody>
-          {/* Conversion location */}
-          <FieldRow label="Conversion location">
-            <Select
-              value={conversionLocation}
-              onValueChange={(v) => { if (v) setConversionLocation(v); }}
-            >
-              <SelectTrigger className="w-full bg-gray-800/30 border-gray-700/40 text-sm text-gray-200 focus:border-blue-500/50">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-gray-900 border-gray-800">
-                {Object.entries(CONVERSION_LOCATIONS).map(([group, items]) => (
-                  <div key={group}>
-                    <div className="px-2 py-1.5 text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
-                      {group}
-                    </div>
-                    {items.map((item) => (
-                      <SelectItem
-                        key={item}
-                        value={item}
-                        className="text-xs text-gray-300 pl-4"
-                      >
-                        {item}
-                        {item === "Website" && (
-                          <span className="ml-1.5 text-[10px] text-gray-600">(default)</span>
-                        )}
-                      </SelectItem>
-                    ))}
-                  </div>
-                ))}
-              </SelectContent>
-            </Select>
-          </FieldRow>
-
           {/* Performance goal */}
           <FieldRow label="Performance goal">
             <Select
@@ -965,93 +681,11 @@ export function AwarenessAdSetForm({
             </Select>
           </FieldRow>
 
-          {/* Dataset */}
-          <DatasetDropdown selected={selectedDataset} onSelect={setSelectedDataset} />
-
-          {/* Conversion event */}
-          <FieldRow label="Conversion event">
-            <SearchableDropdown
-              placeholder="Select conversion event"
-              options={CONVERSION_EVENTS}
-              value={conversionEvent}
-              onChange={setConversionEvent}
-              groupLabel="Inactive events"
-              footer={
-                <button
-                  type="button"
-                  className="w-full flex items-center gap-2 px-3 py-2.5 text-xs text-blue-400 hover:bg-gray-800/40 transition-colors"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Create custom conversion
-                </button>
-              }
-            />
-          </FieldRow>
-
-          {/* Warning: only shown when no event selected */}
-          {!conversionEvent && <WarningBox>
-            <div className="font-semibold text-amber-300">Set up conversion event</div>
-            <div>The dataset selected doesn&apos;t have any conversion events set up</div>
-            <button
-              type="button"
-              onClick={() =>
-                toast.info("Conversion events are configured in Meta Events Manager.", {
-                  description: `Go to Events Manager → select "${selectedDataset.label}" → Set up → then add the events you want to track.`,
-                })
-              }
-              className="inline-flex items-center gap-1.5 mt-1 text-[11px] font-semibold text-amber-400 hover:text-amber-300 transition-colors"
-            >
-              Set up conversion event
-              <ExternalLink className="w-3 h-3" />
-            </button>
-          </WarningBox>}
-
-          {/* Cost per result goal & Value rules */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs text-gray-400">Cost per result goal</Label>
-              <StaticValue value="None" muted />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-gray-400">Value rules</Label>
-              <StaticValue value="Enabled: No" muted />
-            </div>
+          {/* Cost per result goal */}
+          <div className="space-y-1">
+            <Label className="text-xs text-gray-400">Cost per result goal</Label>
+            <StaticValue value="None" muted />
           </div>
-
-          {/* Attribution model */}
-          <FieldRow label="Attribution model">
-            <div className="space-y-2">
-              {ATTRIBUTION_MODELS.map((m) => (
-                <label
-                  key={m.value}
-                  className={cn(
-                    "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all",
-                    attributionModel === m.value
-                      ? "bg-blue-500/8 border-blue-500/35"
-                      : "bg-gray-800/20 border-gray-700/30 hover:border-gray-600/50"
-                  )}
-                >
-                  <input
-                    type="radio"
-                    name="attribution_model"
-                    value={m.value}
-                    checked={attributionModel === m.value}
-                    onChange={() => setAttributionModel(m.value)}
-                    className="mt-0.5 w-3.5 h-3.5 accent-blue-500"
-                  />
-                  <div className="space-y-0.5">
-                    <div className={cn("text-xs font-semibold", attributionModel === m.value ? "text-blue-300" : "text-gray-300")}>
-                      {m.label}
-                      {m.value === "standard" && (
-                        <span className="ml-1.5 text-[10px] text-gray-600">(default)</span>
-                      )}
-                    </div>
-                    <div className="text-[11px] text-gray-500 leading-relaxed">{m.description}</div>
-                  </div>
-                </label>
-              ))}
-            </div>
-          </FieldRow>
         </SectionBody>
       </SectionCard>
 
@@ -1194,7 +828,7 @@ export function AwarenessAdSetForm({
                     <div className="space-y-1.5">
                       <Label className="text-xs text-gray-400">Age</Label>
                       <div className="flex items-center gap-1.5">
-                        <Input type="number" defaultValue={18} min={13} max={65}
+                        <Input type="number" defaultValue={20} min={13} max={65}
                           className="w-16 h-8 bg-gray-800/30 border-gray-700/40 text-xs text-gray-200 focus:border-blue-500/50 focus:ring-0 text-center px-2" />
                         <span className="text-xs text-gray-500">–</span>
                         <Input type="number" defaultValue={65} min={13} max={65}
@@ -1246,7 +880,7 @@ export function AwarenessAdSetForm({
                     <div className="space-y-1.5">
                       <Label className="text-xs text-gray-400">Age range</Label>
                       <div className="flex items-center gap-1.5">
-                        <Input type="number" defaultValue={18} min={13} max={65}
+                        <Input type="number" defaultValue={20} min={13} max={65}
                           className="w-16 h-8 bg-gray-800/30 border-gray-700/40 text-xs text-gray-200 focus:border-blue-500/50 focus:ring-0 text-center px-2" />
                         <span className="text-xs text-gray-500">–</span>
                         <Input type="number" defaultValue={65} min={13} max={65}
@@ -1300,15 +934,16 @@ export function AwarenessAdSetForm({
           <InfoBox>
             <div className="font-semibold text-blue-300">Build trust with your audience by completing verification</div>
             <p className="text-blue-200/60 mt-0.5">Verification helps people know who is behind the ads they see.</p>
-            <button
-              type="button"
-              onClick={() => toast.info("Ad transparency verification is managed in Meta Business Manager.", { description: "Go to Business Settings → Security Centre → Start verification." })}
+            <a
+              href="https://business.facebook.com/accountquality"
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 mt-2 text-[11px] font-semibold text-blue-400 hover:text-blue-300 transition-colors"
             >
               <ShieldCheck className="w-3.5 h-3.5" />
               Start verification
               <ExternalLink className="w-3 h-3" />
-            </button>
+            </a>
           </InfoBox>
         </SectionBody>
       </SectionCard>

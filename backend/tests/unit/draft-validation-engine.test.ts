@@ -83,11 +83,11 @@ describe('DraftValidationEngine.validateCampaign', () => {
     expect(errors.some(e => e.field === 'bid_strategy')).toBe(false);
   });
 
-  it('does not warn when bid cap strategy has bid_constraints', async () => {
+  it('warns when bid cap strategy has no bid_amount', async () => {
     const errors = await DraftValidationEngine.validateCampaign(
-      makeCampaign({ data: { objective: 'OUTCOME_TRAFFIC', bid_strategy: 'COST_CAP', bid_constraints: {} } })
+      makeCampaign({ data: { objective: 'OUTCOME_TRAFFIC', bid_strategy: 'COST_CAP' } })
     );
-    expect(errors.some(e => e.field === 'bid_strategy')).toBe(false);
+    expect(errors.some(e => e.field === 'bid_strategy')).toBe(true);
   });
 
   it('warns about immutable field changes on published campaigns', async () => {
