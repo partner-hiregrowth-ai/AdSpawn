@@ -38,7 +38,7 @@ function LoginContent() {
     }
   }, [searchParams]);
 
-  const handleFacebookLogin = () => {
+  const handleFacebookLogin = async () => {
     const appId = process.env.NEXT_PUBLIC_FB_APP_ID;
     if (!appId || appId === "your_facebook_app_id") {
       toast.error("Facebook App ID is not configured. Please check your .env.local file.");
@@ -49,6 +49,8 @@ function LoginContent() {
       return;
     }
     setIsLoggingIn(true);
+    const { waitForFBInit } = await import("@/components/FacebookSDK");
+    await waitForFBInit();
     window.FB.login(
       (response: any) => {
         if (response.authResponse) {
