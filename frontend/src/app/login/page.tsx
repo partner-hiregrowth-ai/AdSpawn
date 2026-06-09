@@ -51,9 +51,13 @@ function LoginContent() {
     setIsLoggingIn(true);
     try {
       await window.fbReady;
-    } catch {
+    } catch (e: any) {
       setIsLoggingIn(false);
-      toast.error("Facebook SDK failed to initialize.");
+      if (e?.message === "FB_APP_ID_MISSING") {
+        toast.error("Facebook App ID is not configured in this deployment. Check your environment variables.");
+      } else {
+        toast.error("Facebook SDK failed to initialize.");
+      }
       return;
     }
     window.FB.login(
