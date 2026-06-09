@@ -48,6 +48,10 @@ function LoginContent() {
       toast.error("Facebook SDK not loaded. This is often caused by AdBlockers or a slow connection.");
       return;
     }
+    if (!window.FB_INITIALIZED) {
+      toast.error("Facebook SDK is still initializing. Please wait a second and try again.");
+      return;
+    }
     setIsLoggingIn(true);
     window.FB.login(
       (response: any) => {
