@@ -6,9 +6,9 @@ declare global {
   interface Window {
     fbAsyncInit: () => void;
     FB: any;
-    fbReady: Promise<void>;
-    _fbReadyResolve: (() => void) | undefined;
-    _fbReadyReject: ((e: Error) => void) | undefined;
+    fbReady?: Promise<void>;
+    _fbReadyResolve?: () => void;
+    _fbReadyReject?: (e: Error) => void;
   }
 }
 
