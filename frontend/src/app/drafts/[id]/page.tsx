@@ -31,6 +31,12 @@ import { EngagementAdForm } from "@/components/campaign/EngagementAdForm";
 import { LeadsCampaignForm } from "@/components/campaign/LeadsCampaignForm";
 import { LeadsAdSetForm } from "@/components/campaign/LeadsAdSetForm";
 import { LeadsAdForm } from "@/components/campaign/LeadsAdForm";
+import { AppPromotionCampaignForm } from "@/components/campaign/AppPromotionCampaignForm";
+import { AppPromotionAdSetForm } from "@/components/campaign/AppPromotionAdSetForm";
+import { AppPromotionAdForm } from "@/components/campaign/AppPromotionAdForm";
+import { SalesCampaignForm } from "@/components/campaign/SalesCampaignForm";
+import { SalesAdSetForm } from "@/components/campaign/SalesAdSetForm";
+import { SalesAdForm } from "@/components/campaign/SalesAdForm";
 import { OBJECTIVE_LABELS } from "@/lib/meta-schema";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -912,6 +918,52 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
                       />
                     ) : selectedNode?.type === "AD" && campaignObjective === "OUTCOME_LEADS" ? (
                       <LeadsAdForm
+                        key={selectedNode?.id}
+                        initialValues={editData.data || {}}
+                        onChange={(values) => commitEdit(values)}
+                      />
+                    ) : selectedNode?.type === "CAMPAIGN" && campaignObjective === "OUTCOME_APP_PROMOTION" ? (
+                      <AppPromotionCampaignForm
+                        key={selectedNode?.id}
+                        initialValues={editData.data || {}}
+                        onChange={(values) => commitEdit(values)}
+                      />
+                    ) : selectedNode?.type === "ADSET" && campaignObjective === "OUTCOME_APP_PROMOTION" ? (
+                      <AppPromotionAdSetForm
+                        key={selectedNode?.id}
+                        initialValues={editData.data || {}}
+                        campaignBudget={
+                          isCBO
+                            ? (draft?.data?.daily_budget ?? draft?.data?.lifetime_budget)
+                            : undefined
+                        }
+                        onChange={(values) => commitEdit(values)}
+                      />
+                    ) : selectedNode?.type === "AD" && campaignObjective === "OUTCOME_APP_PROMOTION" ? (
+                      <AppPromotionAdForm
+                        key={selectedNode?.id}
+                        initialValues={editData.data || {}}
+                        onChange={(values) => commitEdit(values)}
+                      />
+                    ) : selectedNode?.type === "CAMPAIGN" && campaignObjective === "OUTCOME_SALES" ? (
+                      <SalesCampaignForm
+                        key={selectedNode?.id}
+                        initialValues={editData.data || {}}
+                        onChange={(values) => commitEdit(values)}
+                      />
+                    ) : selectedNode?.type === "ADSET" && campaignObjective === "OUTCOME_SALES" ? (
+                      <SalesAdSetForm
+                        key={selectedNode?.id}
+                        initialValues={editData.data || {}}
+                        campaignBudget={
+                          isCBO
+                            ? (draft?.data?.daily_budget ?? draft?.data?.lifetime_budget)
+                            : undefined
+                        }
+                        onChange={(values) => commitEdit(values)}
+                      />
+                    ) : selectedNode?.type === "AD" && campaignObjective === "OUTCOME_SALES" ? (
+                      <SalesAdForm
                         key={selectedNode?.id}
                         initialValues={editData.data || {}}
                         onChange={(values) => commitEdit(values)}
