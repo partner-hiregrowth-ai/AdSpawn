@@ -6,40 +6,32 @@ declare global {
   interface Window {
     fbAsyncInit: () => void;
     FB: any;
+    _fbInitDone?: boolean;
   }
 }
 
-export const FacebookSDK = () => {
-  const initFacebookSDK = () => {
-    if (window.FB) {
-      window.FB.init({
-        appId: process.env.NEXT_PUBLIC_FB_APP_ID,
-        cookie: true,
-        xfbml: true,
-        version: "v21.0",
-      });
-    }
-  };
+function initFB() {
+  if (window._fbInitDone) return; // prevent double-init
+  window._fbInitDone = true;
+  window.FB.init({
+    appId: process.env.NEXT_PUBLIC_FB_APP_ID,
+    cookie: true,
+    xfbml: true,
+    version: "v21.0",
+  });
+}
 
-  // Set up the global init function that the SDK calls
-  if (typeof window !== "undefined") {
-    window.fbAsyncInit = initFacebookSDK;
-  }
+if (typeof window !== "undefined") {
+  window.fbAsyncInit = initFB;
+}
 
-  return (
-    <Script
-      async
-      defer
-      crossOrigin="anonymous"
-      src="https://connect.facebook.net/en_US/sdk.js"
-      strategy="afterInteractive"
-      onLoad={() => {
-        // If the script loads after fbAsyncInit was already defined,
-        // it should call it automatically, but we can also manually call it if needed.
-        if (window.FB && !window.FB._initialized) {
-          initFacebookSDK();
-        }
-      }}
-    />
-  );
-};
+export const FacebookSDK = () => (
+  <Script
+    src="https://connect.facebook.net/en_US/sdk.js"
+    strategy="afterInteractive"
+    onLoad={() => {
+      // Fallback: SDK loaded but fbAsyncInit wasn't called (e.g. cached script race)
+      if (window.FB && !window._fbInitDone) initFB();
+    }}
+  />
+);
