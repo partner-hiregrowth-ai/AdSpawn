@@ -12,8 +12,6 @@ declare global {
   }
 }
 
-// Runs synchronously during render — guaranteed to execute before
-// Next.js injects the SDK script tag (strategy="afterInteractive").
 function ensureFbReadyPromise() {
   if (typeof window === "undefined") return;
   if (window.fbReady) return;
@@ -39,21 +37,12 @@ function ensureFbReadyPromise() {
 }
 
 export const FacebookSDK = () => {
-  // Called synchronously on every render — sets fbAsyncInit before
-  // the script tag is injected so the SDK always finds it.
   ensureFbReadyPromise();
 
   return (
     <Script
       src="https://connect.facebook.net/en_US/sdk.js"
       strategy="afterInteractive"
-      onLoad={() => {
-        // Fallback: SDK loaded but fbAsyncInit wasn't called
-        // (e.g. SDK was already cached and ran before our render)
-        if (window.FB && window._fbReadyResolve) {
-          window.fbAsyncInit();
-        }
-      }}
     />
   );
 };
