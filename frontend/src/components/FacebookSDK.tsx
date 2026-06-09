@@ -6,18 +6,21 @@ declare global {
   interface Window {
     fbAsyncInit: () => void;
     FB: any;
+    FB_INITIALIZED: boolean;
   }
 }
 
 export const FacebookSDK = () => {
   const initFacebookSDK = () => {
-    if (window.FB) {
+    if (window.FB && !window.FB_INITIALIZED) {
       window.FB.init({
         appId: process.env.NEXT_PUBLIC_FB_APP_ID,
         cookie: true,
         xfbml: true,
         version: "v21.0",
       });
+      window.FB_INITIALIZED = true;
+      console.log("[FacebookSDK] Initialized");
     }
   };
 
@@ -36,7 +39,7 @@ export const FacebookSDK = () => {
       onLoad={() => {
         // If the script loads after fbAsyncInit was already defined, 
         // it should call it automatically, but we can also manually call it if needed.
-        if (window.FB && !window.FB._initialized) {
+        if (window.FB && !window.FB_INITIALIZED) {
           initFacebookSDK();
         }
       }}
