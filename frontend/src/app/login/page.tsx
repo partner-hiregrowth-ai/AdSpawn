@@ -38,21 +38,24 @@ function LoginContent() {
     }
   }, [searchParams]);
 
-  const handleFacebookLogin = () => {
+  const handleFacebookLogin = async () => {
     const appId = process.env.NEXT_PUBLIC_FB_APP_ID;
     if (!appId || appId === "your_facebook_app_id") {
       toast.error("Facebook App ID is not configured. Please check your .env.local file.");
       return;
     }
-    if (!window.FB) {
+    if (!window.FB && !window.fbReady) {
       toast.error("Facebook SDK not loaded. This is often caused by AdBlockers or a slow connection.");
       return;
     }
-    if (!window.FB_INITIALIZED) {
-      toast.error("Facebook SDK is still initializing. Please wait a second and try again.");
+    setIsLoggingIn(true);
+    try {
+      await window.fbReady;
+    } catch {
+      setIsLoggingIn(false);
+      toast.error("Facebook SDK failed to initialize.");
       return;
     }
-    setIsLoggingIn(true);
     window.FB.login(
       (response: any) => {
         if (response.authResponse) {
