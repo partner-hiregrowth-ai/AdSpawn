@@ -59,7 +59,7 @@ export default function PrivacyPage() {
 
           <section className="pt-8 border-t border-gray-800">
             <p className="text-sm text-gray-500 italic">
-              This is a demonstration privacy policy for the AdSpawn developer tool.
+              See also our <Link href="/terms" className="text-blue-400 hover:text-blue-300 not-italic">Terms of Service</Link>.
             </p>
           </section>
         </div>

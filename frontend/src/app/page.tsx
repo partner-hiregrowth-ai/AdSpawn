@@ -113,8 +113,7 @@ export default function RootPage() {
         <p>© 2026 AdSpawn. All rights reserved.</p>
         <div className="mt-4 flex justify-center gap-6">
           <Link href="/privacy" className="hover:text-gray-400 transition-colors">Privacy Policy</Link>
-          <a href="#" className="hover:text-gray-400 transition-colors">Terms of Service</a>
-          <a href="#" className="hover:text-gray-400 transition-colors">Documentation</a>
+          <Link href="/terms" className="hover:text-gray-400 transition-colors">Terms of Service</Link>
         </div>
       </footer>
     </div>
