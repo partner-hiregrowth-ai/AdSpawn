@@ -60,24 +60,34 @@ function LoginContent() {
   }, []);
 
   const handleFacebookLogin = () => {
-    const appId = process.env.NEXT_PUBLIC_FB_APP_ID;
-    console.log("[FB] handleFacebookLogin — __fbReady:", !!window.__fbReady, "window.FB:", !!window.FB);
+    const rawAppId = process.env.NEXT_PUBLIC_FB_APP_ID;
+    const appId = rawAppId?.replace(/^["']|["']$/g, "")?.trim();
+
+    console.log("[FB] handleFacebookLogin — __fbReady:", !!window.__fbReady, "window.FB:", !!window.FB, "appId:", appId);
+    
     if (!appId || appId === "your_facebook_app_id") {
-      toast.error("Facebook App ID is not configured. Please check your .env.local file.");
+      toast.error("Facebook App ID is not configured correctly. Please check your environment variables.");
       return;
     }
     if (!window.FB) {
       toast.error("Facebook SDK not loaded. Please disable any ad-blockers and refresh.");
       return;
     }
+
     // The SDK replaces window.FB after fbAsyncInit (async module load completes).
-    // Re-init the current object if it changed since the last FB.init() call.
+    // Re-init if the FB object changed or we aren't marked as ready.
     if (window.FB !== window.__fbLastRef || !window.__fbReady) {
-      console.log("[FB] re-init before login — FB object changed:", window.FB !== window.__fbLastRef);
-      window.FB.init({ appId, cookie: true, xfbml: false, version: "v21.0" });
+      console.log("[FB] re-init before login — FB object changed:", window.FB !== window.__fbLastRef, "ready:", window.__fbReady);
+      window.FB.init({ 
+        appId, 
+        cookie: true, 
+        xfbml: false, 
+        version: "v21.0" 
+      });
       window.__fbLastRef = window.FB;
       window.__fbReady = true;
     }
+
     console.log("[FB] calling FB.login()");
     setIsLoggingIn(true);
     try {
