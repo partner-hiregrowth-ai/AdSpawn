@@ -70,6 +70,14 @@ function LoginContent() {
       toast.error("Facebook SDK not loaded. Please disable any ad-blockers and refresh.");
       return;
     }
+    // The SDK replaces window.FB after fbAsyncInit (async module load completes).
+    // Re-init the current object if it changed since the last FB.init() call.
+    if (window.FB !== window.__fbLastRef || !window.__fbReady) {
+      console.log("[FB] re-init before login — FB object changed:", window.FB !== window.__fbLastRef);
+      window.FB.init({ appId, cookie: true, xfbml: false, version: "v21.0" });
+      window.__fbLastRef = window.FB;
+      window.__fbReady = true;
+    }
     console.log("[FB] calling FB.login()");
     setIsLoggingIn(true);
     try {
