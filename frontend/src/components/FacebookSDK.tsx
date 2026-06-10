@@ -6,7 +6,6 @@ declare global {
   interface Window {
     fbAsyncInit: () => void;
     FB: any;
-    __fbReady: boolean;
   }
 }
 
@@ -19,8 +18,6 @@ export const FacebookSDK = () => {
         xfbml: true,
         version: "v21.0",
       });
-      window.__fbReady = true;
-      window.dispatchEvent(new Event("fb:ready"));
     }
   };
 
