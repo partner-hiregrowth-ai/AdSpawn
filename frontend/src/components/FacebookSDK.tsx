@@ -12,6 +12,7 @@ declare global {
 
 export const FacebookSDK = () => {
   const initFacebookSDK = () => {
+    console.log("[FB] initFacebookSDK called — window.FB:", !!window.FB, "__fbReady:", !!window.__fbReady);
     if (window.FB && !window.__fbReady) {
       window.FB.init({
         appId: process.env.NEXT_PUBLIC_FB_APP_ID,
@@ -20,10 +21,14 @@ export const FacebookSDK = () => {
         version: "v21.0",
       });
       window.__fbReady = true;
+      console.log("[FB] FB.init() done — __fbReady set");
+    } else {
+      console.log("[FB] initFacebookSDK skipped — FB exists:", !!window.FB, "already ready:", !!window.__fbReady);
     }
   };
 
   if (typeof window !== "undefined") {
+    console.log("[FB] FacebookSDK render — setting window.fbAsyncInit");
     window.fbAsyncInit = initFacebookSDK;
   }
 
@@ -34,7 +39,10 @@ export const FacebookSDK = () => {
       crossOrigin="anonymous"
       src="https://connect.facebook.net/en_US/sdk.js"
       strategy="afterInteractive"
-      onReady={initFacebookSDK}
+      onReady={() => {
+        console.log("[FB] onReady fired — window.FB:", !!window.FB, "__fbReady:", !!window.__fbReady);
+        initFacebookSDK();
+      }}
     />
   );
 };

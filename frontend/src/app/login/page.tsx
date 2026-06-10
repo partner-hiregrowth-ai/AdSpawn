@@ -40,14 +40,18 @@ function LoginContent() {
   }, [searchParams]);
 
   useEffect(() => {
+    console.log("[FB] poll started");
     let timer: ReturnType<typeof setTimeout>;
     const deadline = Date.now() + 10_000;
     const poll = () => {
+      console.log("[FB] poll tick — window.FB:", !!window.FB, "__fbReady:", !!window.__fbReady);
       if (window.FB) {
+        console.log("[FB] window.FB found — enabling button");
         setFbReady(true);
       } else if (Date.now() < deadline) {
         timer = setTimeout(poll, 100);
       } else {
+        console.log("[FB] poll timed out — SDK never loaded");
         toast.error("Facebook SDK failed to load. Disable any ad-blockers and refresh.");
       }
     };
@@ -57,6 +61,7 @@ function LoginContent() {
 
   const handleFacebookLogin = () => {
     const appId = process.env.NEXT_PUBLIC_FB_APP_ID;
+    console.log("[FB] handleFacebookLogin — appId:", appId, "window.FB:", !!window.FB, "__fbReady:", !!window.__fbReady);
     if (!appId || appId === "your_facebook_app_id") {
       toast.error("Facebook App ID is not configured. Please check your .env.local file.");
       return;
@@ -66,9 +71,11 @@ function LoginContent() {
       return;
     }
     if (!window.__fbReady) {
+      console.log("[FB] __fbReady not set at click time — calling FB.init() now");
       window.FB.init({ appId, cookie: true, xfbml: true, version: "v21.0" });
       window.__fbReady = true;
     }
+    console.log("[FB] calling FB.login()");
     setIsLoggingIn(true);
     window.FB.login(
       (response: any) => {
