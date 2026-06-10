@@ -18,12 +18,28 @@ export const FacebookSDK = () => {
     if (!window.FB || window.FB.__buffer) return;
     if (window.__fbReady) return;
 
-    const appId = process.env.NEXT_PUBLIC_FB_APP_ID;
-    console.log("[FB] FB.init() — appId:", appId);
-    window.FB.init({ appId, cookie: true, xfbml: false, version: "v21.0" });
-    window.__fbReady = true;
-    window.__fbLastRef = window.FB;
-    console.log("[FB] FB.init() done");
+    const rawAppId = process.env.NEXT_PUBLIC_FB_APP_ID;
+    const appId = rawAppId?.replace(/^["']|["']$/g, "")?.trim();
+    
+    if (!appId || appId === "your_facebook_app_id") {
+      console.warn("[FB] FB.init() skipped — App ID is missing or default:", appId);
+      return;
+    }
+
+    console.log("[FB] FB.init() — appId:", appId, "raw:", rawAppId);
+    try {
+      window.FB.init({
+        appId,
+        cookie: true,
+        xfbml: false,
+        version: "v21.0"
+      });
+      window.__fbReady = true;
+      window.__fbLastRef = window.FB;
+      console.log("[FB] FB.init() done");
+    } catch (err) {
+      console.error("[FB] FB.init() failed:", err);
+    }
   };
 
   if (typeof window !== "undefined") {
