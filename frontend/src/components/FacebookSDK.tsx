@@ -42,9 +42,10 @@ export const FacebookSDK = () => {
       src="https://connect.facebook.net/en_US/sdk.js"
       strategy="afterInteractive"
       onReady={() => {
-        // onReady fires on script load event, BEFORE the SDK calls fbAsyncInit.
-        // Do NOT call FB.init() here — let fbAsyncInit handle it properly.
         console.log("[FB] onReady fired — window.FB:", !!window.FB, "__fbReady:", !!window.__fbReady);
+        console.log("[FB] login fn source:", window.FB?.login?.toString().slice(0, 400));
+        // Call init here too — matching a46e926 which called from both onLoad and fbAsyncInit
+        if (window.FB) initFacebookSDK();
       }}
     />
   );
