@@ -101,6 +101,15 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Not Found', path: req.url });
 });
 
+// Global error handler — Express 5 forwards sync + async errors here.
+// Keeps responses as JSON instead of the default HTML error page.
+app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error(`[ERROR] ${req.method} ${req.url}:`, err);
+  if (res.headersSent) return;
+  const status = typeof err?.status === 'number' ? err.status : 500;
+  res.status(status).json({ message: err?.message || 'Internal server error' });
+});
+
 console.log(`[DEBUG] Attempting to start server on port ${PORT} (PID: ${process.pid})...`);
 
 const server = app.listen(PORT);
