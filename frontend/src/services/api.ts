@@ -1,7 +1,10 @@
 import axios from 'axios';
 import { useAppStore } from '@/store/useAppStore';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const rawApiUrl = process.env.NEXT_PUBLIC_API_URL;
+const API_BASE_URL = rawApiUrl?.replace(/^["']|["']$/g, "")?.trim() || 'http://localhost:5000/api';
+
+console.log('[API] Base URL:', API_BASE_URL, 'raw:', rawApiUrl);
 
 const api = axios.create({
   baseURL: API_BASE_URL,
