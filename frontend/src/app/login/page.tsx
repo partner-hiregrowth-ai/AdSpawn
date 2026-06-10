@@ -40,17 +40,16 @@ function LoginContent() {
   }, [searchParams]);
 
   useEffect(() => {
-    import("@/components/FacebookSDK").then(({ waitForFBInit }) => {
-      waitForFBInit().then(() => setFbReady(true));
-    });
-  }, []);
-
-  const handleFacebookLogin = async () => {
-    const appId = process.env.NEXT_PUBLIC_FB_APP_ID;
-    if (!appId || appId === "your_facebook_app_id") {
-      toast.error("Facebook App ID is not configured. Please check your .env.local file.");
+    if (window.__fbReady) {
+      setFbReady(true);
       return;
     }
+    const handler = () => setFbReady(true);
+    window.addEventListener("fb:ready", handler);
+    return () => window.removeEventListener("fb:ready", handler);
+  }, []);
+
+  const handleFacebookLogin = () => {
     setIsLoggingIn(true);
     window.FB.login(
       (response: any) => {
