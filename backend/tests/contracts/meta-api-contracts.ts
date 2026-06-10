@@ -82,7 +82,7 @@ export const ADSET_CONTRACT: EntityContract = {
   },
   conditionallyRequired: {
     bid_amount: {
-      when: { bid_strategy: ['LOWEST_COST_WITH_BID_CAP', 'COST_CAP', 'TARGET_COST', 'LOWEST_COST_WITH_MIN_ROAS'] },
+      when: { bid_strategy: ['LOWEST_COST_WITH_BID_CAP', 'COST_CAP', 'TARGET_COST'] },
       message: 'bid_amount is required when using bid cap strategies',
     },
     end_time: {

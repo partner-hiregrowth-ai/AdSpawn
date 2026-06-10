@@ -278,7 +278,7 @@ export class BulkEditCompatibilityEngine {
       globalErrors.push('Cannot set both daily_budget and lifetime_budget');
     }
 
-    if (fieldUpdates.bid_strategy && BID_CAP_STRATEGIES.has(fieldUpdates.bid_strategy) && !fieldUpdates.bid_amount) {
+    if (fieldUpdates.bid_strategy && BID_CAP_STRATEGIES.has(fieldUpdates.bid_strategy) && fieldUpdates.bid_strategy !== 'LOWEST_COST_WITH_MIN_ROAS' && !fieldUpdates.bid_amount) {
       globalWarnings.push(`${fieldUpdates.bid_strategy} typically requires bid_amount`);
     }
 

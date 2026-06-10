@@ -139,7 +139,7 @@ describe('Field Registry Completeness', () => {
 async function checkTokenValid(): Promise<boolean> {
   if (!process.env.META_ACCESS_TOKEN) return false;
   try {
-    const url = `https://graph.facebook.com/v21.0/me?access_token=${process.env.META_ACCESS_TOKEN}`;
+    const url = `https://graph.facebook.com/v22.0/me?access_token=${process.env.META_ACCESS_TOKEN}`;
     const response = await fetch(url);
     const data = await response.json();
     return !data.error;
@@ -172,7 +172,7 @@ describe.skipIf(!process.env.META_ACCESS_TOKEN)('Live Meta API Drift', () => {
       }
       formData.append('access_token', accessToken);
 
-      const url = `https://graph.facebook.com/v21.0/${endpoint}`;
+      const url = `https://graph.facebook.com/v22.0/${endpoint}`;
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

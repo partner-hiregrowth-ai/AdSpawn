@@ -4,7 +4,7 @@
 
 Full-stack Meta Ads duplication/conversion tool.
 
-- **Backend**: Express.js + TypeScript, Prisma + PostgreSQL, Meta Marketing API v21.0
+- **Backend**: Express.js + TypeScript, Prisma + PostgreSQL, Meta Marketing API v22.0
 - **Frontend**: Next.js (App Router) + TypeScript, Tailwind CSS, shadcn/ui, Zustand
 
 ## Key Backend Services

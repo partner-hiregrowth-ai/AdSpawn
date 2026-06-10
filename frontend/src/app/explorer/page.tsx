@@ -144,18 +144,18 @@ export default function ExplorerPage() {
   const filteredCampaigns = useMemo(() => {
     const q = debouncedSearch.toLowerCase();
     const filtered = !q ? campaigns : campaigns.filter(c =>
-      c.name.toLowerCase().includes(q) ||
-      c.objective.toLowerCase().includes(q) ||
+      (c.name || "").toLowerCase().includes(q) ||
+      (c.objective || "").toLowerCase().includes(q) ||
       (adSets[c.id] || []).some(as =>
-        as.name.toLowerCase().includes(q) ||
-        (ads[as.id] || []).some(ad => ad.name.toLowerCase().includes(q))
+        (as.name || "").toLowerCase().includes(q) ||
+        (ads[as.id] || []).some(ad => (ad.name || "").toLowerCase().includes(q))
       )
     );
     return [...filtered].sort((a, b) => {
       let va: string | number, vb: string | number;
       switch (sortKey) {
-        case 'status': va = a.status; vb = b.status; break;
-        case 'objective': va = a.objective; vb = b.objective; break;
+        case 'status': va = a.status || ''; vb = b.status || ''; break;
+        case 'objective': va = a.objective || ''; vb = b.objective || ''; break;
         case 'budget':
           va = parseFloat(a.daily_budget || a.lifetime_budget || '0');
           vb = parseFloat(b.daily_budget || b.lifetime_budget || '0');
@@ -164,7 +164,7 @@ export default function ExplorerPage() {
           va = a.created_time || '';
           vb = b.created_time || '';
           break;
-        default: va = a.name.toLowerCase(); vb = b.name.toLowerCase();
+        default: va = (a.name || '').toLowerCase(); vb = (b.name || '').toLowerCase();
       }
       if (va < vb) return sortDir === 'asc' ? -1 : 1;
       if (va > vb) return sortDir === 'asc' ? 1 : -1;

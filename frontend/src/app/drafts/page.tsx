@@ -130,8 +130,8 @@ export default function DraftsPage() {
   const handleDelete = async (id?: string) => {
     const targetId = id || deleteTargetId;
     if (!targetId) return;
-    const prev = drafts;
-    mutateDrafts(drafts.filter(x => x.id !== targetId), false);
+    const prev = allDrafts;
+    mutateDrafts(allDrafts.filter(x => x.id !== targetId), false);
     setSelectedIds(s => { const next = new Set(s); next.delete(targetId); return next; });
     setConfirmAction(null);
     setDeleteTargetId(null);

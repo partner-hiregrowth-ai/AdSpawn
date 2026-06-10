@@ -94,7 +94,7 @@ export class DraftValidationEngine {
       });
     }
 
-    if (data.bid_strategy && BID_CAP_STRATEGIES.has(data.bid_strategy)) {
+    if (data.bid_strategy && BID_CAP_STRATEGIES.has(data.bid_strategy) && data.bid_strategy !== 'LOWEST_COST_WITH_MIN_ROAS') {
       if (!data.bid_amount) {
         errors.push({
           field: 'bid_strategy',
@@ -289,7 +289,7 @@ export class DraftValidationEngine {
       }
     }
 
-    if (!isCBO && data.bid_strategy && BID_CAP_STRATEGIES.has(data.bid_strategy)) {
+    if (!isCBO && data.bid_strategy && BID_CAP_STRATEGIES.has(data.bid_strategy) && data.bid_strategy !== 'LOWEST_COST_WITH_MIN_ROAS') {
       if (!data.bid_amount) {
         errors.push({
           field: 'bid_amount',
@@ -805,7 +805,9 @@ export class DraftValidationEngine {
     if (campaign.adSets) {
       const campaignData = campaign.data as any;
       const campaignObjective = campaignData?.objective || campaign.objective;
-      const isCBO = !!(campaignData.daily_budget || campaignData.lifetime_budget);
+      const isCBO = campaignData.is_adset_budget_sharing_enabled === true
+        || !!(Number(campaignData.daily_budget) > 0)
+        || !!(Number(campaignData.lifetime_budget) > 0);
 
       if (campaign.adSets.length === 0) {
         campaignErrors.push({

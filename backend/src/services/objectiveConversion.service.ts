@@ -184,8 +184,14 @@ export class ObjectiveConversionService {
     }
 
     if (isCBO) {
-      if (data.daily_budget) payload.daily_budget = String(data.daily_budget);
-      if (data.lifetime_budget) payload.lifetime_budget = String(data.lifetime_budget);
+      // Prefer daily_budget when both are set — Meta rejects campaigns with both budget types.
+      if (data.daily_budget && data.lifetime_budget) {
+        payload.daily_budget = String(data.daily_budget);
+      } else if (data.daily_budget) {
+        payload.daily_budget = String(data.daily_budget);
+      } else if (data.lifetime_budget) {
+        payload.lifetime_budget = String(data.lifetime_budget);
+      }
     }
 
     return this.cleanPayload(payload);
@@ -243,9 +249,12 @@ export class ObjectiveConversionService {
       payload.destination_type = String(data.destination_type);
     }
 
-    // Budgets
-    if (data.daily_budget) payload.daily_budget = String(data.daily_budget);
-    if (data.lifetime_budget) {
+    // Budgets — prefer daily_budget when both are set (Meta rejects both simultaneously)
+    if (data.daily_budget && data.lifetime_budget) {
+      payload.daily_budget = String(data.daily_budget);
+    } else if (data.daily_budget) {
+      payload.daily_budget = String(data.daily_budget);
+    } else if (data.lifetime_budget) {
       payload.lifetime_budget = String(data.lifetime_budget);
       if (data.start_time) payload.start_time = data.start_time;
       if (data.end_time) payload.end_time = data.end_time;

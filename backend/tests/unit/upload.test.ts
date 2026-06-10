@@ -35,7 +35,7 @@ function makeRes() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockUploadImage = vi.fn().mockResolvedValue('abc123hash');
+  mockUploadImage = vi.fn().mockResolvedValue({ hash: 'abc123hash', id: 'img_789' });
   mockUploadVideo = vi.fn().mockResolvedValue('video_456');
 });
 
@@ -45,7 +45,7 @@ describe('Upload Controller', () => {
       const req = makeReq();
       const res = makeRes();
       await uploadImage(req, res);
-      expect(res.json).toHaveBeenCalledWith({ hash: 'abc123hash' });
+      expect(res.json).toHaveBeenCalledWith({ hash: 'abc123hash', id: 'img_789' });
     });
 
     it('returns 400 when no file provided', async () => {

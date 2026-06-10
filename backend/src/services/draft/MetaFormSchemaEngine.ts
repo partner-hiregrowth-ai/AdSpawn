@@ -491,7 +491,8 @@ export class MetaFormSchemaEngine {
               key: 'destination_type',
               label: 'Conversion Location',
               type: 'enum',
-              required: true,
+              // AWARENESS only supports UNDEFINED (omitted at publish time) — not required
+              required: objective !== 'OUTCOME_AWARENESS',
               editable: true,
               options: validDests.map(v => ({
                 value: v,
@@ -1156,22 +1157,22 @@ export class MetaFormSchemaEngine {
           defaultCollapsed: true,
           fields: [
             {
-              key: 'creative.instagram_actor_id',
-              label: 'Instagram Actor ID (Business)',
+              key: 'creative.instagram_user_id',
+              label: 'Instagram User ID',
               type: 'string',
               required: false,
               editable: true,
               placeholder: 'Instagram Business Account ID',
-              helpText: 'Found in Business Settings > Instagram Accounts. Required for Advanced Creative if using Instagram.',
+              helpText: 'Found in Business Settings > Instagram Accounts. Used for Instagram-placed ads.',
             },
             {
-              key: 'creative.instagram_user_id',
-              label: 'Instagram User ID (Legacy)',
+              key: 'creative.instagram_actor_id',
+              label: 'Instagram Actor ID (Deprecated)',
               type: 'string',
               required: false,
               editable: true,
-              placeholder: 'Instagram User ID',
-              helpText: 'Linked Instagram ID from Page settings. Use for standard ads.',
+              placeholder: 'Deprecated — use Instagram User ID above',
+              helpText: 'Deprecated since September 2025. Existing value is preserved for reference only; the API now uses Instagram User ID.',
             },
             {
               key: 'creative.platform_customizations',
