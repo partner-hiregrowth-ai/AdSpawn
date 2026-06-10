@@ -22,9 +22,13 @@ export const loginWithFacebook = async (req: Request, res: Response) => {
 
     let tokenToStore = accessToken;
     let tokenExpiresAt: Date | undefined;
-    const appId = process.env.FB_APP_ID;
-    const appSecret = process.env.FB_APP_SECRET;
-    if (appId && appSecret) {
+    
+    const rawAppId = process.env.FB_APP_ID;
+    const rawAppSecret = process.env.FB_APP_SECRET;
+    const appId = rawAppId?.replace(/^["']|["']$/g, "")?.trim();
+    const appSecret = rawAppSecret?.replace(/^["']|["']$/g, "")?.trim();
+
+    if (appId && appSecret && appId !== "your_facebook_app_id") {
       try {
         const exchangeResponse = await axios.get('https://graph.facebook.com/oauth/access_token', {
           params: {
@@ -39,9 +43,11 @@ export const loginWithFacebook = async (req: Request, res: Response) => {
           tokenExpiresAt = new Date(Date.now() + exchangeResponse.data.expires_in * 1000);
         }
         console.log('[Auth] Successfully exchanged for long-lived token');
-      } catch (exchangeError) {
-        console.warn('[Auth] Could not exchange for long-lived token, using original:', exchangeError);
+      } catch (exchangeError: any) {
+        console.warn('[Auth] Could not exchange for long-lived token, using original:', exchangeError?.response?.data || exchangeError?.message);
       }
+    } else {
+      console.warn('[Auth] Skipping long-lived token exchange — missing or default FB_APP_ID/SECRET');
     }
 
     let user = await withRetry(() => prisma.user.findUnique({
@@ -64,24 +70,36 @@ export const loginWithFacebook = async (req: Request, res: Response) => {
 
     let teamId = user.teamId;
     if (!user.ownedTeam) {
-      const team = await prisma.team.create({
+      console.log(`[Auth] User ${user.id} has no ownedTeam, creating one...`);
+      const team = await withRetry(() => prisma.team.create({
         data: {
           name: `${name || 'My'}'s Team`,
           inviteCode: generateInviteCode(),
           ownerId: user.id,
         }
-      });
-      await prisma.user.update({
+      }));
+      await withRetry(() => prisma.user.update({
         where: { id: user.id },
         data: { teamId: team.id, role: 'admin' },
-      });
+      }));
       teamId = team.id;
+    }
+
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      console.error('[Auth] JWT_SECRET is missing from environment');
+      return res.status(500).json({ message: 'Server configuration error: JWT_SECRET missing' });
     }
 
     const token = signToken(user.id, teamId!);
     res.json({ token, user: { id: user.id, facebookId: user.facebookId, name: user.name, email: user.email, role: user.role, teamId } });
   } catch (error: any) {
-    console.error('FB Login Error:', error);
+    console.error('[Auth] FB Login Error Details:', {
+      message: error?.message,
+      code: error?.code,
+      stack: error?.stack,
+      response: error?.response?.data
+    });
     const prismaCode = error?.code;
     if (prismaCode === 'P1001' || prismaCode === 'P1017' || prismaCode === 'P1002') {
       return res.status(503).json({ message: 'Database unavailable. Please try again in a moment.' });
