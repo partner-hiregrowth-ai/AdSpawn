@@ -41,11 +41,14 @@ function LoginContent() {
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
+    const deadline = Date.now() + 10_000;
     const poll = () => {
-      if (window.FB?._initialized) {
+      if (window.__fbReady) {
         setFbReady(true);
+      } else if (Date.now() < deadline) {
+        timer = setTimeout(poll, 100);
       } else {
-        timer = setTimeout(poll, 50);
+        toast.error("Facebook SDK failed to load. Disable any ad-blockers and try again.");
       }
     };
     poll();
