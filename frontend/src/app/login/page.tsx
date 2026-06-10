@@ -40,13 +40,16 @@ function LoginContent() {
   }, [searchParams]);
 
   useEffect(() => {
-    if (window.__fbReady) {
-      setFbReady(true);
-      return;
-    }
-    const handler = () => setFbReady(true);
-    window.addEventListener("fb:ready", handler);
-    return () => window.removeEventListener("fb:ready", handler);
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = () => {
+      if (window.FB?._initialized) {
+        setFbReady(true);
+      } else {
+        timer = setTimeout(poll, 50);
+      }
+    };
+    poll();
+    return () => clearTimeout(timer);
   }, []);
 
   const handleFacebookLogin = () => {
