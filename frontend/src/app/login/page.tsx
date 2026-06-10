@@ -78,8 +78,10 @@ function LoginContent() {
     console.log("[FB] at click — _initialized:", window.FB._initialized, "_apiKey:", window.FB._apiKey, "version:", window.FB.version);
     console.log("[FB] FB object keys at click:", Object.keys(window.FB).join(", "));
     console.log("[FB] same FB object?", window.FB === (window as any).__lastFB);
+    console.log("[FB] login fn source at click:", window.FB.login.toString().slice(0, 400));
     console.log("[FB] calling FB.login()");
     setIsLoggingIn(true);
+    try {
     window.FB.login(
       (response: any) => {
         if (response.authResponse) {
@@ -91,6 +93,11 @@ function LoginContent() {
       },
       { scope: "ads_management,ads_read,business_management,public_profile,email" }
     );
+    } catch (err: any) {
+      console.error("[FB] FB.login() threw:", err?.message, err?.stack);
+      setIsLoggingIn(false);
+      toast.error("Facebook SDK error: " + (err?.message ?? String(err)));
+    }
   };
 
   const verifyToken = async (accessToken: string) => {
