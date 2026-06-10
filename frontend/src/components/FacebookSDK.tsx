@@ -7,38 +7,56 @@ declare global {
     fbAsyncInit: () => void;
     FB: any;
     __fbReady: boolean;
+    __fbIntercepted: boolean;
   }
 }
 
 export const FacebookSDK = () => {
-  const initFacebookSDK = () => {
-    // The FB SDK installs a stub proxy first (window.FB.__buffer exists).
-    // FB.init() called on the stub gets buffered and replayed when the real SDK
-    // loads — which would call FB.init() twice (once from buffer, once from here),
-    // resetting auth state. Skip until the real SDK is active.
-    if (!window.FB || window.FB.__buffer) {
-      console.log("[FB] initFacebookSDK — stub active, skipping (__buffer:", !!window.FB?.__buffer, ")");
-      return;
-    }
-    if (window.__fbReady) {
-      console.log("[FB] initFacebookSDK — already initialized, skipping");
-      return;
-    }
-    const appId = process.env.NEXT_PUBLIC_FB_APP_ID;
-    console.log("[FB] FB.init() on real SDK — appId:", appId, "FB keys:", Object.keys(window.FB).join(", "));
-    window.FB.init({
-      appId,
-      cookie: true,
-      xfbml: false,
-      version: "v21.0",
-    });
-    window.__fbReady = true;
-    console.log("[FB] FB.init() done");
-  };
+  if (typeof window !== "undefined" && !window.__fbIntercepted) {
+    window.__fbIntercepted = true;
 
-  if (typeof window !== "undefined") {
-    console.log("[FB] FacebookSDK render — setting window.fbAsyncInit");
-    window.fbAsyncInit = initFacebookSDK;
+    const appId = process.env.NEXT_PUBLIC_FB_APP_ID;
+
+    const tryInit = (fb: any) => {
+      // The SDK installs a stub proxy first (window.FB.__buffer exists).
+      // Skip it — only init on the real SDK object.
+      if (!fb || fb.__buffer) {
+        console.log("[FB] tryInit — stub, skipping");
+        return;
+      }
+      console.log("[FB] tryInit — real SDK, calling FB.init() — keys:", Object.keys(fb).slice(0, 5).join(", "), "...");
+      fb.init({ appId, cookie: true, xfbml: false, version: "v21.0" });
+      window.__fbReady = true;
+      console.log("[FB] FB.init() done");
+    };
+
+    // Intercept every window.FB assignment so FB.init() is called on
+    // whichever object the SDK ends up using — it replaces window.FB
+    // async (FedCM/gamingservices modules), and the final object must
+    // be initialized even if earlier objects already were.
+    let _fb: any = window.FB;
+    try {
+      Object.defineProperty(window, "FB", {
+        configurable: true,
+        get() { return _fb; },
+        set(v) {
+          console.log("[FB] window.FB assigned — __buffer:", !!v?.__buffer, "__fbReady:", window.__fbReady);
+          window.__fbReady = false;
+          _fb = v;
+          tryInit(v);
+        },
+      });
+    } catch {
+      // defineProperty failed (already non-configurable) — fall back to fbAsyncInit
+      console.log("[FB] defineProperty failed — falling back to fbAsyncInit");
+    }
+
+    if (_fb) tryInit(_fb);
+
+    window.fbAsyncInit = () => {
+      console.log("[FB] fbAsyncInit called — __buffer:", !!window.FB?.__buffer, "__fbReady:", window.__fbReady);
+      // tryInit already ran via the setter; this is a compatibility no-op
+    };
   }
 
   return (
@@ -50,7 +68,6 @@ export const FacebookSDK = () => {
       strategy="afterInteractive"
       onReady={() => {
         console.log("[FB] onReady fired — __buffer:", !!window.FB?.__buffer, "__fbReady:", !!window.__fbReady);
-        initFacebookSDK();
       }}
     />
   );
