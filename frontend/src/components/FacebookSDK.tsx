@@ -9,6 +9,14 @@ declare global {
   }
 }
 
+let fbInitResolveFn: (() => void) | null = null;
+const fbInitPromise =
+  typeof window !== "undefined"
+    ? new Promise<void>((resolve) => {
+        fbInitResolveFn = resolve;
+      })
+    : Promise.resolve();
+
 if (typeof window !== "undefined") {
   window.fbAsyncInit = () => {
     window.FB.init({
@@ -17,7 +25,12 @@ if (typeof window !== "undefined") {
       xfbml: true,
       version: "v21.0",
     });
+    fbInitResolveFn?.();
   };
+}
+
+export function waitForFBInit(): Promise<void> {
+  return fbInitPromise;
 }
 
 export const FacebookSDK = () => (
