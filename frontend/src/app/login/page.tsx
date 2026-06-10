@@ -44,14 +44,14 @@ function LoginContent() {
     let timer: ReturnType<typeof setTimeout>;
     const deadline = Date.now() + 10_000;
     const poll = () => {
-      console.log("[FB] poll tick — window.FB:", !!window.FB, "__fbReady:", !!window.__fbReady);
-      if (window.FB) {
-        console.log("[FB] window.FB found — enabling button");
+      console.log("[FB] poll tick — __fbReady:", !!window.__fbReady);
+      if (window.__fbReady) {
+        console.log("[FB] SDK ready — enabling button");
         setFbReady(true);
       } else if (Date.now() < deadline) {
         timer = setTimeout(poll, 100);
       } else {
-        console.log("[FB] poll timed out — SDK never loaded");
+        console.log("[FB] poll timed out — SDK never initialized");
         toast.error("Facebook SDK failed to load. Disable any ad-blockers and refresh.");
       }
     };
@@ -61,7 +61,7 @@ function LoginContent() {
 
   const handleFacebookLogin = () => {
     const appId = process.env.NEXT_PUBLIC_FB_APP_ID;
-    console.log("[FB] handleFacebookLogin — appId:", appId, "window.FB:", !!window.FB, "__fbReady:", !!window.__fbReady);
+    console.log("[FB] handleFacebookLogin — __fbReady:", !!window.__fbReady, "window.FB:", !!window.FB);
     if (!appId || appId === "your_facebook_app_id") {
       toast.error("Facebook App ID is not configured. Please check your .env.local file.");
       return;
@@ -70,15 +70,6 @@ function LoginContent() {
       toast.error("Facebook SDK not loaded. Please disable any ad-blockers and refresh.");
       return;
     }
-    if (!window.__fbReady) {
-      console.log("[FB] __fbReady not set at click time — calling FB.init() now");
-      window.FB.init({ appId, cookie: true, xfbml: true, version: "v21.0" });
-      window.__fbReady = true;
-    }
-    console.log("[FB] at click — _initialized:", window.FB._initialized, "_apiKey:", window.FB._apiKey, "version:", window.FB.version);
-    console.log("[FB] FB object keys at click:", Object.keys(window.FB).join(", "));
-    console.log("[FB] same FB object?", window.FB === (window as any).__lastFB);
-    console.log("[FB] login fn source at click:", window.FB.login.toString().slice(0, 400));
     console.log("[FB] calling FB.login()");
     setIsLoggingIn(true);
     try {
