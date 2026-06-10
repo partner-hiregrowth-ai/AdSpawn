@@ -16,8 +16,20 @@ app.set('trust proxy', 1);
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
+const getAllowedOrigins = () => {
+  const envOrigin = process.env.ALLOWED_ORIGIN;
+  if (!envOrigin) {
+    return [
+      'http://localhost:3000', 
+      'https://localhost:3000', 
+      'https://ad-spawn-kappa.vercel.app'
+    ];
+  }
+  return envOrigin.split(',').map(o => o.trim());
+};
+
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGIN || ['http://localhost:3000', 'https://localhost:3000'],
+  origin: getAllowedOrigins(),
   credentials: true,
 }));
 app.use(express.json({ limit: '1mb' }));
