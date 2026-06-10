@@ -13,9 +13,11 @@ declare global {
 export const FacebookSDK = () => {
   const initFacebookSDK = () => {
     console.log("[FB] fbAsyncInit called — window.FB:", !!window.FB);
+    const appId = process.env.NEXT_PUBLIC_FB_APP_ID;
+    console.log("[FB] appId from env in FacebookSDK.tsx:", appId);
     if (window.FB) {
       window.FB.init({
-        appId: process.env.NEXT_PUBLIC_FB_APP_ID,
+        appId,
         cookie: true,
         xfbml: true,
         version: "v21.0",
