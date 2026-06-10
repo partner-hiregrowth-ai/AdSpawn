@@ -19,7 +19,7 @@ export const FacebookSDK = () => {
       window.FB.init({
         appId,
         cookie: true,
-        xfbml: true,
+        xfbml: false,
         version: "v21.0",
       });
       window.__fbReady = true;
