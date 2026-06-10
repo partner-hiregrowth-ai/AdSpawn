@@ -21,7 +21,9 @@ export const FacebookSDK = () => {
         version: "v21.0",
       });
       window.__fbReady = true;
-      console.log("[FB] FB.init() done via fbAsyncInit — __fbReady set");
+      console.log("[FB] FB.init() done — _initialized:", window.FB._initialized, "_apiKey:", window.FB._apiKey, "version:", window.FB.version);
+      console.log("[FB] FB object keys:", Object.keys(window.FB).join(", "));
+      (window as any).__lastFB = window.FB;
     }
   };
 

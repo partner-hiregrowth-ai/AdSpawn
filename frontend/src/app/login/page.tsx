@@ -75,6 +75,9 @@ function LoginContent() {
       window.FB.init({ appId, cookie: true, xfbml: true, version: "v21.0" });
       window.__fbReady = true;
     }
+    console.log("[FB] at click — _initialized:", window.FB._initialized, "_apiKey:", window.FB._apiKey, "version:", window.FB.version);
+    console.log("[FB] FB object keys at click:", Object.keys(window.FB).join(", "));
+    console.log("[FB] same FB object?", window.FB === (window as any).__lastFB);
     console.log("[FB] calling FB.login()");
     setIsLoggingIn(true);
     window.FB.login(
