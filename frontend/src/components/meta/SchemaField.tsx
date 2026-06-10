@@ -1265,7 +1265,7 @@ function UploadField({
       const resp = uploadType === "image"
         ? await uploadApi.uploadImage(file, adAccountId)
         : await uploadApi.uploadVideo(file, adAccountId);
-      onChange(uploadType === "image" ? resp.data.hash : resp.data.videoId);
+      onChange(uploadType === "image" ? (resp.data.hash || resp.data.id) : resp.data.videoId);
       toast.success(`${uploadType === "image" ? "Image" : "Video"} uploaded`);
     } catch (err: any) {
       toast.error(extractApiError(err, `${uploadType} upload failed`));

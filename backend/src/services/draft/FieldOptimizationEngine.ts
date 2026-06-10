@@ -256,7 +256,7 @@ export class FieldOptimizationEngine {
       warnings.push('Both budgets set — kept daily_budget only.');
     }
 
-    if (BID_CAP_STRATEGIES.has(payload.bid_strategy) && !payload.bid_amount) {
+    if (BID_CAP_STRATEGIES.has(payload.bid_strategy) && payload.bid_strategy !== 'LOWEST_COST_WITH_MIN_ROAS' && !payload.bid_amount) {
       warnings.push(`${payload.bid_strategy} requires bid_amount. Falling back to LOWEST_COST_WITHOUT_CAP.`);
       payload.bid_strategy = 'LOWEST_COST_WITHOUT_CAP';
     }
@@ -453,7 +453,7 @@ export class FieldOptimizationEngine {
         }
       }
 
-      if (BID_CAP_STRATEGIES.has(payload.bid_strategy) && !payload.bid_amount) {
+      if (BID_CAP_STRATEGIES.has(payload.bid_strategy) && payload.bid_strategy !== 'LOWEST_COST_WITH_MIN_ROAS' && !payload.bid_amount) {
         warnings.push(`${payload.bid_strategy} requires bid_amount`);
       }
 

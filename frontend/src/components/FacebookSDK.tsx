@@ -32,7 +32,7 @@ export const FacebookSDK = () => {
         appId,
         cookie: true,
         xfbml: false,
-        version: "v21.0"
+        version: "v22.0"
       });
       window.__fbReady = true;
       window.__fbLastRef = window.FB;

@@ -157,10 +157,11 @@ describe('Promoted Object Requirements', () => {
 // ─── Bid Strategy × Bid Amount Dependencies ───
 
 describe('Bid Strategy Requires bid_amount', () => {
-  const capStrategies = [...BID_CAP_STRATEGIES];
+  // LOWEST_COST_WITH_MIN_ROAS uses bid_constraints (roas_average_floor), NOT bid_amount
+  const bidAmountStrategies = [...BID_CAP_STRATEGIES].filter(s => s !== 'LOWEST_COST_WITH_MIN_ROAS');
   const nonCapStrategies = ['LOWEST_COST_WITHOUT_CAP'];
 
-  for (const strategy of capStrategies) {
+  for (const strategy of bidAmountStrategies) {
     it(`${strategy} warns when bid_amount is missing`, () => {
       const result = FieldOptimizationEngine.optimizeAdSetForDuplication(
         {
@@ -193,6 +194,38 @@ describe('Bid Strategy Requires bid_amount', () => {
       expect(result.payload.bid_strategy).toBe(strategy);
     });
   }
+
+  it('LOWEST_COST_WITH_MIN_ROAS passes without bid_amount (uses bid_constraints)', () => {
+    const result = FieldOptimizationEngine.optimizeAdSetForDuplication(
+      {
+        optimization_goal: 'LINK_CLICKS',
+        billing_event: 'IMPRESSIONS',
+        targeting: { geo_locations: { countries: ['TH'] } },
+        bid_strategy: 'LOWEST_COST_WITH_MIN_ROAS',
+        bid_constraints: { roas_average_floor: 100 },
+      },
+      'OUTCOME_TRAFFIC',
+      false,
+    );
+    const hasBidWarning = result.warnings.some(w => w.includes('bid_amount') || w.includes('LOWEST_COST'));
+    expect(hasBidWarning).toBe(false);
+    expect(result.payload.bid_strategy).toBe('LOWEST_COST_WITH_MIN_ROAS');
+  });
+
+  it('LOWEST_COST_WITH_MIN_ROAS without bid_amount or bid_constraints does not fall back to LOWEST_COST_WITHOUT_CAP', () => {
+    const result = FieldOptimizationEngine.optimizeAdSetForDuplication(
+      {
+        optimization_goal: 'LINK_CLICKS',
+        billing_event: 'IMPRESSIONS',
+        targeting: { geo_locations: { countries: ['TH'] } },
+        bid_strategy: 'LOWEST_COST_WITH_MIN_ROAS',
+      },
+      'OUTCOME_TRAFFIC',
+      false,
+    );
+    // Should preserve the strategy even without bid_constraints; Meta will validate server-side
+    expect(result.payload.bid_strategy).toBe('LOWEST_COST_WITH_MIN_ROAS');
+  });
 
   for (const strategy of nonCapStrategies) {
     it(`${strategy} does not require bid_amount`, () => {

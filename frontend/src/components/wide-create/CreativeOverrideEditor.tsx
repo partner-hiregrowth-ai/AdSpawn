@@ -58,7 +58,10 @@ function useUploadFns() {
   if (!acctId) return { uploadImage: undefined, uploadVideo: undefined };
   return {
     uploadImage: (file: File) =>
-      uploadApi.uploadImage(file, acctId).then((r) => r.data.hash as string),
+      uploadApi.uploadImage(file, acctId).then((r) => {
+        // Return hash by default as it's most common for adimages
+        return (r.data.hash || r.data.id) as string;
+      }),
     uploadVideo: (file: File) =>
       uploadApi.uploadVideo(file, acctId).then((r) => r.data.videoId as string),
   };

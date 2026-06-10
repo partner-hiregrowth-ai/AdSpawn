@@ -735,6 +735,15 @@ export class DraftPublishService {
       targeting,
     };
 
+    // v22.0 Corrective: HEF (Housing, Employment, Finance) categories require certification
+    // if using certain audience types. Safest to always include it when a category is set.
+    const rawCampaignCategories: string[] = campaignData.special_ad_categories || [];
+    const hasSpecialCategories = rawCampaignCategories.length > 0 &&
+      !(rawCampaignCategories.length === 1 && rawCampaignCategories[0] === 'NONE');
+    if (hasSpecialCategories) {
+      adSetPayload.is_sac_cfca_terms_certified = true;
+    }
+
     if (adSetData.is_dynamic_creative !== undefined) {
       adSetPayload.is_dynamic_creative = !!adSetData.is_dynamic_creative;
     }
@@ -767,7 +776,12 @@ export class DraftPublishService {
       const adSetBidAmount: number | string | undefined = adSetData.bid_amount;
 
       if (adSetBidStrategy) {
-        if (BID_CAP_STRATEGIES.has(adSetBidStrategy) && adSetBidAmount) {
+        if (adSetBidStrategy === 'LOWEST_COST_WITH_MIN_ROAS') {
+          // ROAS Goal uses bid_constraints.roas_average_floor, not bid_amount.
+          // Pass the strategy as-is; do NOT require or inject bid_amount.
+          adSetPayload.bid_strategy = adSetBidStrategy;
+          if (adSetData.bid_constraints) adSetPayload.bid_constraints = adSetData.bid_constraints;
+        } else if (BID_CAP_STRATEGIES.has(adSetBidStrategy) && adSetBidAmount) {
           adSetPayload.bid_strategy = adSetBidStrategy;
           adSetPayload.bid_amount = String(adSetBidAmount);
         } else if (BID_CAP_STRATEGIES.has(adSetBidStrategy) && !adSetBidAmount) {
@@ -802,7 +816,10 @@ export class DraftPublishService {
       // CBO: campaign owns the budget, but bid_amount still applies at ad set level
       const campBidStrategy = campaignData.bid_strategy;
       if (campBidStrategy && BID_CAP_STRATEGIES.has(campBidStrategy)) {
-        adSetPayload.bid_amount = String(adSetData.bid_amount || campaignData.bid_amount);
+        const resolvedBidAmount = adSetData.bid_amount || campaignData.bid_amount;
+        if (resolvedBidAmount) {
+          adSetPayload.bid_amount = String(resolvedBidAmount);
+        }
       }
     }
 
@@ -893,7 +910,10 @@ export class DraftPublishService {
 
     if (!isCBO) {
       if (adSetData.bid_strategy) {
-        if (BID_CAP_STRATEGIES.has(adSetData.bid_strategy) && adSetData.bid_amount) {
+        if (adSetData.bid_strategy === 'LOWEST_COST_WITH_MIN_ROAS') {
+          updatePayload.bid_strategy = adSetData.bid_strategy;
+          if (adSetData.bid_constraints) updatePayload.bid_constraints = adSetData.bid_constraints;
+        } else if (BID_CAP_STRATEGIES.has(adSetData.bid_strategy) && adSetData.bid_amount) {
           updatePayload.bid_strategy = adSetData.bid_strategy;
           updatePayload.bid_amount = String(adSetData.bid_amount);
         } else if (BID_CAP_STRATEGIES.has(adSetData.bid_strategy) && !adSetData.bid_amount) {
@@ -919,7 +939,10 @@ export class DraftPublishService {
     } else {
       const campBidStrategy = campaignData.bid_strategy;
       if (campBidStrategy && BID_CAP_STRATEGIES.has(campBidStrategy)) {
-        updatePayload.bid_amount = String(adSetData.bid_amount || campaignData.bid_amount);
+        const resolvedBidAmount = adSetData.bid_amount || campaignData.bid_amount;
+        if (resolvedBidAmount) {
+          updatePayload.bid_amount = String(resolvedBidAmount);
+        }
       }
     }
 
@@ -934,7 +957,7 @@ export class DraftPublishService {
       await fbService.client.post(`/${metaAdSetId}`, cleaned);
     } catch (error: any) {
       console.error(`[DraftPublishService] Failed to update Meta ad set ${metaAdSetId}:`, error.response?.data?.error || error.message);
-      throw error;
+      throw this.toPublishError(error, 'Ad Set update');
     }
   }
 
@@ -1044,7 +1067,7 @@ export class DraftPublishService {
         || adData.creative?.page_id
         || adData.creative?.object_story_spec?.page_id;
 
-      const afs = { ...adData.creative.asset_feed_spec };
+      const afs = sanitizeAssetFeedSpec(adData.creative.asset_feed_spec);
       if (afs.call_to_action_types?.length > 5) {
         console.log(`[DraftPublishService] Trimming call_to_action_types from ${afs.call_to_action_types.length} to 5 (Meta limit)`);
         afs.call_to_action_types = afs.call_to_action_types.slice(0, 5);
@@ -1080,7 +1103,7 @@ export class DraftPublishService {
         asset_feed_spec: afs,
       };
       if (adData.creative.platform_customizations) {
-        adCreativePayload.platform_customizations = adData.creative.platform_customizations;
+        adCreativePayload.platform_customizations = sanitizePlatformCustomizations(adData.creative.platform_customizations);
       }
 
       console.log(`[DraftPublishService] Pre-creating adcreative for ad ${ad.id} (asset_feed_spec)`);
@@ -1115,11 +1138,17 @@ export class DraftPublishService {
         || adData.creative?.page_id
         || adData.creative?.object_story_spec?.page_id;
 
-      const instagramActorId = adData.creative?.instagram_actor_id
+      // instagram_actor_id was deprecated for all API versions on Sept 9 2025.
+      // Prefer instagram_user_id; fall back to instagram_actor_id stored in older draft data.
+      const instagramActorId = adData.creative?.instagram_user_id
+        || adData.creative?.instagram_actor_id
+        || adData.instagram_user_id
         || adData.instagram_actor_id
+        || adSet?.data?.promoted_object?.instagram_user_id
         || adSet?.data?.promoted_object?.instagram_actor_id
+        || adSet?.data?.instagram_user_id
         || adSet?.data?.instagram_actor_id
-        || (hasAssetFeed ? undefined : (adData.creative?.object_story_spec?.instagram_actor_id || adData.creative?.object_story_spec?.instagram_user_id));
+        || (hasAssetFeed ? undefined : (adData.creative?.object_story_spec?.instagram_user_id || adData.creative?.object_story_spec?.instagram_actor_id));
 
       if (pageId && !creative.page_id) {
         creative.page_id = String(pageId);
@@ -1135,9 +1164,6 @@ export class DraftPublishService {
       // Only inject Instagram identity if explicitly provided in ad or ad set.
       // If blank, Meta will auto-resolve from the Page, which avoids strict Actor ID validation.
       if (instagramActorId) {
-        if (!creative.instagram_actor_id) {
-          creative.instagram_actor_id = String(instagramActorId);
-        }
         if (!creative.instagram_user_id) {
           creative.instagram_user_id = String(instagramActorId);
         }
@@ -1150,7 +1176,7 @@ export class DraftPublishService {
     }
 
     if (hasPlatformCustomizations && !hasAssetFeed) {
-      creative.platform_customizations = adData.creative.platform_customizations;
+      creative.platform_customizations = sanitizePlatformCustomizations(adData.creative.platform_customizations);
     }
     
     delete creative.creative_type;

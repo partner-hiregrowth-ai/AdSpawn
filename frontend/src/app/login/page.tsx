@@ -78,11 +78,11 @@ function LoginContent() {
     // Re-init if the FB object changed or we aren't marked as ready.
     if (window.FB !== window.__fbLastRef || !window.__fbReady) {
       console.log("[FB] re-init before login — FB object changed:", window.FB !== window.__fbLastRef, "ready:", window.__fbReady);
-      window.FB.init({ 
-        appId, 
-        cookie: true, 
-        xfbml: false, 
-        version: "v21.0" 
+      window.FB.init({
+        appId,
+        cookie: true,
+        xfbml: false,
+        version: "v22.0"
       });
       window.__fbLastRef = window.FB;
       window.__fbReady = true;
@@ -155,7 +155,7 @@ function LoginContent() {
           </h1>
 
           <p className="text-base text-gray-400 leading-relaxed mb-10 max-w-md">
-            Duplicate, convert, and publish campaign structures safely — powered by Meta Marketing API v21.0.
+            Duplicate, convert, and publish campaign structures safely — powered by Meta Marketing API v22.0.
           </p>
 
           <div className="space-y-3.5">
@@ -175,7 +175,7 @@ function LoginContent() {
           <div className="mt-12 flex items-center gap-3">
             <div className="h-px flex-1 bg-gradient-to-r from-gray-800/80 to-transparent" />
             <span className="text-[10px] font-medium text-gray-700 uppercase tracking-[0.15em] whitespace-nowrap">
-              Meta Marketing API v21.0
+              Meta Marketing API v22.0
             </span>
             <div className="h-px flex-1 bg-gradient-to-l from-gray-800/80 to-transparent" />
           </div>

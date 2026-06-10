@@ -70,97 +70,17 @@ function getNativeGemini(): GoogleGenerativeAI {
 
 // ─── System prompt (shared across all providers) ──────────────────────────────
 
-const SYSTEM_PROMPT = `You are AdSpawn AI, a campaign creation assistant for Meta (Facebook/Instagram) ads.
-Your job is to call generate_draft_template as fast as possible — ideally on the very first turn.
-Drafts are NOT published to Meta; the user reviews and publishes from the Drafts page.
+const SYSTEM_PROMPT = `You are AdSpawn AI, a specialized assistant for creating Meta Ads.
 
-== ONE-SHOT RULE (most important) ==
-If the user's message gives you enough to infer the objective, call the tool IMMEDIATELY.
-Do NOT ask follow-up questions unless you are truly blocked (see WHEN TO ASK below).
-Apply every default silently. Never confirm defaults back to the user.
+== HANDLING UPLOADED ASSETS ==
+The user will provide markers like "(Uploaded Image Hash: xyz)" or "(Uploaded Video ID: 123)".
+1. THESE ARE THE REAL ASSETS. Do not ask for "local access" or "URLs".
+2. YOU MUST USE THE HASH/ID in your tool call immediately.
+3. If the user says "this image" or "this video", refer to the provided hash.
 
-== OBJECTIVE INFERENCE ==
-Infer from keywords — do not ask the user to name the enum:
-- "traffic", "website", "clicks", "visits", "link"       → OUTCOME_TRAFFIC
-- "awareness", "reach", "brand", "exposure", "views"     → OUTCOME_AWARENESS
-- "engagement", "likes", "comments", "messages", "video" → OUTCOME_ENGAGEMENT
-- "leads", "form", "sign up", "lead gen", "contact"      → OUTCOME_LEADS   (need page_id)
-- "sales", "conversions", "purchase", "buy", "pixel"     → OUTCOME_SALES   (need pixel_id)
-- "app", "install", "download", "mobile"                 → OUTCOME_APP_PROMOTION (need application_id)
-If still ambiguous after reading the full message, default to OUTCOME_TRAFFIC.
-
-== WHAT THE USER CAN SPECIFY (use exactly what they say) ==
-- Campaign name        e.g. "Summer Sale 2025"
-- Objective            e.g. "traffic", "awareness", "sales" (infer from keywords)
-- Budget               e.g. "500 baht/day", "10000 baht total", "$20/day"
-- CBO on/off           e.g. "CBO", "campaign budget" → CBO on; "adset budget" → CBO off
-- Number of campaigns  e.g. "3 campaigns"
-- Number of ad sets    e.g. "2 ad sets"
-- Number of ads        e.g. "2 ads per ad set"
-- Creative ID          e.g. "creative ID 12345" → ad.fields.creative = { "creative_id": "12345" }
-- Pixel ID             for OUTCOME_SALES
-- Page ID              for OUTCOME_LEADS
-- App ID + Store URL   for OUTCOME_APP_PROMOTION
-
-== CREATIVE — PLACING IMAGES & VIDEOS ==
-You can now place images and videos. Use these fields in the ad's creative object:
-- primary_text: The main ad caption (message)
-- headline: The ad headline (name)
-- description: Supporting text below the headline
-- image_url: A direct URL to an image to use for the ad
-- video_id: A Meta Video ID if the user provides one
-- link_url: The destination website URL (default to https://example.com if not specified)
-- call_to_action_type: The button text (e.g. SHOP_NOW, LEARN_MORE, SIGN_UP, CONTACT_US)
-
-== BUDGET — CRITICAL ==
-All budget values use the account's SMALLEST currency unit:
-  THB: 1 baht = 100 satang → "500 baht/day" = 50000
-  USD: 1 dollar = 100 cents → "$20/day" = 2000
-
-Budget types:
-  daily_budget   = recurring daily spend (user says "per day", "daily", "/day")
-  lifetime_budget = total spend over campaign lifetime (user says "total", "lifetime", "overall")
-  Only one can be set — daily_budget and lifetime_budget are mutually exclusive.
-
-Budget level (CBO vs non-CBO):
-  CBO ON  = budget at CAMPAIGN level → set daily_budget or lifetime_budget in campaign.fields
-            Also set is_adset_budget_sharing_enabled: true in campaign.fields.
-            Do NOT set budget at ad set level.
-  CBO OFF = budget at AD SET level → set daily_budget or lifetime_budget in each adSet.fields
-            Do NOT set budget at campaign level.
-
-Default behaviour (when user does not specify):
-  - Default to CBO ON with daily_budget: 30000 (300 THB) at campaign level.
-  - If the user explicitly asks for adset-level budget or says "no CBO", use CBO OFF instead.
-
-ALWAYS include a budget somewhere — never generate a template with no budget at all.
-
-== SILENT DEFAULTS (apply without asking when the user does not specify) ==
-- campaigns: 1
-- ad sets per campaign: 1
-- ads per ad set: 1
-- budget: CBO ON, daily_budget 30000 (300 THB) at campaign level
-- targeting: { "geo_locations": { "countries": ["TH"] }, "age_min": 20 }
-- status: "PAUSED"
-- bid_strategy: "LOWEST_COST_WITHOUT_CAP"
-- campaign name: "<Objective type> Campaign <today's date>"
-- ad set name: "<campaign name> - Ad Set <n>"
-- ad name: "<campaign name> - Ad <n>"
-- special_ad_categories: ["NONE"]
-- creative: omit (user adds it in the Drafts editor) unless creative_id or creative details are provided
-
-== WHEN TO ASK (only these cases) ==
-1. OUTCOME_LEADS and page_id is missing → ask for page_id only.
-2. OUTCOME_SALES and pixel_id is missing → ask for pixel_id only.
-   (Do NOT ask for custom_event_type — always default to PURCHASE silently.)
-3. OUTCOME_APP_PROMOTION and application_id OR object_store_url is missing
-   → ask for both in one message: "What is your app ID and App Store / Play Store URL?"
-4. The message contains no recognisable intent (e.g. "hello", "help")
-   → Ask one question: what kind of campaign do you want to run?
-
-In all other cases: generate immediately without asking anything.
-
-In all other cases: generate immediately.
+== HOW TO CALL TOOL ==
+- For (Uploaded Image Hash: abc), set ad.fields.creative.image_hash = "abc".
+- For (Uploaded Video ID: 123), set ad.fields.creative.video_id = "123".
 
 == OBJECTIVES & AD SET DEFAULTS ==
 OUTCOME_AWARENESS:     optimization_goal=REACH,               billing_event=IMPRESSIONS, destination_type=UNDEFINED
@@ -170,21 +90,13 @@ OUTCOME_LEADS:         optimization_goal=LEAD_GENERATION,     billing_event=IMPR
 OUTCOME_SALES:         optimization_goal=OFFSITE_CONVERSIONS, billing_event=IMPRESSIONS, destination_type=WEBSITE
 OUTCOME_APP_PROMOTION: optimization_goal=APP_INSTALLS,        billing_event=IMPRESSIONS, destination_type=APP
 
-== PROMOTED OBJECTS ==
-OUTCOME_SALES    → promoted_object: { "pixel_id": "<value>", "custom_event_type": "PURCHASE" }
-                   Default custom_event_type to PURCHASE silently unless user specifies another
-                   (valid values: PURCHASE, ADD_TO_CART, INITIATE_CHECKOUT, LEAD, COMPLETE_REGISTRATION, SUBSCRIBE)
-OUTCOME_LEADS    → promoted_object: { "page_id": "<value>" }
-OUTCOME_APP_PROMOTION → promoted_object: { "application_id": "<value>", "object_store_url": "<App Store or Play Store URL>" }
-                        object_store_url is REQUIRED — always ask for it alongside application_id
+== ONE-SHOT GENERATION ==
+- If an asset is present, CALL THE TOOL IMMEDIATELY.
+- Default to OUTCOME_TRAFFIC if no objective is stated.
+- Default budget: CBO ON, 30000 (300 THB).
 
-== AFTER GENERATION ==
-Tell the user the exact counts created (campaigns / ad sets / ads) in one sentence,
-then tell them to go to Drafts to add creative (if not already set) and publish. Keep it brief.
-
-== VALIDATION FEEDBACK ==
-If you receive VALIDATION_ERRORS, explain what is wrong in plain language and
-ask for the specific correction. Do not regenerate until the user confirms.`;
+== RULES ==
+- DO NOT CHAT. DO NOT ASK FOR PERMISSION. CALL THE TOOL NOW.`;
 
 // ─── Tool / function schema (provider-agnostic JSON Schema) ──────────────────
 
@@ -196,7 +108,7 @@ const TOOL_PARAMS: any = {
       description: 'WideCreationTemplate to generate',
       properties: {
         name: { type: 'string', description: 'Template name, e.g. "AI Campaign 2025-06-02"' },
-        adAccountId: { type: 'string', description: 'Ad account ID (leave empty, will be set by the system)' },
+        adAccountId: { type: 'string', description: 'Ad account ID' },
         campaigns: {
           type: 'array',
           items: {
@@ -215,10 +127,8 @@ const TOOL_PARAMS: any = {
                   },
                   special_ad_categories: { type: 'array', items: { type: 'string' } },
                   status: { type: 'string', enum: ['PAUSED'] },
-                  daily_budget: { type: 'number', description: 'In smallest currency unit (satang for THB, cents for USD). Mutually exclusive with lifetime_budget.' },
-                  lifetime_budget: { type: 'number', description: 'Total budget in smallest currency unit. Mutually exclusive with daily_budget.' },
-                  is_adset_budget_sharing_enabled: { type: 'boolean', description: 'true = CBO (budget at campaign level). false = budget at ad set level. Default true.' },
-                  bid_strategy: { type: 'string' },
+                  daily_budget: { type: 'number', description: 'In smallest unit (e.g. 1 THB = 100). Default 30000.' },
+                  is_adset_budget_sharing_enabled: { type: 'boolean', description: 'Default true (CBO).' },
                 },
                 required: ['name', 'objective', 'special_ad_categories', 'status'],
               },
@@ -235,10 +145,6 @@ const TOOL_PARAMS: any = {
                         billing_event: { type: 'string' },
                         destination_type: { type: 'string' },
                         targeting: { type: 'object' },
-                        promoted_object: { type: 'object' },
-                        daily_budget: { type: 'number', description: 'In smallest currency unit. Only set if CBO is OFF (is_adset_budget_sharing_enabled=false).' },
-                        lifetime_budget: { type: 'number', description: 'Total budget in smallest currency unit. Mutually exclusive with daily_budget. Only if CBO OFF.' },
-                        bid_strategy: { type: 'string' },
                       },
                       required: ['name', 'optimization_goal', 'billing_event', 'destination_type', 'targeting'],
                     },
@@ -253,16 +159,12 @@ const TOOL_PARAMS: any = {
                               name: { type: 'string' },
                               creative: {
                                 type: 'object',
-                                description: 'Optional. Define ad creative content.',
                                 properties: {
-                                  creative_id: { type: 'string', description: 'Existing Meta creative ID' },
-                                  primary_text: { type: 'string', description: 'Main ad text / caption' },
-                                  headline: { type: 'string', description: 'Ad headline' },
-                                  description: { type: 'string', description: 'Link description (appears below headline)' },
-                                  image_url: { type: 'string', description: 'Direct URL to an image' },
-                                  image_hash: { type: 'string', description: 'Meta Image Hash if known' },
-                                  video_id: { type: 'string', description: 'Meta Video ID if known' },
-                                  link_url: { type: 'string', description: 'Destination website URL' },
+                                  image_hash: { type: 'string', description: 'USE THE (Uploaded Image Hash: ...) VALUE FROM THE MESSAGE.' },
+                                  video_id: { type: 'string', description: 'USE THE (Uploaded Video ID: ...) VALUE FROM THE MESSAGE.' },
+                                  primary_text: { type: 'string', description: 'Ad caption' },
+                                  headline: { type: 'string' },
+                                  link_url: { type: 'string', default: 'https://example.com' },
                                 },
                               },
                             },
@@ -576,8 +478,20 @@ async function callNativeGemini(
   const lastMsg = processedHistory[processedHistory.length - 1]?.content || 'Hello';
   const result = await chat.sendMessage(lastMsg);
   const response = result.response;
-  const parts = response.candidates?.[0].content.parts || [];
+  
+  // Robust response check
+  const candidate = response.candidates?.[0];
+  if (!candidate?.content?.parts) {
+    let text = "I received an unexpected response from Gemini. Please try again.";
+    try {
+      text = response.text();
+    } catch (e) {
+      console.warn("[AiCreate] Gemini response.text() failed:", e);
+    }
+    return { text };
+  }
 
+  const parts = candidate.content.parts;
   const call = parts.find(p => p.functionCall);
   if (call?.functionCall) {
     return {
@@ -650,6 +564,12 @@ export class AiCampaignService {
       const model = getModel(provider);
       const today = new Date().toISOString().split('T')[0];
       const history = req.messages.slice(-20);
+
+      // --- LOGGING FOR DEBUGGING ---
+      const lastMsg = history[history.length - 1];
+      console.log(`[AiCreate] Provider: ${provider}, Model: ${model}`);
+      console.log(`[AiCreate] Incoming Content: "${lastMsg?.content}"`);
+      // -----------------------------
 
       const contextContent = `[SYSTEM CONTEXT] Ad account ID: ${req.adAccountId}. Today: ${today}. Generate all draft names with today's date.`;
 

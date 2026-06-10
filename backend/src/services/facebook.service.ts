@@ -3,7 +3,7 @@ import FormData from 'form-data';
 import { READ_ONLY_FIELDS } from './draft/MetaFieldRegistry';
 import { sleep } from '../utils/sleep';
 
-const FB_API_VERSION = 'v21.0';
+const FB_API_VERSION = 'v22.0';
 const FB_BASE_URL = `https://graph.facebook.com/${FB_API_VERSION}`;
 
 export class FacebookService {
@@ -167,7 +167,7 @@ export class FacebookService {
         if (isFirstPage) {
           const resp = await this.client.get(`/${adSetId}/ads`, {
             params: {
-              fields: 'name,id,status,creative{id,name,object_story_spec,asset_feed_spec,platform_customizations},tracking_specs',
+              fields: 'name,id,status,creative{id,name,object_story_spec,asset_feed_spec,platform_customizations,instagram_user_id},tracking_specs',
               limit: 100,
             },
           });
@@ -403,11 +403,15 @@ export class FacebookService {
     );
 
     const data = original.data;
+    const creativeId = data.creative?.id || data.creative?.creative_id;
+    if (!creativeId) {
+      throw new Error(`Ad ${adId} has no creative to duplicate`);
+    }
     const payload: any = {
       name: newName,
       adset_id: adSetId,
       status: 'PAUSED',
-      creative: { creative_id: data.creative.id },
+      creative: { creative_id: creativeId },
     };
     if (data.tracking_specs) payload.tracking_specs = data.tracking_specs;
 
@@ -494,7 +498,7 @@ export class FacebookService {
     }
   }
 
-  async uploadImage(adAccountId: string, fileBuffer: Buffer, filename: string): Promise<string> {
+  async uploadImage(adAccountId: string, fileBuffer: Buffer, filename: string): Promise<{ hash: string; id: string }> {
     const form = new FormData();
     form.append('filename', fileBuffer, { filename });
     const resp = await this.client.post(`/${adAccountId}/adimages`, form, {
@@ -502,16 +506,51 @@ export class FacebookService {
     });
     const images = resp.data.images;
     const key = Object.keys(images)[0];
-    return images[key].hash;
+    return {
+      hash: images[key].hash,
+      id: images[key].id
+    };
   }
 
+  /**
+   * Resumable Video Upload for Meta (handles large files > 4MB)
+   * 1. Start session
+   * 2. Upload chunks (we do one large chunk for simplicity as we have memoryBuffer)
+   * 3. Finish session
+   */
   async uploadVideo(adAccountId: string, fileBuffer: Buffer, filename: string): Promise<string> {
+    const fileSize = fileBuffer.length;
+    
+    // Step 1: Initialize session
+    const initResp = await this.client.post(`/${adAccountId}/advideos`, null, {
+      params: {
+        upload_phase: 'start',
+        file_size: fileSize,
+      }
+    });
+    const { upload_session_id, video_id } = initResp.data;
+
+    // Step 2: Upload the file data
+    // Meta resumable API expects the file in the 'video_file_chunk' param as binary
     const form = new FormData();
-    form.append('source', fileBuffer, { filename });
-    const resp = await this.client.post(`/${adAccountId}/advideos`, form, {
+    form.append('upload_phase', 'transfer');
+    form.append('upload_session_id', upload_session_id);
+    form.append('start_offset', '0');
+    form.append('video_file_chunk', fileBuffer, { filename });
+
+    await this.client.post(`/${adAccountId}/advideos`, form, {
       headers: form.getHeaders(),
     });
-    return resp.data.id;
+
+    // Step 3: Finish upload
+    await this.client.post(`/${adAccountId}/advideos`, null, {
+      params: {
+        upload_phase: 'finish',
+        upload_session_id,
+      }
+    });
+
+    return video_id;
   }
 
   async getAccountInsights(adAccountId: string, datePreset?: string, since?: string, until?: string) {

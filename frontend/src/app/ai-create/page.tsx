@@ -127,10 +127,26 @@ function MessageBubble({ msg }: { msg: Message }) {
 
   if (isUser) {
     return (
-      <div className="flex justify-end">
+      <div className="flex flex-col items-end gap-2">
         <div className="max-w-[80%] px-4 py-2.5 bg-blue-600/20 text-gray-100 rounded-2xl rounded-tr-sm text-sm leading-relaxed">
           {msg.content}
         </div>
+        {msg.attachments && msg.attachments.length > 0 && (
+          <div className="flex flex-wrap justify-end gap-2 max-w-[80%]">
+            {msg.attachments.map((att) => (
+              <div key={att.id} className="relative w-24 h-24 bg-gray-900 border border-gray-700/60 rounded-xl overflow-hidden shadow-sm">
+                {att.type === 'image' ? (
+                  <img src={att.url} alt="upload" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-violet-500/10">
+                    <Video className="w-6 h-6 text-violet-400" />
+                    <span className="text-[9px] text-violet-400 font-medium mt-1 uppercase">Video</span>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -209,7 +225,7 @@ export default function AiCreatePage() {
         let res;
         if (att.type === 'image') {
           res = await uploadApi.uploadImage(att.file, selectedAccount.adaccount_id || selectedAccount.id);
-          const hash = res.data.hash;
+          const hash = res.data.hash || res.data.id;
           setSelectedFiles(prev => prev.map(f => f.id === att.id ? { ...f, status: 'ready', metaId: hash } : f));
         } else if (att.type === 'video') {
           res = await uploadApi.uploadVideo(att.file, selectedAccount.adaccount_id || selectedAccount.id);
@@ -270,9 +286,10 @@ export default function AiCreatePage() {
     
     if (readyAttachments.length > 0) {
       const attachmentContext = readyAttachments.map(f => 
-        f.type === 'image' ? `[IMAGE_HASH: ${f.metaId}]` : `[VIDEO_ID: ${f.metaId}]`
+        f.type === 'image' ? `(Uploaded Image Hash: ${f.metaId})` : `(Uploaded Video ID: ${f.metaId})`
       ).join(' ');
-      finalContent = `${text}\n\nUser attached these files: ${attachmentContext}. Use these identifiers for the ad creative if applicable.`;
+      // INJECT AS A NATURAL STATEMENT
+      finalContent = `I have uploaded these assets for you to use: ${attachmentContext}. \n\n${text}`;
     }
 
     const userMsg: Message = { 

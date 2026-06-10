@@ -17,8 +17,9 @@ export const uploadImage = async (req: AuthRequest, res: Response) => {
     }
 
     const fbService = new FacebookService(req.userAccessToken!);
-    const hash = await fbService.uploadImage(adAccountId, file.buffer, file.originalname);
-    res.json({ hash });
+    const { hash, id } = await fbService.uploadImage(adAccountId, file.buffer, file.originalname);
+    console.log(`[Upload] Image uploaded: ${hash} (ID: ${id})`);
+    res.json({ hash, id });
   } catch (error: any) {
     console.error('[Upload] Image upload failed:', error.response?.data || error.message);
     const metaMsg = error.response?.data?.error?.message;
