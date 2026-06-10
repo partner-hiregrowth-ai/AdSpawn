@@ -31,6 +31,7 @@ function LoginContent() {
   const searchParams = useSearchParams();
   const { setUser } = useAppStore();
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [fbReady, setFbReady] = useState(false);
 
   useEffect(() => {
     if (searchParams.get("reason") === "token_expired") {
@@ -38,19 +39,19 @@ function LoginContent() {
     }
   }, [searchParams]);
 
+  useEffect(() => {
+    import("@/components/FacebookSDK").then(({ waitForFBInit }) => {
+      waitForFBInit().then(() => setFbReady(true));
+    });
+  }, []);
+
   const handleFacebookLogin = async () => {
     const appId = process.env.NEXT_PUBLIC_FB_APP_ID;
     if (!appId || appId === "your_facebook_app_id") {
       toast.error("Facebook App ID is not configured. Please check your .env.local file.");
       return;
     }
-    if (!window.FB) {
-      toast.error("Facebook SDK not loaded. This is often caused by AdBlockers or a slow connection.");
-      return;
-    }
     setIsLoggingIn(true);
-    const { waitForFBInit } = await import("@/components/FacebookSDK");
-    await waitForFBInit();
     window.FB.login(
       (response: any) => {
         if (response.authResponse) {
@@ -160,14 +161,14 @@ function LoginContent() {
 
               <Button
                 onClick={handleFacebookLogin}
-                disabled={isLoggingIn}
-                className="w-full bg-[#1877F2] hover:bg-[#1568d3] text-white h-12 text-sm font-semibold gap-2.5 rounded-xl transition-all duration-150 hover:shadow-lg hover:shadow-blue-600/25 active:scale-[0.98]"
+                disabled={!fbReady || isLoggingIn}
+                className="w-full bg-[#1877F2] hover:bg-[#1568d3] text-white h-12 text-sm font-semibold gap-2.5 rounded-xl transition-all duration-150 hover:shadow-lg hover:shadow-blue-600/25 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {isLoggingIn
+                {(!fbReady || isLoggingIn)
                   ? <Loader2 className="w-4 h-4 animate-spin" />
                   : <FacebookIcon className="w-4 h-4" />
                 }
-                {isLoggingIn ? "Connecting..." : "Continue with Facebook"}
+                {isLoggingIn ? "Connecting..." : !fbReady ? "Initializing..." : "Continue with Facebook"}
               </Button>
 
               <div className="mt-4 flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05]">
