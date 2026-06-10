@@ -6,18 +6,20 @@ declare global {
   interface Window {
     fbAsyncInit: () => void;
     FB: any;
+    __fbReady: boolean;
   }
 }
 
 export const FacebookSDK = () => {
   const initFacebookSDK = () => {
-    if (window.FB) {
+    if (window.FB && !window.__fbReady) {
       window.FB.init({
         appId: process.env.NEXT_PUBLIC_FB_APP_ID,
         cookie: true,
         xfbml: true,
         version: "v21.0",
       });
+      window.__fbReady = true;
     }
   };
 
@@ -32,11 +34,7 @@ export const FacebookSDK = () => {
       crossOrigin="anonymous"
       src="https://connect.facebook.net/en_US/sdk.js"
       strategy="afterInteractive"
-      onLoad={() => {
-        if (window.FB && !window.FB._initialized) {
-          initFacebookSDK();
-        }
-      }}
+      onReady={initFacebookSDK}
     />
   );
 };
