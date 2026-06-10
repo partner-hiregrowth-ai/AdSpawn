@@ -50,6 +50,11 @@ function LoginContent() {
   }, []);
 
   const handleFacebookLogin = () => {
+    const appId = process.env.NEXT_PUBLIC_FB_APP_ID;
+    if (!appId || appId === "your_facebook_app_id") {
+      toast.error("Facebook App ID is not configured. Please check your .env.local file.");
+      return;
+    }
     setIsLoggingIn(true);
     window.FB.login(
       (response: any) => {
