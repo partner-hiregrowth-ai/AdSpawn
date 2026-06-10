@@ -43,12 +43,12 @@ function LoginContent() {
     let timer: ReturnType<typeof setTimeout>;
     const deadline = Date.now() + 10_000;
     const poll = () => {
-      if (window.__fbReady) {
+      if (window.FB) {
         setFbReady(true);
       } else if (Date.now() < deadline) {
         timer = setTimeout(poll, 100);
       } else {
-        toast.error("Facebook SDK failed to load. Disable any ad-blockers and try again.");
+        toast.error("Facebook SDK failed to load. Disable any ad-blockers and refresh.");
       }
     };
     poll();
@@ -60,6 +60,14 @@ function LoginContent() {
     if (!appId || appId === "your_facebook_app_id") {
       toast.error("Facebook App ID is not configured. Please check your .env.local file.");
       return;
+    }
+    if (!window.FB) {
+      toast.error("Facebook SDK not loaded. Please disable any ad-blockers and refresh.");
+      return;
+    }
+    if (!window.__fbReady) {
+      window.FB.init({ appId, cookie: true, xfbml: true, version: "v21.0" });
+      window.__fbReady = true;
     }
     setIsLoggingIn(true);
     window.FB.login(
