@@ -17,9 +17,13 @@ import { extractMetaError } from '../utils/metaErrorHelper';
 
 export const getHistory = async (req: AuthRequest, res: Response) => {
   try {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, Number(req.query.pageSize) || 50));
     const jobs = await prisma.duplicateJob.findMany({
       where: { userId: req.userId },
       orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
       include: { profile: { select: { id: true, name: true } } },
     });
     res.json(jobs);
@@ -94,28 +98,39 @@ export const previewConversion = async (req: AuthRequest, res: Response) => {
 export const convertObjective = async (req: AuthRequest, res: Response) => {
   const { items, targetObjective, newName, adAccountId, saveAsDraft } = req.body;
   const publishNow = saveAsDraft === false;
+
+  if (!req.profileId) {
+    return res.status(400).json({ message: 'No profile selected. Select a profile before converting.' });
+  }
+  const campaignItems = items.filter((i: any) => i.type === 'CAMPAIGN');
+  if (campaignItems.length === 0) {
+    return res.status(400).json({ message: 'Only campaigns can be converted. Select a campaign and try again.' });
+  }
+
   try {
     const results = [];
 
-    for (const item of items) {
-      if (item.type !== 'CAMPAIGN') continue;
-
-      const finalName = items.length === 1 ? newName : `${item.name} - Converted`;
+    for (const item of campaignItems) {
+      const finalName = (campaignItems.length === 1 && newName) ? newName : `${item.name} - Converted`;
 
       const draftCampaign = await DraftService.convertCampaignToDraft(
         item.id,
         targetObjective,
         finalName,
         adAccountId,
-        req.profileId!,
+        req.profileId,
         req.userAccessToken!
       );
 
+      // Publish failures must reach the user — the draft still exists, but
+      // "Converted successfully" would be a lie if nothing was created on Meta.
+      let publishError: string | undefined;
       if (publishNow) {
         try {
           await DraftPublishService.publishCampaign(draftCampaign.id, req.userAccessToken!);
-        } catch (publishError: any) {
-          console.error(`Immediate publish failed for draft ${draftCampaign.id}:`, publishError.message);
+        } catch (err: any) {
+          publishError = err.userMessage || err.message;
+          console.error(`Immediate publish failed for draft ${draftCampaign.id}:`, err.message);
         }
       }
 
@@ -123,14 +138,18 @@ export const convertObjective = async (req: AuthRequest, res: Response) => {
         data: {
           userId: req.userId!,
           profileId: req.profileId || null,
-          status: 'COMPLETED',
+          status: publishNow && publishError ? 'FAILED' : 'COMPLETED',
           type: 'CAMPAIGN',
           sourceId: item.id,
           targetId: draftCampaign.id,
-          details: { newName: finalName, targetObjective, adAccountId, isConversion: true, savedAsDraft: !publishNow },
+          details: {
+            newName: finalName, targetObjective, adAccountId, isConversion: true,
+            savedAsDraft: !publishNow || !!publishError,
+            ...(publishError ? { publishError } : {}),
+          },
         },
       });
-      results.push(draftCampaign);
+      results.push({ ...draftCampaign, publishError });
     }
 
     res.json({ success: true, results });

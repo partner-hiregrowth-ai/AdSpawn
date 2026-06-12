@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import fs from 'fs';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { FacebookService } from '../services/facebook.service';
 
@@ -28,8 +29,8 @@ export const uploadImage = async (req: AuthRequest, res: Response) => {
 };
 
 export const uploadVideo = async (req: AuthRequest, res: Response) => {
+  const file = req.file;
   try {
-    const file = req.file;
     const { adAccountId } = req.body;
 
     if (!file) return res.status(400).json({ error: 'No file provided' });
@@ -39,11 +40,14 @@ export const uploadVideo = async (req: AuthRequest, res: Response) => {
     }
 
     const fbService = new FacebookService(req.userAccessToken!);
-    const videoId = await fbService.uploadVideo(adAccountId, file.buffer, file.originalname);
+    const videoId = await fbService.uploadVideo(adAccountId, file.path, file.originalname);
     res.json({ videoId });
   } catch (error: any) {
     console.error('[Upload] Video upload failed:', error.response?.data || error.message);
     const metaMsg = error.response?.data?.error?.message;
     res.status(500).json({ error: metaMsg || 'Video upload failed' });
+  } finally {
+    // Videos are written to a temp file by multer diskStorage — always clean up.
+    if (file?.path) fs.unlink(file.path, () => {});
   }
 };

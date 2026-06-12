@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../prisma';
 import { config } from '../config';
+import { decryptToken } from '../utils/tokenCrypto';
 
 export interface AuthRequest extends Request {
   userId?: string;
@@ -47,7 +48,7 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
     req.teamId = user.teamId || decoded.teamId || undefined;
     req.userRole = user.role;
 
-    const ownerToken = user.team?.owner?.accessToken;
+    const ownerToken = decryptToken(user.team?.owner?.accessToken);
     const ownerExpiry = user.team?.owner?.accessTokenExpiresAt;
 
     if (!ownerToken) {

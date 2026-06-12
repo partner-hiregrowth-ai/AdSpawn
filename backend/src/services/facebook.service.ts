@@ -66,6 +66,14 @@ export class FacebookService {
     return response.data.data;
   }
 
+  /** Pages the user granted this app access to (requires pages_show_list). */
+  async getPages(): Promise<Array<{ id: string; name: string }>> {
+    const response = await this.client.get('/me/accounts', {
+      params: { fields: 'id,name', limit: 100 },
+    });
+    return response.data.data || [];
+  }
+
   async checkExistence(id: string) {
     try {
       await this.client.get(`/${id}`, { params: { fields: 'id' } });
@@ -515,12 +523,14 @@ export class FacebookService {
   /**
    * Resumable Video Upload for Meta (handles large files > 4MB)
    * 1. Start session
-   * 2. Upload chunks (we do one large chunk for simplicity as we have memoryBuffer)
+   * 2. Upload the file as a single chunk, STREAMED from disk — videos are
+   *    written to a temp file by multer so a 100MB upload never sits in RAM.
    * 3. Finish session
    */
-  async uploadVideo(adAccountId: string, fileBuffer: Buffer, filename: string): Promise<string> {
-    const fileSize = fileBuffer.length;
-    
+  async uploadVideo(adAccountId: string, filePath: string, filename: string): Promise<string> {
+    const fs = await import('fs');
+    const fileSize = fs.statSync(filePath).size;
+
     // Step 1: Initialize session
     const initResp = await this.client.post(`/${adAccountId}/advideos`, null, {
       params: {
@@ -536,10 +546,12 @@ export class FacebookService {
     form.append('upload_phase', 'transfer');
     form.append('upload_session_id', upload_session_id);
     form.append('start_offset', '0');
-    form.append('video_file_chunk', fileBuffer, { filename });
+    form.append('video_file_chunk', fs.createReadStream(filePath), { filename, knownLength: fileSize });
 
     await this.client.post(`/${adAccountId}/advideos`, form, {
       headers: form.getHeaders(),
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity,
     });
 
     // Step 3: Finish upload

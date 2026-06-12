@@ -1,5 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
+import os from 'os';
 import { uploadImage, uploadVideo } from '../controllers/upload.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 
@@ -11,8 +12,10 @@ const imageUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: IMAGE_MAX_BYTES },
 });
+// Videos go to a temp file, not RAM — a handful of concurrent 100MB buffers
+// would otherwise OOM the process. The controller deletes the file when done.
 const videoUpload = multer({
-  storage: multer.memoryStorage(),
+  storage: multer.diskStorage({ destination: os.tmpdir() }),
   limits: { fileSize: VIDEO_MAX_BYTES },
 });
 

@@ -16,7 +16,7 @@ import { uploadApi } from "@/services/api";
 // Emitting `undefined` clears the override (the store strips undefined values,
 // reverting the ad to the bulk default creative from the Configure step).
 
-type CreativeKind = "none" | "creative_id" | "inline" | "dynamic";
+type CreativeKind = "none" | "creative_id" | "post" | "inline" | "dynamic";
 type InlineMediaKind = "link" | "video" | "photo";
 
 // CTA types accepted by both inline link/video data. Mirrors the common subset
@@ -118,6 +118,7 @@ function UploadFieldButton({
 function detectKind(creative: any): CreativeKind {
   if (!creative || typeof creative !== "object") return "none";
   if ("creative_id" in creative) return "creative_id";
+  if ("object_story_id" in creative) return "post";
   if (creative.asset_feed_spec) return "dynamic";
   if (creative.object_story_spec) return "inline";
   return "none";
@@ -143,6 +144,9 @@ export function CreativeOverrideEditor({ value, onChange }: CreativeOverrideEdit
       case "creative_id":
         onChange({ creative_id: "" });
         break;
+      case "post":
+        onChange({ object_story_id: "" });
+        break;
       case "inline":
         onChange({ object_story_spec: { page_id: "", link_data: {} } });
         break;
@@ -163,6 +167,7 @@ export function CreativeOverrideEditor({ value, onChange }: CreativeOverrideEdit
         >
           <option value="none">None (use bulk default)</option>
           <option value="creative_id">Creative ID</option>
+          <option value="post">Existing Post</option>
           <option value="inline">Inline Creative</option>
           <option value="dynamic">Dynamic Creative</option>
         </select>
@@ -171,6 +176,7 @@ export function CreativeOverrideEditor({ value, onChange }: CreativeOverrideEdit
       {kind === "creative_id" && (
         <CreativeIdEditor value={value} onChange={onChange} />
       )}
+      {kind === "post" && <ExistingPostEditor value={value} onChange={onChange} />}
       {kind === "inline" && <InlineCreativeEditor value={value} onChange={onChange} />}
       {kind === "dynamic" && <DynamicCreativeEditor value={value} onChange={onChange} />}
     </div>
@@ -190,6 +196,26 @@ function CreativeIdEditor({ value, onChange }: CreativeOverrideEditorProps) {
         onChange={(e) => onChange(e.target.value ? { creative_id: e.target.value } : undefined)}
         className="bg-gray-800 border-gray-700 h-7 text-[11px]"
       />
+    </FieldRow>
+  );
+}
+
+// ─── Existing Post (object_story_id) ───
+
+function ExistingPostEditor({ value, onChange }: CreativeOverrideEditorProps) {
+  const postId: string = value?.object_story_id ?? "";
+  return (
+    <FieldRow label="Post ID">
+      <Input
+        type="text"
+        value={postId}
+        placeholder="e.g. 123456789_987654321"
+        onChange={(e) => onChange(e.target.value ? { object_story_id: e.target.value.trim() } : { object_story_id: "" })}
+        className="bg-gray-800 border-gray-700 h-7 text-[11px] font-mono"
+      />
+      <RequiredHint show={!postId}>
+        Paste the Facebook post ID (pageId_postId) to run an ad on an existing post.
+      </RequiredHint>
     </FieldRow>
   );
 }

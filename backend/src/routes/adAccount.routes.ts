@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getAdAccounts, getCampaigns, getAdSets, getAds, updateObjectName, bulkDeleteCampaigns, bulkActivateObjects, bulkPauseObjects } from '../controllers/adAccount.controller';
+import { getAdAccounts, getPages, getCampaigns, getAdSets, getAds, updateObjectName, bulkDeleteCampaigns, bulkActivateObjects, bulkPauseObjects } from '../controllers/adAccount.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { bulkLimiter } from '../middleware/rateLimit.middleware';
 
@@ -8,6 +8,7 @@ const router = Router();
 router.use(authMiddleware);
 
 router.get('/', getAdAccounts);
+router.get('/pages', getPages);
 router.get('/:adAccountId/campaigns', getCampaigns);
 router.get('/campaigns/:campaignId/adsets', getAdSets);
 router.get('/adsets/:adSetId/ads', getAds);

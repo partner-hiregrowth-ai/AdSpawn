@@ -40,6 +40,19 @@ export const getAdAccounts = async (req: AuthRequest, res: Response) => {
   }
 };
 
+// Facebook Pages the token can act on. Returns [] (not an error) when the
+// token lacks pages_* scopes so the UI can fall back to manual Page ID entry.
+export const getPages = async (req: AuthRequest, res: Response) => {
+  try {
+    const fbService = new FacebookService(req.userAccessToken!);
+    const pages = await fbService.getPages();
+    res.json(pages);
+  } catch (error: any) {
+    console.warn('Get Pages Error:', error.response?.data?.error?.message || error.message);
+    res.json([]);
+  }
+};
+
 export const getCampaigns = async (req: AuthRequest, res: Response) => {
   const adAccountId = req.params.adAccountId as string;
   try {

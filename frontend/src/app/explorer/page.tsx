@@ -355,12 +355,20 @@ export default function ExplorerPage() {
     if (!targetAccId) { toast.error("No destination account selected"); return; }
     setConverting(true);
     try {
-      await duplicationApi.convertObjective({
+      const resp = await duplicationApi.convertObjective({
         items: selectedItemsList, targetObjective,
         newName: convertName, adAccountId: targetAccId,
         saveAsDraft: mode === "draft",
       });
-      toast.success(mode === "draft" ? "Saved as draft!" : "Converted successfully!");
+      const publishFailures = (resp.data?.results || []).filter((r: any) => r.publishError);
+      if (mode === "publish" && publishFailures.length > 0) {
+        toast.warning(
+          `Converted to draft, but publishing to Meta failed: ${publishFailures[0].publishError}. Fix it in Drafts and publish from there.`,
+          { duration: 10000 },
+        );
+      } else {
+        toast.success(mode === "draft" ? "Saved as draft!" : "Converted and published!");
+      }
       setSelectedItems(new Map());
       setPanelOpen(false);
       resetOptimization();

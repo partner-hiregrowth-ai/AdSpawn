@@ -721,11 +721,11 @@ export class AiCampaignService {
       
       return {
         reply: isHighDemand
-          ? 'Gemini is currently experiencing very high demand. Please wait 10-30 seconds and try sending your message again.'
+          ? 'The AI service is experiencing high demand right now. Please wait a few seconds and try again.'
           : isRateLimit
-          ? 'Gemini API quota exceeded (429). This often happens on the Free Tier. Please wait a minute or try again later.'
+          ? 'The AI service is temporarily rate-limited. Please wait a minute and try again.'
           : isConfig
-          ? 'AI service is not configured. Please check the API key for your selected provider.'
+          ? 'The AI service is not configured. Please contact your administrator.'
           : 'Something went wrong. Please try again in a moment.',
         error: err.message,
       };

@@ -10,6 +10,7 @@ import { Team, TokenStatus, UserStats, UserProfile } from "@/types";
 import { useAppStore } from "@/store/useAppStore";
 import { toast } from "sonner";
 import { cn, extractApiError } from "@/lib/utils";
+import { clearSession } from "@/lib/logout";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   User,
@@ -71,7 +72,7 @@ export default function SettingsPage() {
     setIsDeleting(true);
     try {
       await userApi.deleteAccount();
-      localStorage.removeItem("token");
+      clearSession();
       window.location.href = "/login";
     } catch (err: any) {
       toast.error(extractApiError(err, "Failed to delete account"));
@@ -80,7 +81,7 @@ export default function SettingsPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
+    clearSession();
     window.location.href = "/login";
   };
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useAppStore, Profile } from "@/store/useAppStore";
+import { clearSession } from "@/lib/logout";
 import { usePathname, useRouter } from "next/navigation";
 import { User, LogOut, ChevronRight, Menu, Users, ChevronDown, CreditCard, Search } from "lucide-react";
 import {
@@ -173,17 +174,7 @@ export const Navbar = () => {
             <DropdownMenuSeparator className="bg-gray-800" />
             <DropdownMenuItem
               onClick={() => {
-                const store = useAppStore.getState();
-                store.setUser(null);
-                store.setTeam(null);
-                store.setProfile(null);
-                store.setProfiles([]);
-                store.setSelectedAccount(null);
-                store.setAdAccounts([]);
-                localStorage.removeItem("token");
-                localStorage.removeItem("profileId");
-                localStorage.removeItem("adspawn-app");
-                localStorage.removeItem("adspawn-wide-creation");
+                clearSession();
                 window.location.href = "/login";
               }}
               className="text-red-400 focus:text-red-400 focus:bg-red-500/10 cursor-pointer"

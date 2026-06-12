@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import axios from 'axios';
 import crypto from 'crypto';
 import { config } from '../config';
+import { encryptToken } from '../utils/tokenCrypto';
 
 function generateInviteCode(): string {
   return crypto.randomBytes(4).toString('hex');
@@ -17,7 +18,10 @@ export const loginWithFacebook = async (req: Request, res: Response) => {
   const { accessToken } = req.body;
 
   try {
-    const fbResponse = await axios.get(`https://graph.facebook.com/me?fields=id,name,email&access_token=${accessToken}`);
+    // Token goes in params, never in the URL string — URLs end up in logs.
+    const fbResponse = await axios.get('https://graph.facebook.com/me', {
+      params: { fields: 'id,name,email', access_token: accessToken },
+    });
     const { id, name, email } = fbResponse.data;
 
     let tokenToStore = accessToken;
@@ -55,15 +59,19 @@ export const loginWithFacebook = async (req: Request, res: Response) => {
       include: { ownedTeam: true }
     }));
 
+    // Tokens are encrypted at rest; legacy plaintext rows are re-encrypted on
+    // the next login because we always rewrite the token here.
+    const storedToken = encryptToken(tokenToStore);
+
     if (!user) {
       user = await withRetry(() => prisma.user.create({
-        data: { facebookId: id, name, email, accessToken: tokenToStore, accessTokenExpiresAt: tokenExpiresAt, role: 'admin' },
+        data: { facebookId: id, name, email, accessToken: storedToken, accessTokenExpiresAt: tokenExpiresAt, role: 'admin' },
         include: { ownedTeam: true }
       }));
     } else {
       user = await withRetry(() => prisma.user.update({
         where: { id: user!.id },
-        data: { name, email, accessToken: tokenToStore, accessTokenExpiresAt: tokenExpiresAt },
+        data: { name, email, accessToken: storedToken, accessTokenExpiresAt: tokenExpiresAt },
         include: { ownedTeam: true }
       }));
     }
@@ -109,5 +117,78 @@ export const loginWithFacebook = async (req: Request, res: Response) => {
     }
     res.status(500).json({ message: 'Login failed', detail: error?.message });
   }
+};
+
+// ─── Facebook Data Deletion Callback ───
+// Required by Meta App Review. Facebook POSTs a signed_request when a user
+// requests deletion of their data; we must anonymize the user and respond with
+// a status URL + confirmation code.
+// https://developers.facebook.com/docs/development/create-an-app/app-dashboard/data-deletion-callback
+
+function parseSignedRequest(signedRequest: string, appSecret: string): any | null {
+  const dot = signedRequest.indexOf('.');
+  if (dot < 0) return null;
+  const encodedSig = signedRequest.slice(0, dot);
+  const payload = signedRequest.slice(dot + 1);
+
+  const fromBase64Url = (s: string) => Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+  const sig = fromBase64Url(encodedSig);
+  const expected = crypto.createHmac('sha256', appSecret).update(payload).digest();
+  if (sig.length !== expected.length || !crypto.timingSafeEqual(sig, expected)) return null;
+
+  try {
+    return JSON.parse(fromBase64Url(payload).toString('utf8'));
+  } catch {
+    return null;
+  }
+}
+
+export const facebookDataDeletion = async (req: Request, res: Response) => {
+  const signedRequest = req.body?.signed_request;
+  const appSecret = process.env.FB_APP_SECRET?.replace(/^["']|["']$/g, '')?.trim();
+  if (!signedRequest || !appSecret) {
+    return res.status(400).json({ error: 'Missing signed_request' });
+  }
+
+  const data = parseSignedRequest(String(signedRequest), appSecret);
+  if (!data?.user_id) {
+    return res.status(400).json({ error: 'Invalid signed_request' });
+  }
+
+  const confirmationCode = crypto.randomBytes(8).toString('hex');
+  try {
+    const user = await prisma.user.findUnique({ where: { facebookId: String(data.user_id) } });
+    if (user) {
+      // Anonymize: revoke token, strip PII, detach the Facebook identity.
+      await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          accessToken: null,
+          accessTokenExpiresAt: null,
+          email: null,
+          name: 'Deleted User',
+          facebookId: `deleted_${confirmationCode}`,
+        },
+      });
+      console.log(`[DataDeletion] Anonymized user ${user.id} (confirmation ${confirmationCode})`);
+    } else {
+      console.log(`[DataDeletion] No user found for facebookId ${data.user_id} (confirmation ${confirmationCode})`);
+    }
+  } catch (error: any) {
+    console.error('[DataDeletion] Failed:', error?.message);
+    return res.status(500).json({ error: 'Deletion failed' });
+  }
+
+  const baseUrl = process.env.PUBLIC_API_URL || `http://localhost:${process.env.PORT || 5000}`;
+  res.json({
+    url: `${baseUrl}/api/auth/facebook/data-deletion-status?code=${confirmationCode}`,
+    confirmation_code: confirmationCode,
+  });
+};
+
+export const facebookDataDeletionStatus = async (req: Request, res: Response) => {
+  // Deletion is synchronous (anonymization happens in the callback), so any
+  // issued confirmation code is by definition completed.
+  res.json({ code: String(req.query.code || ''), status: 'completed' });
 };
 

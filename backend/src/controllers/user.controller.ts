@@ -27,9 +27,10 @@ export const getTokenStatus = async (req: AuthRequest, res: Response) => {
       return res.json({ valid: false, message: 'No access token. Ask your team admin to connect Facebook.' });
     }
 
-    const fbRes = await axios.get(
-      `https://graph.facebook.com/debug_token?input_token=${accessToken}&access_token=${accessToken}`
-    );
+    // Token goes in params, never in the URL string — URLs end up in logs.
+    const fbRes = await axios.get('https://graph.facebook.com/debug_token', {
+      params: { input_token: accessToken, access_token: accessToken },
+    });
     const data = fbRes.data?.data;
     res.json({
       valid: data?.is_valid ?? false,

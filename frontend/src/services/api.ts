@@ -31,8 +31,11 @@ api.interceptors.response.use(
   (error) => {
     const data = error.response?.data;
     if (error.response?.status === 401 && data?.code === 'TOKEN_EXPIRED') {
-      localStorage.removeItem('token');
-      window.location.href = '/login?reason=token_expired';
+      // Lazy import avoids a circular dependency (logout.ts → store, api.ts → store).
+      import('@/lib/logout').then(({ clearSession }) => {
+        clearSession();
+        window.location.href = '/login?reason=token_expired';
+      });
     }
     return Promise.reject(error);
   }
@@ -44,6 +47,7 @@ export const authApi = {
 
 export const adAccountApi = {
   getAdAccounts: () => api.get('/adaccounts'),
+  getPages: () => api.get('/adaccounts/pages'),
   getCampaigns: (adAccountId: string) => api.get(`/adaccounts/${adAccountId}/campaigns`),
   getAdSets: (campaignId: string) => api.get(`/adaccounts/campaigns/${campaignId}/adsets`),
   getAds: (adSetId: string) => api.get(`/adaccounts/adsets/${adSetId}/ads`),
@@ -54,7 +58,6 @@ export const adAccountApi = {
 };
 
 export const duplicationApi = {
-  getHistory: () => api.get('/duplicate/history'),
   deleteHistory: (id: string) => api.delete(`/duplicate/history/${id}`),
   cleanupHistory: () => api.post('/duplicate/sync'),
   duplicateCampaign: (data: any) => api.post('/duplicate/campaign', data),

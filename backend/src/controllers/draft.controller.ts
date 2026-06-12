@@ -120,7 +120,7 @@ export class DraftController {
     const id = req.params.id as string;
     const { profileId } = req as AuthRequest;
     try {
-      console.log(`[DraftController] Updating campaign: ${id}`, req.body);
+      console.log(`[DraftController] Updating campaign: ${id}`);
       const draft = await DraftCampaignService.update(id, req.body, profileId);
       res.json(draft);
     } catch (error: any) {
@@ -134,7 +134,7 @@ export class DraftController {
     const id = req.params.id as string;
     const { profileId } = req as AuthRequest;
     try {
-      console.log(`[DraftController] Updating adset: ${id}`, req.body);
+      console.log(`[DraftController] Updating adset: ${id}`);
       const draft = await DraftAdSetService.update(id, req.body, profileId);
       res.json(draft);
     } catch (error: any) {
@@ -148,7 +148,7 @@ export class DraftController {
     const id = req.params.id as string;
     const { profileId } = req as AuthRequest;
     try {
-      console.log(`[DraftController] Updating ad: ${id}`, req.body);
+      console.log(`[DraftController] Updating ad: ${id}`);
       const draft = await DraftAdService.update(id, req.body, profileId);
       res.json(draft);
     } catch (error: any) {

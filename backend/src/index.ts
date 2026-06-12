@@ -6,6 +6,9 @@ import { prisma } from './prisma';
 
 dotenv.config();
 
+import { validateEnvironment } from './config';
+validateEnvironment();
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -35,9 +38,12 @@ app.use(cors({
 app.use(express.json({ limit: '1mb' }));
 
 // GLOBAL ERROR HANDLERS
+// After an uncaught exception the process is in an undefined state — log and
+// exit so the supervisor restarts a clean instance instead of limping on.
 process.on('uncaughtException', (error) => {
-  console.error('!!! [CRITICAL] UNCAUGHT EXCEPTION !!!');
+  console.error('!!! [CRITICAL] UNCAUGHT EXCEPTION — exiting !!!');
   console.error(error);
+  process.exit(1);
 });
 
 process.on('unhandledRejection', (reason, promise) => {
@@ -58,8 +64,13 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', pid: process.pid, time: new Date().toISOString() });
+app.get('/health', async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({ status: 'ok', db: 'up', pid: process.pid, time: new Date().toISOString() });
+  } catch {
+    res.status(503).json({ status: 'degraded', db: 'down', pid: process.pid, time: new Date().toISOString() });
+  }
 });
 
 // Baseline rate limit for all API routes. Stricter limiters (auth, bulk, ai)
@@ -138,5 +149,29 @@ server.on('error', (err: any) => {
 server.on('close', () => {
   console.warn('!!! SERVER CLOSED !!!');
 });
+
+// Graceful shutdown: stop accepting connections, let in-flight requests
+// (including multi-step publishes) finish, then release the DB pool.
+let shuttingDown = false;
+const shutdown = (signal: string) => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[Shutdown] Received ${signal} — draining connections…`);
+  server.close(async () => {
+    try {
+      await prisma.$disconnect();
+    } finally {
+      console.log('[Shutdown] Done.');
+      process.exit(0);
+    }
+  });
+  // Hard-exit if draining takes too long (hung sockets, long publishes).
+  setTimeout(() => {
+    console.error('[Shutdown] Drain timeout exceeded — forcing exit.');
+    process.exit(1);
+  }, 30_000).unref();
+};
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 export { prisma };

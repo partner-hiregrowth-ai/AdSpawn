@@ -95,7 +95,12 @@ function LoginContent() {
       // pages_* scopes are required to create ads that post on behalf of a Page
       // (inline object_story_spec / dynamic creatives). Without them Meta rejects
       // ad creation with error 10/1341012 or the generic 100/2490433.
-      { scope: "ads_management,ads_read,business_management,public_profile,email,pages_show_list,pages_read_engagement,pages_manage_ads" }
+      // auth_type: "rerequest" forces the permission dialog even when the app was
+      // already authorized, so newly added scopes are actually asked for.
+      {
+        scope: "ads_management,ads_read,business_management,public_profile,email,pages_show_list,pages_read_engagement,pages_manage_ads",
+        auth_type: "rerequest",
+      }
     );
     } catch (err: any) {
       console.error("[FB] FB.login() threw:", err?.message, err?.stack);
