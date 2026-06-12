@@ -2,6 +2,33 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { FacebookService } from '../services/facebook.service';
 
+export const getLevelInsights = async (req: AuthRequest, res: Response) => {
+  const adAccountId = req.params.adAccountId as string;
+  const level = req.params.level as string;
+  if (!['campaign', 'adset', 'ad'].includes(level)) {
+    return res.status(400).json({ message: 'level must be campaign, adset, or ad' });
+  }
+  const q = (key: string) => {
+    const v = req.query[key];
+    return typeof v === 'string' ? v : undefined;
+  };
+  try {
+    const fbService = new FacebookService(req.userAccessToken!);
+    const rows = await fbService.getLevelInsights(
+      adAccountId,
+      level as 'campaign' | 'adset' | 'ad',
+      q('datePreset'),
+      q('since'),
+      q('until'),
+    );
+    res.json(rows);
+  } catch (error: any) {
+    const msg = error.response?.data?.error?.message || error.message || 'Failed to fetch insights';
+    const status = msg.toLowerCase().includes('rate limit') ? 429 : 500;
+    res.status(status).json({ message: msg });
+  }
+};
+
 export const getAccountAnalytics = async (req: AuthRequest, res: Response) => {
   const adAccountId = req.params.adAccountId as string;
   const q = (key: string) => {

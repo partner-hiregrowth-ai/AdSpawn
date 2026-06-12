@@ -110,6 +110,8 @@ export const activityApi = {
 export const analyticsApi = {
   getAccountAnalytics: (adAccountId: string, params?: { datePreset?: string; since?: string; until?: string }) =>
     api.get(`/analytics/${adAccountId}`, { params }),
+  getLevelInsights: (adAccountId: string, level: 'campaign' | 'adset' | 'ad', params?: { datePreset?: string }) =>
+    api.get(`/analytics/${adAccountId}/insights/${level}`, { params }),
 };
 
 export const draftApi = {

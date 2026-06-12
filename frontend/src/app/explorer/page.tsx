@@ -8,15 +8,17 @@ import { adAccountApi, duplicationApi, draftApi } from "@/services/api";
 import { Campaign, AdSet, Ad } from "@/types";
 import { OptimizedField } from "@/lib/meta-schema";
 import {
-  RefreshCw, FolderTree, PanelRightClose, PanelRightOpen,
+  RefreshCw, FolderTree, PanelRightClose, PanelRightOpen, Table2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn, extractApiError } from "@/lib/utils";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CampaignTree } from "@/components/explorer/CampaignTree";
+import { ExplorerTable } from "@/components/explorer/ExplorerTable";
 import { ActionPanel } from "@/components/explorer/ActionPanel";
 
 type PanelMode = 'duplicate' | 'convert';
+type ViewMode = 'tree' | 'table';
 
 // ─── Main page ───
 
@@ -39,6 +41,17 @@ export default function ExplorerPage() {
   // Panel state
   const [panelOpen, setPanelOpen] = useState(false);
   const [panelMode, setPanelMode] = useState<PanelMode>('duplicate');
+
+  // View mode: classic tree vs Google-Ads-style metrics table (persisted)
+  const [viewMode, setViewMode] = useState<ViewMode>('tree');
+  useEffect(() => {
+    const saved = localStorage.getItem('adspawn-explorer-view');
+    if (saved === 'table' || saved === 'tree') setViewMode(saved);
+  }, []);
+  const changeViewMode = (mode: ViewMode) => {
+    setViewMode(mode);
+    localStorage.setItem('adspawn-explorer-view', mode);
+  };
 
   // Duplicate settings
   const [renamePattern, setRenamePattern] = useState("{{campaign_name}}{{adset_name}}{{ad_name}} - Copy {{iteration_number}}");
@@ -510,6 +523,31 @@ export default function ExplorerPage() {
             <p className="text-gray-500 mt-1 text-sm">Browse and select structures to duplicate or convert.</p>
           </div>
           <div className="flex flex-wrap gap-2 shrink-0">
+            {/* View toggle: classic tree vs Google-Ads-style metrics table */}
+            <div className="inline-flex rounded-lg border border-gray-800 overflow-hidden" role="group" aria-label="View mode">
+              <button
+                onClick={() => changeViewMode('tree')}
+                aria-pressed={viewMode === 'tree'}
+                title="Tree view"
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors",
+                  viewMode === 'tree' ? "bg-blue-500/15 text-blue-300" : "text-gray-500 hover:text-gray-300",
+                )}
+              >
+                <FolderTree className="w-3.5 h-3.5" /> Tree
+              </button>
+              <button
+                onClick={() => changeViewMode('table')}
+                aria-pressed={viewMode === 'table'}
+                title="Table view with metrics (Google Ads style)"
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors border-l border-gray-800",
+                  viewMode === 'table' ? "bg-blue-500/15 text-blue-300" : "text-gray-500 hover:text-gray-300",
+                )}
+              >
+                <Table2 className="w-3.5 h-3.5" /> Table
+              </button>
+            </div>
             <Button variant="outline" size="sm" className="gap-1.5 border-gray-800 text-gray-400 hover:text-gray-200"
               onClick={handleFullRefresh} disabled={loading}>
               <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} /> Refresh
@@ -535,6 +573,16 @@ export default function ExplorerPage() {
           </div>
         ) : (
           <div className="flex flex-col lg:flex-row flex-1 gap-4 min-h-0 lg:overflow-hidden">
+            {viewMode === 'table' ? (
+              <ExplorerTable
+                account={selectedAccount}
+                campaigns={filteredCampaigns}
+                adSets={adSets} ads={ads}
+                setAdSets={setAdSets} setAds={setAds} setCampaigns={setCampaigns}
+                selectedItems={selectedItems} handleSelection={handleSelection}
+                searchQuery={searchQuery} setSearchQuery={setSearchQuery}
+              />
+            ) : (
             <CampaignTree
               panelOpen={panelOpen} loading={loading}
               filteredCampaigns={filteredCampaigns}
@@ -547,6 +595,7 @@ export default function ExplorerPage() {
               handleSelection={handleSelection} handleSelectAll={handleSelectAll}
               handleUpdateName={handleUpdateName} toggleCampaign={toggleCampaign} toggleAdSet={toggleAdSet}
             />
+            )}
 
             {panelOpen && selectedItems.size > 0 && (
               <ActionPanel

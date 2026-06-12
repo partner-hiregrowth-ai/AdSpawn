@@ -599,6 +599,40 @@ export class FacebookService {
     return response.data.data || [];
   }
 
+  /**
+   * Insights for every entity at one level (campaign/adset/ad) — powers the
+   * table view in Explorer. Returns rows with the level's id field so callers
+   * can join metrics onto entities client-side.
+   */
+  async getLevelInsights(
+    adAccountId: string,
+    level: 'campaign' | 'adset' | 'ad',
+    datePreset?: string,
+    since?: string,
+    until?: string,
+  ) {
+    const idFields: Record<string, string> = {
+      campaign: 'campaign_id',
+      adset: 'adset_id',
+      ad: 'ad_id',
+    };
+    const params: any = {
+      fields: `${idFields[level]},spend,impressions,clicks,ctr,cpc,cpm`,
+      level,
+      limit: 500,
+    };
+    if (since && until) {
+      params.time_range = JSON.stringify({ since, until });
+    } else {
+      params.date_preset = datePreset || 'last_7d';
+    }
+    const response = await this.withRetry(
+      () => this.client.get(`/${adAccountId}/insights`, { params }),
+      `getLevelInsights(${adAccountId},${level})`
+    );
+    return response.data.data || [];
+  }
+
   async getCampaignInsights(adAccountId: string, datePreset?: string, since?: string, until?: string, limit = 10) {
     const params: any = {
       fields: 'campaign_id,campaign_name,objective,spend,impressions,clicks,ctr,cpc,cpm',
