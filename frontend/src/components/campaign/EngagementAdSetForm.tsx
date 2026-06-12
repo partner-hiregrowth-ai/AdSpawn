@@ -523,8 +523,11 @@ function BrandSafetySection() {
 const ENGAGEMENT_CONVERSION_LOCATIONS = [
   { value: "ON_POST", label: "On post" },
   { value: "ON_VIDEO", label: "On video" },
+  { value: "ON_PAGE", label: "On your Page" },
+  { value: "ON_EVENT", label: "On your event" },
   { value: "WEBSITE", label: "Website" },
   { value: "FACEBOOK", label: "Facebook" },
+  { value: "INSTAGRAM_DIRECT", label: "Instagram Direct" },
 ] as const;
 
 type EngagementConversionLocationValue = typeof ENGAGEMENT_CONVERSION_LOCATIONS[number]["value"];
@@ -540,15 +543,31 @@ const ENGAGEMENT_PERFORMANCE_GOALS = [
   { value: "MESSAGES", label: "Maximize messages" },
   { value: "REACH", label: "Maximize daily unique reach" },
   { value: "IMPRESSIONS", label: "Maximize number of impressions" },
+  { value: "PAGE_LIKES", label: "Maximize Page likes" },
+  { value: "EVENT_RESPONSES", label: "Maximize event responses" },
 ] as const;
 
 const ENGAGEMENT_PERFORMANCE_GOAL_LABELS: Record<string, string> = Object.fromEntries(
   ENGAGEMENT_PERFORMANCE_GOALS.map((g) => [g.value, g.label])
 );
 
+// Which optimization goals Meta accepts per conversion location. The first
+// entry is the default applied when switching to that location.
+const ENGAGEMENT_GOALS_BY_LOCATION: Record<EngagementConversionLocationValue, string[]> = {
+  ON_POST: ["POST_ENGAGEMENT", "REACH", "IMPRESSIONS"],
+  ON_VIDEO: ["VIDEO_VIEWS", "THRUPLAY"],
+  ON_PAGE: ["PAGE_LIKES"],
+  ON_EVENT: ["EVENT_RESPONSES"],
+  WEBSITE: ["POST_ENGAGEMENT", "VIDEO_VIEWS", "THRUPLAY", "REACH", "IMPRESSIONS"],
+  FACEBOOK: ["MESSAGES"],
+  INSTAGRAM_DIRECT: ["MESSAGES"],
+};
+
 const ENGAGEMENT_BILLING_EVENTS = [
   { value: "IMPRESSIONS", label: "Impressions" },
   { value: "POST_ENGAGEMENT", label: "Post engagement" },
+  { value: "THRUPLAY", label: "ThruPlay" },
+  { value: "PAGE_LIKES", label: "Page likes" },
 ] as const;
 
 const ENGAGEMENT_BILLING_EVENT_LABELS: Record<string, string> = Object.fromEntries(
@@ -684,7 +703,9 @@ export function EngagementAdSetForm({
   );
 
   // Section 3: Dynamic creative
-  const [dynamicCreative, setDynamicCreative] = useState(false);
+  const [dynamicCreative, setDynamicCreative] = useState(!!initialValues.is_dynamic_creative);
+  const dynamicCreativeRef = useRef(dynamicCreative);
+  dynamicCreativeRef.current = dynamicCreative;
 
   // Section 4: Budget & schedule
   const [hasEndDate, setHasEndDate] = useState(!!(initialValues.end_time));
@@ -748,6 +769,16 @@ export function EngagementAdSetForm({
         delete values.end_time;
       }
 
+      // Dynamic Creative is a real ad set flag on Meta — publish requires it on
+      // both the ad set and its ads, so it must round-trip through draft data.
+      const effDynamicCreative =
+        "dynamicCreative" in overrides ? overrides.dynamicCreative : dynamicCreativeRef.current;
+      if (effDynamicCreative) {
+        values.is_dynamic_creative = true;
+      } else {
+        delete values.is_dynamic_creative;
+      }
+
       onChangeRef.current(values);
     },
     [initialValues, name, conversionLocation, performanceGoal, billingEvent, pageId, startDate, startTime, hasEndDate, endDate, endTime]
@@ -768,6 +799,7 @@ export function EngagementAdSetForm({
       setConversionLocation(initialValues.destination_type as EngagementConversionLocationValue);
     }
     if (initialValues.optimization_goal) setPerformanceGoal(initialValues.optimization_goal);
+    setDynamicCreative(!!initialValues.is_dynamic_creative);
     if (initialValues.billing_event) setBillingEvent(initialValues.billing_event);
     setPageId(initialValues.promoted_object?.page_id ?? "");
     if (initialValues.start_time) {
@@ -815,7 +847,22 @@ export function EngagementAdSetForm({
                 if (!v) return;
                 const loc = v as EngagementConversionLocationValue;
                 setConversionLocation(loc);
-                emit({ conversionLocation: loc });
+                // Each location supports a specific set of optimization goals —
+                // when the current goal isn't valid there, switch to the
+                // location's default and reset billing alongside it.
+                const validGoals = ENGAGEMENT_GOALS_BY_LOCATION[loc] ?? [];
+                if (!validGoals.includes(performanceGoal)) {
+                  const nextGoal = validGoals[0] ?? "POST_ENGAGEMENT";
+                  setPerformanceGoal(nextGoal);
+                  const nextBilling =
+                    billingEvent === "IMPRESSIONS" || billingEvent === nextGoal
+                      ? billingEvent
+                      : "IMPRESSIONS";
+                  if (nextBilling !== billingEvent) setBillingEvent(nextBilling);
+                  emit({ conversionLocation: loc, performanceGoal: nextGoal, billingEvent: nextBilling });
+                } else {
+                  emit({ conversionLocation: loc });
+                }
               }}
             >
               <SelectTrigger className="w-full bg-gray-800/30 border-gray-700/40 text-sm text-gray-200 focus:border-blue-500/50">
@@ -843,7 +890,14 @@ export function EngagementAdSetForm({
               onValueChange={(v) => {
                 if (!v) return;
                 setPerformanceGoal(v);
-                emit({ performanceGoal: v });
+                // Meta only accepts a non-IMPRESSIONS billing event when it
+                // matches the optimization goal — reset it if it no longer does.
+                if (billingEvent !== "IMPRESSIONS" && billingEvent !== v) {
+                  setBillingEvent("IMPRESSIONS");
+                  emit({ performanceGoal: v, billingEvent: "IMPRESSIONS" });
+                } else {
+                  emit({ performanceGoal: v });
+                }
               }}
             >
               <SelectTrigger className="w-full bg-gray-800/30 border-gray-700/40 text-sm text-gray-200 focus:border-blue-500/50">
@@ -852,7 +906,9 @@ export function EngagementAdSetForm({
                 </span>
               </SelectTrigger>
               <SelectContent className="bg-gray-900 border-gray-800">
-                {ENGAGEMENT_PERFORMANCE_GOALS.map((g) => (
+                {ENGAGEMENT_PERFORMANCE_GOALS.filter((g) =>
+                  (ENGAGEMENT_GOALS_BY_LOCATION[conversionLocation] ?? []).includes(g.value)
+                ).map((g) => (
                   <SelectItem key={g.value} value={g.value} className="text-xs text-gray-300">
                     {g.label}
                     {"recommended" in g && g.recommended && (
@@ -880,7 +936,9 @@ export function EngagementAdSetForm({
                 </span>
               </SelectTrigger>
               <SelectContent className="bg-gray-900 border-gray-800">
-                {ENGAGEMENT_BILLING_EVENTS.map((b) => (
+                {ENGAGEMENT_BILLING_EVENTS.filter(
+                  (b) => b.value === "IMPRESSIONS" || b.value === performanceGoal
+                ).map((b) => (
                   <SelectItem key={b.value} value={b.value} className="text-xs text-gray-300">
                     {b.label}
                     {b.value === "IMPRESSIONS" && (
@@ -913,7 +971,10 @@ export function EngagementAdSetForm({
           title="Dynamic creative"
           hasToggle
           toggled={dynamicCreative}
-          onToggle={setDynamicCreative}
+          onToggle={(v) => {
+            setDynamicCreative(v);
+            emit({ dynamicCreative: v });
+          }}
         />
         <SectionBody className="!py-3">
           <p className="text-[11px] text-gray-500 leading-relaxed">

@@ -195,6 +195,7 @@ describe('DraftCampaignService', () => {
       take: 50,
       include: {
         _count: { select: { adSets: true } },
+        adSets: { select: { _count: { select: { ads: true } } } },
       },
     });
     expect(result.total).toBe(0);

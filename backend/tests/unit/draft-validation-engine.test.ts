@@ -398,11 +398,48 @@ describe('DraftValidationEngine.validateAd', () => {
     expect(errors).toHaveLength(0);
   });
 
-  it('accepts ad with video_data and video_id', async () => {
+  it('accepts ad with video_data, video_id, and thumbnail', async () => {
+    const errors = await DraftValidationEngine.validateAd(
+      makeAd({ data: { creative: { object_story_spec: { page_id: '111', video_data: { video_id: '456', image_hash: 'thumb1' } } } } })
+    );
+    expect(errors.filter(e => e.severity === 'error')).toHaveLength(0);
+  });
+
+  it('rejects video_data without a thumbnail (Meta requires image_hash or image_url)', async () => {
     const errors = await DraftValidationEngine.validateAd(
       makeAd({ data: { creative: { object_story_spec: { page_id: '111', video_data: { video_id: '456' } } } } })
     );
+    expect(errors.some(e => e.field === 'creative.video_data.image_hash' && e.severity === 'error')).toBe(true);
+  });
+
+  it('rejects link_data carrying both image_hash and picture (mutually exclusive)', async () => {
+    const errors = await DraftValidationEngine.validateAd(
+      makeAd({ data: { creative: { object_story_spec: { page_id: '111', link_data: { link: 'https://x.com', image_hash: 'abc', picture: 'https://x.com/p.jpg' } } } } })
+    );
+    expect(errors.some(e => e.field === 'creative.link_data.image_hash' && e.severity === 'error')).toBe(true);
+  });
+
+  it('accepts photo_data with url instead of image_hash', async () => {
+    const errors = await DraftValidationEngine.validateAd(
+      makeAd({ data: { creative: { object_story_spec: { page_id: '111', photo_data: { url: 'https://x.com/p.jpg' } } } } })
+    );
     expect(errors.filter(e => e.severity === 'error')).toHaveLength(0);
+  });
+
+  it('rejects a standard inline creative inside a Dynamic Creative ad set', async () => {
+    const errors = await DraftValidationEngine.validateAd(
+      makeAd({ data: { creative: { object_story_spec: { page_id: '111', link_data: { link: 'https://x.com', image_hash: 'abc' } } } } }),
+      true, // isDynamicCreative ad set
+    );
+    expect(errors.some(e => e.field === 'creative' && e.severity === 'error' && e.message.includes('Dynamic Creative'))).toBe(true);
+  });
+
+  it('rejects a plain creative_id reference inside a Dynamic Creative ad set', async () => {
+    const errors = await DraftValidationEngine.validateAd(
+      makeAd({ data: { creative: { creative_id: '123' } } }),
+      true,
+    );
+    expect(errors.some(e => e.field === 'creative' && e.severity === 'error' && e.message.includes('Dynamic Creative'))).toBe(true);
   });
 
   it('rejects video_data without video_id', async () => {

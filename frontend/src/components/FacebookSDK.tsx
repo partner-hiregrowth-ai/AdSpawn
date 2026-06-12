@@ -26,7 +26,6 @@ export const FacebookSDK = () => {
       return;
     }
 
-    console.log("[FB] FB.init() — appId:", appId, "raw:", rawAppId);
     try {
       window.FB.init({
         appId,
@@ -36,7 +35,6 @@ export const FacebookSDK = () => {
       });
       window.__fbReady = true;
       window.__fbLastRef = window.FB;
-      console.log("[FB] FB.init() done");
     } catch (err) {
       console.error("[FB] FB.init() failed:", err);
     }
@@ -53,10 +51,7 @@ export const FacebookSDK = () => {
       crossOrigin="anonymous"
       src="https://connect.facebook.net/en_US/sdk.js"
       strategy="afterInteractive"
-      onReady={() => {
-        console.log("[FB] onReady — __buffer:", !!window.FB?.__buffer, "__fbReady:", !!window.__fbReady);
-        initFacebookSDK();
-      }}
+      onReady={initFacebookSDK}
     />
   );
 };

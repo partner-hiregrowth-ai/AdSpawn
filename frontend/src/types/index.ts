@@ -74,6 +74,7 @@ export type DraftStatus = 'DRAFT' | 'VALIDATED' | 'VALIDATION_FAILED' | 'PUBLISH
 
 export interface DraftCampaign {
   id: string;
+  adAccountId: string;
   name: string;
   objective: string;
   status: DraftStatus;
@@ -81,7 +82,7 @@ export interface DraftCampaign {
   profileId?: string | null;
   createdAt: string;
   updatedAt: string;
-  _count?: { adSets: number };
+  _count?: { adSets: number; ads: number };
 }
 
 export interface DraftShare {

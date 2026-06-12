@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { CreativeOverrideEditor } from "@/components/wide-create/CreativeOverrideEditor";
 import { toast } from "sonner";
 import {
   X, ChevronDown, ChevronRight, Info, AlertTriangle, Star,
@@ -399,6 +400,10 @@ export function SalesAdForm({ initialValues, onChange }: SalesAdFormProps) {
   const [partnershipStep, setPartnershipStep] = useState<"code" | "identities" | null>(null);
   const [partnershipCode, setPartnershipCode] = useState("");
 
+  const [pageId, setPageId] = useState<string>(initialValues.page_id ?? "");
+  const pageIdRef = useRef(pageId);
+  pageIdRef.current = pageId;
+
   const [adSetup, setAdSetup] = useState<SalesAdSetup>("create");
   const [creativeSource, setCreativeSource] = useState<"manual" | "catalog">("manual");
   const [format, setFormat] = useState<"single" | "carousel">("single");
@@ -412,6 +417,9 @@ export function SalesAdForm({ initialValues, onChange }: SalesAdFormProps) {
   const [urlTouched, setUrlTouched] = useState(false);
 
   const [creativeId, setCreativeId] = useState<string>(initialValues.creative?.creative_id ?? initialValues.creative?.id ?? "");
+  const [creative, setCreative] = useState<any>(initialValues.creative);
+  const creativeRef = useRef(creative);
+  creativeRef.current = creative;
   const [showCreativeMockup, setShowCreativeMockup] = useState(false);
   const [postId, setPostId] = useState<string>(initialValues.creative?.object_story_id ?? "");
 
@@ -434,13 +442,26 @@ export function SalesAdForm({ initialValues, onChange }: SalesAdFormProps) {
     if (isInternalChange.current) { isInternalChange.current = false; return; }
     setAdName(initialValues.name ?? "New Sales Ad");
     setCreativeId(initialValues.creative?.creative_id ?? initialValues.creative?.id ?? "");
+    setCreative(initialValues.creative);
+    setPageId(initialValues.page_id ?? "");
   }, [initialValues]);
 
   const emit = useCallback((overrides: Record<string, any> = {}) => {
     isInternalChange.current = true;
     const values: Record<string, any> = { ...initialValues, name: adName, ...overrides };
-    const cid = overrides.hasOwnProperty("creative") ? overrides.creative?.creative_id : creativeId;
-    if (cid?.trim()) { values.creative = { creative_id: cid.trim() }; } else { delete values.creative; }
+    // Pass the full creative through — it can be { creative_id }, an inline
+    // { object_story_spec } (image/video), or a dynamic { asset_feed_spec }.
+    // Reducing it to creative_id here used to destroy duplicated creatives.
+    const effCreative = overrides.hasOwnProperty("creative") ? overrides.creative : creativeRef.current;
+    if (effCreative && typeof effCreative === "object" && Object.keys(effCreative).length > 0) {
+      values.creative = effCreative;
+    } else {
+      delete values.creative;
+    }
+    // page_id rides along on every emit so it isn't lost when other fields change.
+    const effPageId = overrides.hasOwnProperty("page_id") ? overrides.page_id : (pageIdRef.current?.trim() || undefined);
+    if (effPageId) values.page_id = effPageId;
+    else delete values.page_id;
     onChangeRef.current(values);
   }, [initialValues, adName, creativeId]);
 
@@ -482,20 +503,13 @@ export function SalesAdForm({ initialValues, onChange }: SalesAdFormProps) {
       <SectionCard>
         <SectionHeader title="Identity" description="The profiles that will be used in your ad." />
         <SectionBody>
-          <FieldRow label="Facebook Page">
-            <Select defaultValue="test_page">
-              <SelectTrigger className="w-full bg-gray-800/30 border-gray-700/40 text-sm text-gray-200 focus:border-blue-500/50">
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 rounded bg-blue-600 flex items-center justify-center shrink-0">
-                    <span className="text-[9px] font-bold text-white">f</span>
-                  </div>
-                  <span>Test page for dup</span>
-                </div>
-              </SelectTrigger>
-              <SelectContent className="bg-gray-900 border-gray-800">
-                <SelectItem value="test_page" className="text-xs text-gray-300">Test page for dup</SelectItem>
-              </SelectContent>
-            </Select>
+          <FieldRow label="Facebook Page ID" required hint="Numeric ID of the Facebook Page this ad runs under. Required to publish.">
+            <Input
+              value={pageId}
+              onChange={(e) => { setPageId(e.target.value); emit({ page_id: e.target.value.trim() || undefined }); }}
+              placeholder="e.g. 1064753226727354"
+              className="bg-gray-800/30 border-gray-700/40 text-sm text-gray-200 placeholder-gray-600 focus:border-blue-500/50 focus:ring-0 font-mono"
+            />
           </FieldRow>
           <div className="flex gap-2">
             <div className="flex-1">
@@ -771,15 +785,13 @@ export function SalesAdForm({ initialValues, onChange }: SalesAdFormProps) {
       <SectionCard>
         <SectionHeader title="Ad creative" description="Select and optimize your ad text, media and enhancements." />
         <SectionBody>
-          <FieldRow label="Creative ID" hint="Reference an existing creative. Required when your FB App is in Development mode.">
-            <Input
-              value={creativeId}
-              onChange={(e) => { setCreativeId(e.target.value); emit({ creative: e.target.value.trim() ? { creative_id: e.target.value.trim() } : null }); }}
-              placeholder="e.g. 120209859739520186"
-              className="bg-gray-800/30 border-gray-700/40 text-xs text-gray-200 placeholder-gray-600 focus:border-blue-500/50 focus:ring-0 font-mono"
+          <FieldRow label="Creative" hint="Reference an existing creative ID, or build an inline creative with an uploaded image or video. Inline creatives require your FB App to be in Live mode.">
+            <CreativeOverrideEditor
+              value={creative}
+              onChange={(c) => { setCreative(c); emit({ creative: c }); }}
             />
           </FieldRow>
-          {!creativeId.trim() && <InfoBox>Please specify an image or enter a Creative ID to run with this ad.</InfoBox>}
+          {!creative && <InfoBox>Add a creative — reference a Creative ID or upload an image/video — to run this ad.</InfoBox>}
           {(adSetup === "existing" || adSetup === "boost") && (
             <div className="space-y-3">
               <FieldRow label="Post ID" hint="Enter the post ID or URL to use as an existing post.">

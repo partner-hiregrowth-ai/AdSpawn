@@ -85,7 +85,19 @@ export class DraftController {
       const page = Math.max(1, parseInt(req.query.page as string) || 1);
       const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize as string) || 50));
       const result = await DraftCampaignService.listByProfile(profileId!, page, pageSize);
-      res.json(result);
+      
+      const enrichedItems = result.items.map((campaign: any) => {
+        const { adSets, ...rest } = campaign;
+        return {
+          ...rest,
+          _count: {
+            ...campaign._count,
+            ads: adSets.reduce((sum: number, s: any) => sum + (s._count?.ads || 0), 0)
+          }
+        };
+      });
+
+      res.json({ ...result, items: enrichedItems });
     } catch (error: any) {
       console.error(`[DraftController] Error in listCampaigns:`, error);
       res.status(500).json({ error: error.message });
@@ -470,7 +482,7 @@ export class DraftController {
         });
       } else if (level === 'adSet') {
         drafts = await prisma.draftAdSet.findMany({
-          where: { id: { in: draftIds } },
+          where: { id: { in: draftIds }, campaign: { profileId } },
           include: { campaign: { select: { objective: true, data: true } } },
         });
         drafts = drafts.map((d: any) => ({
@@ -480,7 +492,7 @@ export class DraftController {
         }));
       } else {
         drafts = await prisma.draftAd.findMany({
-          where: { id: { in: draftIds } },
+          where: { id: { in: draftIds }, adSet: { campaign: { profileId } } },
         });
       }
 
@@ -516,12 +528,12 @@ export class DraftController {
         });
       } else if (level === 'adSet') {
         drafts = await prisma.draftAdSet.findMany({
-          where: { id: { in: draftIds } },
+          where: { id: { in: draftIds }, campaign: { profileId } },
           include: { campaign: { select: { objective: true } } },
         });
         drafts = drafts.map((d: any) => ({ ...d, objective: d.campaign?.objective }));
       } else {
-        drafts = await prisma.draftAd.findMany({ where: { id: { in: draftIds } } });
+        drafts = await prisma.draftAd.findMany({ where: { id: { in: draftIds }, adSet: { campaign: { profileId } } } });
       }
 
       const result = BulkEditCompatibilityEngine.validateBulkEdit(drafts, fieldUpdates, level);
@@ -557,16 +569,14 @@ export class DraftController {
           });
         } else if (level === 'adSet') {
           drafts = await tx.draftAdSet.findMany({
-            where: { id: { in: draftIds } },
+            where: { id: { in: draftIds }, campaign: { profileId } },
             include: { campaign: { select: { objective: true, profileId: true } } },
           });
-          drafts = drafts.filter((d: any) => d.campaign?.profileId === profileId);
         } else {
           drafts = await tx.draftAd.findMany({
-            where: { id: { in: draftIds } },
+            where: { id: { in: draftIds }, adSet: { campaign: { profileId } } },
             include: { adSet: { include: { campaign: { select: { profileId: true } } } } },
           });
-          drafts = drafts.filter((d: any) => d.adSet?.campaign?.profileId === profileId);
         }
 
         const validation = BulkEditCompatibilityEngine.validateBulkEdit(drafts, fieldUpdates, level);
@@ -779,6 +789,14 @@ export class DraftController {
     try {
       if (!targetProfileId) return res.status(400).json({ error: 'profileId is required' });
       if (targetProfileId === authReq.profileId) return res.status(400).json({ error: 'Cannot share with yourself' });
+      if (!['view', 'edit'].includes(permission)) {
+        return res.status(400).json({ error: 'permission must be "view" or "edit"' });
+      }
+
+      const targetProfile = await prisma.profile.findFirst({
+        where: { id: targetProfileId, teamId: authReq.teamId },
+      });
+      if (!targetProfile) return res.status(404).json({ error: 'Target profile not found in your team' });
 
       const draft = await prisma.draftCampaign.findFirst({ where: { id, profileId: authReq.profileId } });
       if (!draft) return res.status(404).json({ error: 'Draft not found' });
@@ -846,6 +864,16 @@ export class DraftController {
       if (!Array.isArray(campaignIds) || campaignIds.length === 0) return res.status(400).json({ error: 'campaignIds is required' });
       if (!Array.isArray(profileIds) || profileIds.length === 0) return res.status(400).json({ error: 'profileIds is required' });
       if (profileIds.includes(authReq.profileId)) return res.status(400).json({ error: 'Cannot share with yourself' });
+      if (!['view', 'edit'].includes(permission)) {
+        return res.status(400).json({ error: 'permission must be "view" or "edit"' });
+      }
+
+      const teamProfileCount = await prisma.profile.count({
+        where: { id: { in: profileIds }, teamId: authReq.teamId },
+      });
+      if (teamProfileCount !== profileIds.length) {
+        return res.status(404).json({ error: 'One or more target profiles not found in your team' });
+      }
 
       const ownedCount = await prisma.draftCampaign.count({
         where: { id: { in: campaignIds }, profileId: authReq.profileId },

@@ -203,9 +203,12 @@ function InlineCreativeEditor({ value, onChange }: CreativeOverrideEditorProps) 
   const media = detectInlineMedia(value);
 
   // Rebuild object_story_spec preserving page_id + a single data block. Switching
-  // media kind drops the prior data block (Meta accepts exactly one).
+  // media kind drops the prior data block (Meta accepts exactly one). An empty
+  // page_id is omitted so the ad set's Page can satisfy identity at publish time.
   const emitSpec = (next: Record<string, any>) => {
-    onChange({ object_story_spec: next });
+    const cleaned = { ...next };
+    if (!cleaned.page_id) delete cleaned.page_id;
+    onChange({ object_story_spec: cleaned });
   };
 
   const setPageId = (id: string) => {
@@ -261,7 +264,28 @@ function InlineCreativeEditor({ value, onChange }: CreativeOverrideEditorProps) 
 
       {media === "link" && (
         <div className="space-y-1.5">
-          <FieldRow label="Destination URL">
+          <FieldRow label="Image hash *">
+            <div className="flex gap-1">
+              <Input
+                type="text"
+                value={spec.link_data?.image_hash ?? ""}
+                placeholder="e.g. 8c0e8...d3f"
+                onChange={(e) => setDataField("link_data", "image_hash", e.target.value)}
+                className="bg-gray-800 border-gray-700 h-7 text-[11px] flex-1"
+              />
+              {uploadImage && (
+                <UploadFieldButton
+                  uploadFn={uploadImage}
+                  accept="image/*"
+                  onResult={(hash) => setDataField("link_data", "image_hash", hash)}
+                />
+              )}
+            </div>
+            <RequiredHint show={!spec.link_data?.image_hash && !spec.link_data?.picture && !spec.link_data?.video_id}>
+              Link ads need a visual — upload an image or paste an image hash.
+            </RequiredHint>
+          </FieldRow>
+          <FieldRow label="Destination URL *">
             <Input
               type="text"
               value={spec.link_data?.link ?? ""}
@@ -269,6 +293,9 @@ function InlineCreativeEditor({ value, onChange }: CreativeOverrideEditorProps) 
               onChange={(e) => setDataField("link_data", "link", e.target.value)}
               className="bg-gray-800 border-gray-700 h-7 text-[11px]"
             />
+            <RequiredHint show={!spec.link_data?.link}>
+              Required — the page people visit after clicking the ad.
+            </RequiredHint>
           </FieldRow>
           <FieldRow label="Primary text">
             <Input
@@ -304,7 +331,7 @@ function InlineCreativeEditor({ value, onChange }: CreativeOverrideEditorProps) 
               const current = { ...(spec.link_data ?? {}) };
               if (cta) current.call_to_action = { type: cta };
               else delete current.call_to_action;
-              onChange({ object_story_spec: { page_id: pageId, link_data: current } });
+              emitSpec({ page_id: pageId, link_data: current });
             }}
           />
         </div>
@@ -312,7 +339,7 @@ function InlineCreativeEditor({ value, onChange }: CreativeOverrideEditorProps) 
 
       {media === "video" && (
         <div className="space-y-1.5">
-          <FieldRow label="Video ID">
+          <FieldRow label="Video ID *">
             <div className="flex gap-1">
               <Input
                 type="text"
@@ -329,6 +356,9 @@ function InlineCreativeEditor({ value, onChange }: CreativeOverrideEditorProps) 
                 />
               )}
             </div>
+            <RequiredHint show={!spec.video_data?.video_id}>
+              Required — upload a video or paste an existing Video ID.
+            </RequiredHint>
           </FieldRow>
           <FieldRow label="Title">
             <Input
@@ -339,6 +369,36 @@ function InlineCreativeEditor({ value, onChange }: CreativeOverrideEditorProps) 
               className="bg-gray-800 border-gray-700 h-7 text-[11px]"
             />
           </FieldRow>
+          <FieldRow label="Primary text">
+            <Input
+              type="text"
+              value={spec.video_data?.message ?? ""}
+              placeholder="Body / primary text"
+              onChange={(e) => setDataField("video_data", "message", e.target.value)}
+              className="bg-gray-800 border-gray-700 h-7 text-[11px]"
+            />
+          </FieldRow>
+          <FieldRow label="Thumbnail image hash *">
+            <div className="flex gap-1">
+              <Input
+                type="text"
+                value={spec.video_data?.image_hash ?? ""}
+                placeholder="Required by Meta for video ads"
+                onChange={(e) => setDataField("video_data", "image_hash", e.target.value)}
+                className="bg-gray-800 border-gray-700 h-7 text-[11px] flex-1"
+              />
+              {uploadImage && (
+                <UploadFieldButton
+                  uploadFn={uploadImage}
+                  accept="image/*"
+                  onResult={(hash) => setDataField("video_data", "image_hash", hash)}
+                />
+              )}
+            </div>
+            <RequiredHint show={!spec.video_data?.image_hash && !spec.video_data?.image_url}>
+              Meta rejects video ads without a thumbnail — upload an image or paste an image hash.
+            </RequiredHint>
+          </FieldRow>
           <CtaSelect
             value={extractCtaType(spec.video_data?.call_to_action)}
             options={CTA_OPTIONS}
@@ -346,7 +406,7 @@ function InlineCreativeEditor({ value, onChange }: CreativeOverrideEditorProps) 
               const current = { ...(spec.video_data ?? {}) };
               if (cta) current.call_to_action = { type: cta };
               else delete current.call_to_action;
-              onChange({ object_story_spec: { page_id: pageId, video_data: current } });
+              emitSpec({ page_id: pageId, video_data: current });
             }}
           />
         </div>
@@ -354,7 +414,7 @@ function InlineCreativeEditor({ value, onChange }: CreativeOverrideEditorProps) 
 
       {media === "photo" && (
         <div className="space-y-1.5">
-          <FieldRow label="Image hash">
+          <FieldRow label="Image hash *">
             <div className="flex gap-1">
               <Input
                 type="text"
@@ -371,6 +431,9 @@ function InlineCreativeEditor({ value, onChange }: CreativeOverrideEditorProps) 
                 />
               )}
             </div>
+            <RequiredHint show={!spec.photo_data?.image_hash && !spec.photo_data?.url}>
+              Required — upload an image or paste an existing Image Hash.
+            </RequiredHint>
           </FieldRow>
           <FieldRow label="Caption">
             <Input
@@ -390,6 +453,13 @@ function InlineCreativeEditor({ value, onChange }: CreativeOverrideEditorProps) 
 // call_to_action is stored as `{ type: "..." }`; surface just the type string.
 function extractCtaType(cta: any): string {
   return cta && typeof cta === "object" ? cta.type ?? "" : "";
+}
+
+// Inline required-field hint, mirroring DraftValidationEngine's rules so the
+// user sees what blocks publishing without waiting for a server validate.
+function RequiredHint({ show, children }: { show: boolean; children: React.ReactNode }) {
+  if (!show) return null;
+  return <p className="text-[9px] text-red-400 mt-0.5">{children}</p>;
 }
 
 function CtaSelect({
@@ -480,23 +550,32 @@ function DynamicCreativeEditor({ value, onChange }: CreativeOverrideEditorProps)
       </FieldRow>
 
       <AssetList
-        label="Bodies"
+        label="Bodies *"
         placeholder="Primary text"
         rows={readList("bodies", "text")}
         onChange={(rows) => setListField("bodies", "text", rows)}
       />
+      <RequiredHint show={!readList("bodies", "text").some(r => r.trim())}>
+        Dynamic creative needs at least one body text.
+      </RequiredHint>
       <AssetList
-        label="Titles"
+        label="Titles *"
         placeholder="Headline"
         rows={readList("titles", "text")}
         onChange={(rows) => setListField("titles", "text", rows)}
       />
+      <RequiredHint show={!readList("titles", "text").some(r => r.trim())}>
+        Dynamic creative needs at least one title.
+      </RequiredHint>
       <AssetList
-        label="Link URLs"
+        label="Link URLs *"
         placeholder="https://example.com"
         rows={readList("link_urls", "website_url")}
         onChange={(rows) => setListField("link_urls", "website_url", rows)}
       />
+      <RequiredHint show={!readList("link_urls", "website_url").some(r => r.trim())}>
+        Dynamic creative needs at least one website URL.
+      </RequiredHint>
       <AssetList
         label="Image Hashes"
         placeholder="Image hash"
@@ -513,6 +592,9 @@ function DynamicCreativeEditor({ value, onChange }: CreativeOverrideEditorProps)
         uploadFn={uploadVideo}
         uploadAccept="video/*"
       />
+      <RequiredHint show={!readList("images", "hash").some(r => r.trim()) && !readList("videos", "video_id").some(r => r.trim())}>
+        Dynamic creative needs at least one image or video.
+      </RequiredHint>
 
       <div>
         <Label className="text-[9px] text-gray-500">Call to actions</Label>

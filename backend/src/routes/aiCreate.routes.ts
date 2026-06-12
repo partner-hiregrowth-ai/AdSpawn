@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { AiCreateController } from '../controllers/aiCreate.controller';
 import { authMiddleware } from '../middleware/auth.middleware';
 import { validateBody } from '../middleware/validate.middleware';
+import { aiLimiter } from '../middleware/rateLimit.middleware';
 
 const chatSchema = z.object({
   adAccountId: z.string().min(1, 'adAccountId is required'),
@@ -18,6 +19,6 @@ const chatSchema = z.object({
 
 const router = Router();
 router.use(authMiddleware);
-router.post('/chat', validateBody(chatSchema), AiCreateController.chat);
+router.post('/chat', aiLimiter, validateBody(chatSchema), AiCreateController.chat);
 
 export default router;

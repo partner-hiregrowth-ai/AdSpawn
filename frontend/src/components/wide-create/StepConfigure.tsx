@@ -23,6 +23,7 @@ import {
 } from "@/store/useWideCreationStore";
 import { draftApi } from "@/services/api";
 import { CreativeOverrideEditor } from "./CreativeOverrideEditor";
+import { OBJECTIVE_FORMS } from "@/components/campaign/objectiveForms";
 import {
   Loader2,
   Copy,
@@ -94,6 +95,19 @@ const SCHEDULE_PRESETS = [
   { label: "Custom", value: "custom" },
 ];
 
+// Stable empty object so untouched objectives don't hand the rich forms a new
+// identity every render (their initialValues sync is identity-based).
+const EMPTY_FIELDS: Record<string, any> = {};
+
+// The rich objective forms emit `name`/`status`, but in wide creation names
+// come from the naming pattern and status is always PAUSED — strip them so
+// they never land in the objective defaults.
+function stripManagedKeys(values: Record<string, any>, extra: string[] = []): Record<string, any> {
+  const cleaned = { ...values };
+  for (const key of ["name", "status", ...extra]) delete cleaned[key];
+  return cleaned;
+}
+
 function getPresetDates(preset: string): { start?: string; end?: string } {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
@@ -120,6 +134,7 @@ export function StepConfigure() {
   const [editMode, setEditMode] = useState<'all' | 'override'>('all');
   const [layout, setLayout] = useState<'vertical' | 'horizontal'>('horizontal');
   const [expandedOverrides, setExpandedOverrides] = useState<Set<string>>(new Set());
+  const [activeObjective, setActiveObjective] = useState(objectives[0] || "");
 
   useEffect(() => {
     loadAllSchemas();
@@ -162,11 +177,21 @@ export function StepConfigure() {
     );
   }
 
-  const primaryObjective = objectives[0] || "";
+  const currentObjective = objectives.includes(activeObjective) ? activeObjective : (objectives[0] || "");
   const firstCampaign = store.campaigns[0];
   const firstAdSet = firstCampaign?.adSets[0];
-  const campSchema = campaignSchemas[primaryObjective];
-  const asSchema = adSetSchemas[primaryObjective];
+  const campSchema = campaignSchemas[currentObjective];
+  const asSchema = adSetSchemas[currentObjective];
+
+  // Rich objective forms (same components as the draft editor); fall back to
+  // the generic schema-driven fields when an objective has no dedicated form.
+  const RichCampaignForm = OBJECTIVE_FORMS[`${currentObjective}:CAMPAIGN`];
+  const RichAdSetForm = OBJECTIVE_FORMS[`${currentObjective}:ADSET`];
+
+  const objDefaults = store.objectiveDefaults[currentObjective];
+  const campaignDefaults = objDefaults?.campaign ?? EMPTY_FIELDS;
+  const adSetDefaults = objDefaults?.adSet ?? EMPTY_FIELDS;
+  const cboBudget = campaignDefaults.daily_budget ?? campaignDefaults.lifetime_budget;
 
   return (
     <div className="space-y-4">
@@ -222,6 +247,28 @@ export function StepConfigure() {
       </div>
 
       {editMode === 'all' ? (
+        <>
+        {objectives.length > 1 && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {objectives.map((obj) => (
+              <button
+                key={obj}
+                onClick={() => setActiveObjective(obj)}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-xs font-medium transition-all border",
+                  obj === currentObjective
+                    ? "bg-blue-600/20 text-blue-400 border-blue-500/30"
+                    : "text-gray-500 hover:text-gray-300 border-gray-700 hover:border-gray-600"
+                )}
+              >
+                {OBJECTIVE_LABELS[obj] || obj}
+                <span className="ml-1.5 text-[10px] opacity-70">
+                  ({store.getCampaignsByObjective(obj).length})
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
         <div className={cn(
           layout === 'horizontal'
             ? "flex items-stretch gap-4 overflow-x-auto pb-3 snap-x snap-mandatory h-[55vh]"
@@ -229,17 +276,44 @@ export function StepConfigure() {
         )}>
           <div className={layout === 'horizontal' ? "min-w-[640px] shrink-0 snap-start" : ""}>
             <SectionAccordion id="campaign" title="Campaign Settings" icon={<FolderTree className="w-4 h-4 text-blue-400" />} open={openSections.has("campaign")} onToggle={() => toggleSection("campaign")}>
-              {campSchema && firstCampaign ? <CampaignFields schema={campSchema} objectives={objectives} campaign={firstCampaign} /> : <p className="text-xs text-gray-500">No campaign schema available</p>}
+              {RichCampaignForm ? (
+                <RichCampaignForm
+                  key={`campaign-${currentObjective}`}
+                  initialValues={campaignDefaults}
+                  onChange={(values: Record<string, any>) =>
+                    store.setObjectiveLevelDefaults(currentObjective, 'campaign', stripManagedKeys(values))
+                  }
+                />
+              ) : campSchema && firstCampaign ? (
+                <CampaignFields schema={campSchema} objectives={[currentObjective]} campaign={firstCampaign} />
+              ) : (
+                <p className="text-xs text-gray-500">No campaign schema available</p>
+              )}
             </SectionAccordion>
           </div>
-          <div className={layout === 'horizontal' ? "min-w-[360px] shrink-0 snap-start" : ""}>
-            <SectionAccordion id="schedule" title="Schedule" icon={<Calendar className="w-4 h-4 text-amber-400" />} open={openSections.has("schedule")} onToggle={() => toggleSection("schedule")}>
-              <ScheduleSection objectives={objectives} />
-            </SectionAccordion>
-          </div>
+          {!RichAdSetForm && (
+            <div className={layout === 'horizontal' ? "min-w-[360px] shrink-0 snap-start" : ""}>
+              <SectionAccordion id="schedule" title="Schedule" icon={<Calendar className="w-4 h-4 text-amber-400" />} open={openSections.has("schedule")} onToggle={() => toggleSection("schedule")}>
+                <ScheduleSection objectives={[currentObjective]} />
+              </SectionAccordion>
+            </div>
+          )}
           <div className={layout === 'horizontal' ? "min-w-[640px] shrink-0 snap-start" : ""}>
             <SectionAccordion id="adset" title="Ad Set Settings" icon={<Layers className="w-4 h-4 text-green-400" />} open={openSections.has("adset")} onToggle={() => toggleSection("adset")}>
-              {asSchema && firstAdSet ? <AdSetFields schema={asSchema} objectives={objectives} /> : <p className="text-xs text-gray-500">No ad set schema available</p>}
+              {RichAdSetForm ? (
+                <RichAdSetForm
+                  key={`adset-${currentObjective}`}
+                  initialValues={adSetDefaults}
+                  campaignBudget={cboBudget !== undefined ? Number(cboBudget) : undefined}
+                  onChange={(values: Record<string, any>) =>
+                    store.setObjectiveLevelDefaults(currentObjective, 'adSet', stripManagedKeys(values, ["campaign_id"]))
+                  }
+                />
+              ) : asSchema && firstAdSet ? (
+                <AdSetFields schema={asSchema} objectives={[currentObjective]} />
+              ) : (
+                <p className="text-xs text-gray-500">No ad set schema available</p>
+              )}
             </SectionAccordion>
           </div>
           <div className={layout === 'horizontal' ? "min-w-[480px] shrink-0 snap-start" : ""}>
@@ -253,6 +327,7 @@ export function StepConfigure() {
             </SectionAccordion>
           </div>
         </div>
+        </>
       ) : (
         <OverrideTreeView
           campaignSchemas={campaignSchemas}

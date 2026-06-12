@@ -62,9 +62,10 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', pid: process.pid, time: new Date().toISOString() });
 });
 
-app.get('/api/test', (req, res) => {
-  res.json({ message: 'API is alive' });
-});
+// Baseline rate limit for all API routes. Stricter limiters (auth, bulk, ai)
+// are layered on top inside individual route files.
+import { apiLimiter } from './middleware/rateLimit.middleware';
+app.use('/api', apiLimiter);
 
 // Import routes
 import authRoutes from './routes/auth.routes';

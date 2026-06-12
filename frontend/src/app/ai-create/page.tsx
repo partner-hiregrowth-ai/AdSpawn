@@ -263,7 +263,11 @@ export default function AiCreatePage() {
 
   const sendMessage = useCallback(async () => {
     const text = input.trim();
-    if (!text || isLoading) return;
+    const readyAttachments = selectedFiles.filter(f => f.status === 'ready' && f.metaId);
+    if ((!text && readyAttachments.length === 0) || isLoading) return;
+    // Files still uploading would be silently dropped — the send button is
+    // disabled while uploads are in flight; this is just a race guard.
+    if (selectedFiles.some(f => f.status === 'uploading')) return;
 
     // Guard: no account or profile selected
     const { selectedAccount, profile } = useAppStore.getState();
@@ -282,21 +286,20 @@ export default function AiCreatePage() {
 
     // Build final message content with attachment info
     let finalContent = text;
-    const readyAttachments = selectedFiles.filter(f => f.status === 'ready' && f.metaId);
-    
+
     if (readyAttachments.length > 0) {
-      const attachmentContext = readyAttachments.map(f => 
+      const attachmentContext = readyAttachments.map(f =>
         f.type === 'image' ? `(Uploaded Image Hash: ${f.metaId})` : `(Uploaded Video ID: ${f.metaId})`
       ).join(' ');
       // INJECT AS A NATURAL STATEMENT
-      finalContent = `I have uploaded these assets for you to use: ${attachmentContext}. \n\n${text}`;
+      finalContent = `I have uploaded these assets for you to use: ${attachmentContext}. \n\n${text || "Use these assets in the ad creatives."}`;
     }
 
-    const userMsg: Message = { 
-      id: crypto.randomUUID(), 
-      role: "user", 
-      content: text, // Show the original text in UI
-      attachments: [...selectedFiles] 
+    const userMsg: Message = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: text || "Sent attachments", // Show the original text in UI
+      attachments: [...selectedFiles]
     };
     const loadingId = crypto.randomUUID();
     const loadingMsg: Message = { id: loadingId, role: "assistant", content: "", isLoading: true };
@@ -334,7 +337,7 @@ export default function AiCreatePage() {
       setIsLoading(false);
       textareaRef.current?.focus();
     }
-  }, [input, isLoading, messages, selectedAccount]);
+  }, [input, isLoading, messages, selectedAccount, selectedFiles]);
 
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -468,7 +471,11 @@ export default function AiCreatePage() {
             />
             <Button
               onClick={sendMessage}
-              disabled={isLoading || (!input.trim() && selectedFiles.filter(f => f.status === 'ready').length === 0)}
+              disabled={
+                isLoading ||
+                selectedFiles.some(f => f.status === 'uploading') ||
+                (!input.trim() && selectedFiles.filter(f => f.status === 'ready').length === 0)
+              }
               size="icon"
               className="h-11 w-11 shrink-0 bg-violet-600 hover:bg-violet-700 text-white rounded-xl shadow-lg shadow-violet-600/20"
               aria-label="Send message"

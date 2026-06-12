@@ -123,7 +123,7 @@ export default function SettingsPage() {
                 <div className="min-w-0">
                   <p className="text-base font-semibold text-gray-200">{user?.name || "Unknown"}</p>
                   <p className="text-sm text-gray-500">{user?.email || "No email"}</p>
-                  <p className="text-xs text-gray-600 mt-0.5">FB ID: {user?.facebookId || "—"}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">FB ID: {user?.facebookId || "—"}</p>
                 </div>
               </div>
             )}
@@ -153,7 +153,7 @@ export default function SettingsPage() {
 
                 {team.inviteCode && (
                   <div>
-                    <p className="text-xs text-gray-600 mb-1.5">Invite code (admin only)</p>
+                    <p className="text-xs text-gray-400 mb-1.5">Invite code (admin only)</p>
                     <div className="flex items-center gap-2">
                       <code className="text-sm font-mono text-blue-400 bg-gray-800/60 px-3 py-1.5 rounded-lg border border-gray-700/50">
                         {team.inviteCode}
@@ -181,7 +181,7 @@ export default function SettingsPage() {
 
                 {team.members.length > 0 && (
                   <div>
-                    <p className="text-xs text-gray-600 mb-2">Members</p>
+                    <p className="text-xs text-gray-400 mb-2">Members</p>
                     <div className="space-y-1">
                       {team.members.map(m => (
                         <div key={m.id} className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-gray-800/30 transition-colors">
@@ -191,7 +191,7 @@ export default function SettingsPage() {
                             </div>
                             <div className="min-w-0">
                               <p className="text-xs text-gray-300 truncate">{m.name || "Unnamed"}</p>
-                              <p className="text-[10px] text-gray-600 truncate">{m.email}</p>
+                              <p className="text-[10px] text-gray-400 truncate">{m.email}</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
@@ -287,7 +287,7 @@ export default function SettingsPage() {
 
                 {tokenStatus?.scopes && tokenStatus.scopes.length > 0 && (
                   <div>
-                    <p className="text-xs text-gray-600 mb-2">Permissions granted:</p>
+                    <p className="text-xs text-gray-400 mb-2">Permissions granted:</p>
                     <div className="flex flex-wrap gap-1.5">
                       {tokenStatus.scopes.map((scope) => (
                         <span
@@ -348,7 +348,7 @@ export default function SettingsPage() {
                   >
                     <s.icon className="w-4 h-4 text-gray-600 mx-auto mb-1.5" />
                     <p className="text-xl font-bold text-gray-200">{s.value}</p>
-                    <p className="text-[10px] text-gray-600 mt-0.5">{s.label}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{s.label}</p>
                   </div>
                 ))}
               </div>
@@ -368,7 +368,7 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between py-2">
               <div>
                 <p className="text-sm text-gray-300">Sign out</p>
-                <p className="text-xs text-gray-600">Log out of this session.</p>
+                <p className="text-xs text-gray-400">Log out of this session.</p>
               </div>
               <Button
                 variant="outline"
@@ -384,7 +384,7 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between py-2">
               <div>
                 <p className="text-sm text-red-400">Delete account</p>
-                <p className="text-xs text-gray-600">Permanently delete your account and all data.</p>
+                <p className="text-xs text-gray-400">Permanently delete your account and all data.</p>
               </div>
               <Button
                 variant="outline"

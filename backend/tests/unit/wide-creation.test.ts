@@ -68,7 +68,7 @@ describe('WideCreationService.validateTemplate', () => {
     expect(result.errors.some(e => e.message.toLowerCase().includes('ad account') || e.message.includes('adAccountId'))).toBe(true);
   });
 
-  it('rejects missing objective', async () => {
+  it('defaults a missing objective to OUTCOME_TRAFFIC instead of rejecting', async () => {
     const template: WideCreationTemplate = {
       name: 'No Obj',
       adAccountId: 'act_123',
@@ -78,8 +78,8 @@ describe('WideCreationService.validateTemplate', () => {
       }],
     };
     const result = await WideCreationService.validateTemplate(template);
-    expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.field === 'objective')).toBe(true);
+    expect(result.errors.some(e => e.field === 'objective')).toBe(false);
+    expect(result.valid).toBe(true);
   });
 
   it('rejects invalid objective', async () => {
@@ -242,7 +242,7 @@ describe('WideCreationService.validateTemplate', () => {
     expect(result.errors.some(e => e.field === 'destination_type' && e.message.includes('not available'))).toBe(true);
   });
 
-  it('errors on missing promoted_object for objectives that require it', async () => {
+  it('does not block template validation on missing promoted_object (fixed later in the dashboard)', async () => {
     for (const objective of ALL_OBJECTIVES) {
       const reqs = PROMOTED_OBJECT_REQUIREMENTS[objective] || [];
       if (reqs.length === 0) continue;
@@ -260,8 +260,9 @@ describe('WideCreationService.validateTemplate', () => {
         }],
       };
       const result = await WideCreationService.validateTemplate(template);
-      expect(result.valid).toBe(false);
-      expect(result.errors.some(e => e.message.toLowerCase().includes('promoted object') || e.field === 'promoted_object')).toBe(true);
+      // Promoted object is often incomplete at template time — drafts are
+      // created anyway and DraftValidationEngine enforces it at publish time.
+      expect(result.errors.some(e => e.field === 'promoted_object' || e.field?.startsWith('promoted_object.'))).toBe(false);
     }
   });
 

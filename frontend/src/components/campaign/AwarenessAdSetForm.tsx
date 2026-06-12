@@ -555,7 +555,9 @@ export function AwarenessAdSetForm({
 }: AwarenessAdSetFormProps) {
   const [name, setName] = useState<string>(initialValues.name ?? "New Awareness Ad Set");
   const [performanceGoal, setPerformanceGoal] = useState(initialValues.optimization_goal ?? "REACH");
-  const [dynamicCreative, setDynamicCreative] = useState(false);
+  const [dynamicCreative, setDynamicCreative] = useState(!!initialValues.is_dynamic_creative);
+  const dynamicCreativeRef = useRef(dynamicCreative);
+  dynamicCreativeRef.current = dynamicCreative;
 
   const [hasEndDate, setHasEndDate] = useState(!!(initialValues.end_time));
   const [startDate, setStartDate] = useState(
@@ -604,6 +606,16 @@ export function AwarenessAdSetForm({
         delete values.end_time;
       }
 
+      // Dynamic Creative is a real ad set flag on Meta — publish requires it on
+      // both the ad set and its ads, so it must round-trip through draft data.
+      const effDynamicCreative =
+        "dynamicCreative" in overrides ? overrides.dynamicCreative : dynamicCreativeRef.current;
+      if (effDynamicCreative) {
+        values.is_dynamic_creative = true;
+      } else {
+        delete values.is_dynamic_creative;
+      }
+
       onChangeRef.current(values);
     },
     [initialValues, name, performanceGoal, startDate, startTime, hasEndDate, endDate, endTime]
@@ -615,6 +627,7 @@ export function AwarenessAdSetForm({
     prevInitialRef.current = initialValues;
     setName(initialValues.name ?? "New Awareness Ad Set");
     if (initialValues.optimization_goal) setPerformanceGoal(initialValues.optimization_goal);
+    setDynamicCreative(!!initialValues.is_dynamic_creative);
     if (initialValues.start_time) {
       setStartDate(initialValues.start_time.slice(0, 10));
       setStartTime(initialValues.start_time.slice(11, 16));
@@ -695,7 +708,10 @@ export function AwarenessAdSetForm({
           title="Dynamic creative"
           hasToggle
           toggled={dynamicCreative}
-          onToggle={setDynamicCreative}
+          onToggle={(v) => {
+            setDynamicCreative(v);
+            emit({ dynamicCreative: v });
+          }}
         />
         <SectionBody className="!py-3">
           <p className="text-[11px] text-gray-500 leading-relaxed">

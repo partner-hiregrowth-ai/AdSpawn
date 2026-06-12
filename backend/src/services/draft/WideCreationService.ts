@@ -175,10 +175,10 @@ export class WideCreationService {
         Object.keys(CAMPAIGN_FIELDS),
       );
 
-      const objective = campaignFields.objective;
+      const objective = campaignFields.objective || 'OUTCOME_TRAFFIC';
       const campaignName = campaignFields.name || resolveNamingPattern(
         template.namingPattern?.campaign,
-        { index: ci, objective: objective || 'UNKNOWN', total: template.campaigns.length },
+        { index: ci, objective, total: template.campaigns.length },
       );
       const campaignPath = `campaigns[${ci}]`;
       const campaignLabel = campaignName || `Campaign ${ci + 1}`;
@@ -195,12 +195,30 @@ export class WideCreationService {
 
       const explicitCBOFlag = campaignFields.is_adset_budget_sharing_enabled;
       const hasCampaignBudget = !!(campaignFields.daily_budget || campaignFields.lifetime_budget);
-      const isCBO = explicitCBOFlag === true || explicitCBOFlag === false
-        ? explicitCBOFlag
-        : hasCampaignBudget;
+      
+      const adSetsToValidate: WideAdSetNode[] = campaign.adSets || Array.from(
+        { length: campaign.adSetCount || 1 },
+        () => ({ fields: {}, adCount: 1 } as WideAdSetNode),
+      );
+      
+      const anyAdSetBudget = adSetsToValidate.some(as =>
+        as.fields.daily_budget || as.fields.lifetime_budget
+      ) || template.defaults?.adSet?.daily_budget || template.defaults?.adSet?.lifetime_budget;
+
+      let isCBO: boolean;
+      if (explicitCBOFlag === true || explicitCBOFlag === false) {
+        isCBO = explicitCBOFlag;
+      } else if (hasCampaignBudget) {
+        isCBO = true;
+      } else if (anyAdSetBudget) {
+        isCBO = false;
+      } else {
+        // Match generation default: CBO with 30000
+        isCBO = true;
+      }
 
       // Build synthetic campaign for DraftValidationEngine
-      const syntheticCampaignData = {
+      const syntheticCampaignData: any = {
         ...campaignFields,
         name: campaignName,
         objective: objective || '',
@@ -208,10 +226,11 @@ export class WideCreationService {
         special_ad_categories: campaignFields.special_ad_categories || ['NONE'],
       };
 
-      const adSetsToValidate: WideAdSetNode[] = campaign.adSets || Array.from(
-        { length: campaign.adSetCount || 1 },
-        () => ({ fields: {}, adCount: 1 } as WideAdSetNode),
-      );
+      if (isCBO) {
+        syntheticCampaignData.is_adset_budget_sharing_enabled = true;
+        if (!hasCampaignBudget) syntheticCampaignData.daily_budget = 30000;
+      }
+
       totalAdSets += adSetsToValidate.length;
 
       const syntheticAdSets: any[] = [];
@@ -314,6 +333,10 @@ export class WideCreationService {
           const adSetPath = `${campaignPath}.adSets[${ai}]`;
           const adSetLabel = `${campaignLabel} > ${syntheticAdSets[ai]?.name || `Ad Set ${ai + 1}`}`;
           for (const err of adSetErrs) {
+            // Promoted object is often incomplete at template time (missing Pixel ID, etc.)
+            // Allow drafts to be created; user will fix in the dashboard.
+            if (err.field === 'promoted_object' || err.field?.startsWith('promoted_object.')) continue;
+            
             const entry = { path: adSetPath, field: err.field, message: err.message, entityLabel: adSetLabel };
             if (err.severity === 'error') errors.push(entry);
             else warnings.push(entry);
@@ -327,9 +350,10 @@ export class WideCreationService {
           const adPath = `${campaignPath}.adSets[${ai}].ads[${adi}]`;
           const adLabel = `${campaignLabel} > ${syntheticAdSets[ai]?.name || `Ad Set ${ai + 1}`} > ${syntheticAdSets[ai]?.ads[adi]?.name || `Ad ${adi + 1}`}`;
           for (const err of adErrs) {
-            // Creative is intentionally absent at template/draft-creation time — skip it here.
+            // Creative is intentionally absent or incomplete at template/draft-creation time — skip it here.
             // The DraftValidationEngine enforces it at publish time.
-            if (err.field === 'creative') continue;
+            if (err.field === 'creative' || err.field?.startsWith('creative.')) continue;
+            
             const entry = { path: adPath, field: err.field, message: err.message, entityLabel: adLabel };
             if (err.severity === 'error') errors.push(entry);
             else warnings.push(entry);

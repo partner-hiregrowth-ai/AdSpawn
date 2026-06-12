@@ -605,6 +605,17 @@ export class DraftValidationEngine {
       });
     }
 
+    // The reverse mismatch: a Dynamic Creative ad set accepts ONLY inline
+    // asset-feed ads — Meta rejects both standard inline creatives and plain
+    // creative_id references under a DC ad set (error 100/1885702).
+    if (isDynamicCreative && !hasAssetFeed) {
+      errors.push({
+        field: 'creative',
+        message: 'This ad set has Dynamic Creative enabled, so every ad in it must use Dynamic Creative assets (Asset Feed). Switch this ad\'s creative to Dynamic Creative, or disable Dynamic Creative on the ad set.',
+        severity: 'error',
+      });
+    }
+
     // Identity resolution check
     const hasPageId = data.creative.page_id
       || data.page_id
@@ -673,7 +684,13 @@ export class DraftValidationEngine {
         errors.push({ field: 'creative.video_data.video_id', message: 'Video ad requires a Video ID. Upload a video or paste an existing Video ID.', severity: 'error' });
       }
 
-      if (hasPhotoData && !oss.photo_data.image_hash) {
+      // Meta requires a thumbnail (image_hash or image_url) on video_data —
+      // creating the ad without one fails at publish time.
+      if (hasVideoData && !oss.video_data.image_hash && !oss.video_data.image_url) {
+        errors.push({ field: 'creative.video_data.image_hash', message: 'Video ad requires a thumbnail image. Upload an image or paste an Image Hash into the Thumbnail field.', severity: 'error' });
+      }
+
+      if (hasPhotoData && !oss.photo_data.image_hash && !oss.photo_data.url) {
         errors.push({ field: 'creative.photo_data.image_hash', message: 'Photo ad requires an image. Upload an image or paste an existing Image Hash.', severity: 'error' });
       }
 
@@ -687,6 +704,10 @@ export class DraftValidationEngine {
           }
           if (!oss.link_data.image_hash && !oss.link_data.picture && !oss.link_data.video_id) {
             errors.push({ field: 'creative.link_data.image_hash', message: 'Link ad requires an image, image hash, or video. Add a visual to the creative.', severity: 'error' });
+          }
+          // Meta accepts image_hash OR picture, never both.
+          if (oss.link_data.image_hash && oss.link_data.picture) {
+            errors.push({ field: 'creative.link_data.image_hash', message: 'Link ad has both an Image Hash and a Picture URL — Meta accepts only one. Remove one of them.', severity: 'error' });
           }
         } else {
           const cards = oss.link_data.child_attachments;

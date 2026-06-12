@@ -128,6 +128,23 @@ function isDevModeCapabilityError(error: any): boolean {
   return /does not have the capability/i.test(msg);
 }
 
+// The user token cannot act on the Page referenced by the creative — the pages_*
+// scopes were not granted at login, or the Facebook user has no role on the Page.
+// Meta surfaces this as 10/1341012 ("You don't have the required permission to
+// access this profile") on inline object_story_spec creatives, and masks it as the
+// generic 100/2490433 ("An unexpected error occurred...") on inline Dynamic
+// Creative ads. Verified empirically with validate_only against a live ad set.
+const PAGE_PERMISSION_MESSAGE =
+  'Your Facebook login cannot act on the Facebook Page used in this ad. Log out and log in again to grant the app Page access (pages_show_list, pages_read_engagement, pages_manage_ads), and make sure your Facebook account has a role on that Page.';
+
+function isPagePermissionError(error: any): boolean {
+  const errData = error?.response?.data?.error;
+  if (!errData) return false;
+  if (errData.code === 10 && errData.error_subcode === 1341012) return true;
+  if (errData.code === 100 && errData.error_subcode === 2490433) return true;
+  return false;
+}
+
 export class DraftPublishService {
   static async publishCampaign(campaignId: string, accessToken: string) {
     if (!accessToken) {
@@ -168,6 +185,12 @@ export class DraftPublishService {
       id.startsWith('act_') ? id : `act_${id}`;
 
     const campaignAccountId = normalizeAccountId(campaign.adAccountId);
+
+    // Preflight: every Page referenced by an inline creative must be accessible
+    // to the user token, or ad creation fails late (10/1341012, or the generic
+    // 100/2490433 for Dynamic Creative) after campaign/ad set were already
+    // created and must be rolled back. Probe Page access up front instead.
+    await this.assertPageAccess(fbService, campaign);
 
     try {
       const claimed = await withDbRetry(
@@ -1123,6 +1146,10 @@ export class DraftPublishService {
       }
     } else if (creativeId && !forceInline) {
       creative = { creative_id: String(creativeId) };
+    } else if (adData.creative?.object_story_id) {
+      // Existing-post ad: Meta accepts { object_story_id: "<pageId>_<postId>" }
+      // as a complete creative spec referencing a published post.
+      creative = { object_story_id: String(adData.creative.object_story_id) };
     } else if (hasInlineCreative) {
       const storySpec = { ...adData.creative.object_story_spec };
       creative = { object_story_spec: storySpec };
@@ -1130,8 +1157,9 @@ export class DraftPublishService {
       creative = {};
     }
 
-    // Ensure identity (page_id, instagram_actor_id) is set for inline creatives
-    if (!creative.creative_id) {
+    // Ensure identity (page_id, instagram_actor_id) is set for inline creatives.
+    // creative_id and object_story_id are complete references — no identity needed.
+    if (!creative.creative_id && !creative.object_story_id) {
       const pageId = adSet?.data?.promoted_object?.page_id
         || adSet?.data?.page_id
         || adData.page_id
@@ -1215,6 +1243,10 @@ export class DraftPublishService {
         const info = extractMetaErrorInfo(error, 'Ad');
         throw new PublishError(info.detail, DEV_MODE_CAPABILITY_MESSAGE);
       }
+      if (isPagePermissionError(error)) {
+        const info = extractMetaErrorInfo(error, 'Ad');
+        throw new PublishError(info.detail, PAGE_PERMISSION_MESSAGE);
+      }
       throw this.toPublishError(error, 'Ad');
     }
   }
@@ -1224,6 +1256,48 @@ export class DraftPublishService {
   private static toPublishError(error: any, entity: string): PublishError {
     const info = extractMetaErrorInfo(error, `${entity} error`);
     return new PublishError(info.detail, info.userMessage);
+  }
+
+  // ─── Page access preflight ───
+
+  // Collects every Page referenced by an inline creative (creative_id /
+  // object_story_id references carry their own identity and are skipped) and
+  // probes it with a GET. A page the token cannot read is a page the token
+  // cannot create ads for — failing here avoids creating campaign + ad sets on
+  // Meta only to roll them back when the first ad is rejected.
+  private static async assertPageAccess(fbService: FacebookService, campaign: any): Promise<void> {
+    const pageIds = new Set<string>();
+
+    for (const adSet of campaign.adSets || []) {
+      const adSetData = adSet.data as any;
+      for (const ad of adSet.ads || []) {
+        const adData = ad.data as any;
+        const creative = adData?.creative;
+        if (!creative) continue;
+        // Complete references — no identity resolution needed at create time.
+        if (creative.creative_id || creative.id || creative.object_story_id) continue;
+        if (!creative.object_story_spec && !creative.asset_feed_spec) continue;
+
+        const pageId = creative.object_story_spec?.page_id
+          || creative.page_id
+          || adData.page_id
+          || adSetData?.page_id
+          || adSetData?.promoted_object?.page_id;
+        if (pageId) pageIds.add(String(pageId));
+      }
+    }
+
+    for (const pageId of pageIds) {
+      try {
+        await fbService.client.get(`/${pageId}`, { params: { fields: 'id' } });
+      } catch (error: any) {
+        const info = extractMetaErrorInfo(error, 'Page access');
+        throw new PublishError(
+          `Page ${pageId} is not accessible with the current token: ${info.detail}`,
+          PAGE_PERMISSION_MESSAGE,
+        );
+      }
+    }
   }
 
   // ─── Targeting conflict resolution ───

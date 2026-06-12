@@ -292,6 +292,11 @@ export function AwarenessCampaignForm({ initialValues, onChange }: AwarenessCamp
   const [bidStrategy, setBidStrategy] = useState<string>(
     initialValues.bid_strategy ?? "LOWEST_COST_WITHOUT_CAP"
   );
+  const [bidAmount, setBidAmount] = useState<number>(
+    Number(initialValues.bid_amount) || 0
+  );
+  const bidAmountRef = useRef(bidAmount);
+  bidAmountRef.current = bidAmount;
 
   const [hasBudgetSchedule, setHasBudgetSchedule] = useState(
     !!(initialValues.start_time || initialValues.stop_time)
@@ -344,6 +349,7 @@ export function AwarenessCampaignForm({ initialValues, onChange }: AwarenessCamp
     setBudgetType(initialValues.lifetime_budget ? "lifetime_budget" : "daily_budget");
     setBudgetAmount(initialValues.daily_budget ?? initialValues.lifetime_budget ?? 15000);
     setBidStrategy(initialValues.bid_strategy ?? "LOWEST_COST_WITHOUT_CAP");
+    setBidAmount(Number(initialValues.bid_amount) || 0);
     const hasSchedule = !!(initialValues.start_time || initialValues.stop_time);
     setHasBudgetSchedule(hasSchedule);
     if (initialValues.start_time) {
@@ -417,6 +423,17 @@ export function AwarenessCampaignForm({ initialValues, onChange }: AwarenessCamp
       delete values.increaseType;
       delete values.increaseAmount;
       delete values.buyingType;
+
+      // Cap bid strategies require bid_amount (smallest currency unit) — Meta
+      // rejects COST_CAP / BID_CAP campaigns without it.
+      const effBidStrategy = values.bid_strategy;
+      const effBidAmount = "bidAmount" in overrides ? overrides.bidAmount : bidAmountRef.current;
+      if ((effBidStrategy === "COST_CAP" || effBidStrategy === "LOWEST_COST_WITH_BID_CAP") && effBidAmount > 0) {
+        values.bid_amount = effBidAmount;
+      } else {
+        delete values.bid_amount;
+      }
+      delete values.bidAmount;
 
       onChangeRef.current(values);
     },
@@ -576,6 +593,21 @@ export function AwarenessCampaignForm({ initialValues, onChange }: AwarenessCamp
                 </SelectContent>
               </Select>
             </FieldRow>
+
+            {(bidStrategy === "COST_CAP" || bidStrategy === "LOWEST_COST_WITH_BID_CAP") && (
+              <FieldRow
+                label={bidStrategy === "COST_CAP" ? "Cost per result goal" : "Bid cap"}
+                hint="Meta requires an amount for this bid strategy — your target cost or maximum bid per result."
+              >
+                <CurrencyInput
+                  value={bidAmount}
+                  onChange={(v) => {
+                    setBidAmount(v);
+                    emit({ bidAmount: v });
+                  }}
+                />
+              </FieldRow>
+            )}
 
             {/* Budget scheduling */}
             <div className="border border-gray-800/40 rounded-lg overflow-hidden">

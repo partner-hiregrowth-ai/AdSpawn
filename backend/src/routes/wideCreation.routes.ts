@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { WideCreationController } from '../controllers/wideCreation.controller';
-import { authMiddleware } from '../middleware/auth.middleware';
+import { authMiddleware, requireProfile } from '../middleware/auth.middleware';
 import { validateBody } from '../middleware/validate.middleware';
 import { bulkLimiter } from '../middleware/rateLimit.middleware';
 import {
@@ -15,8 +15,8 @@ const router = Router();
 router.use(authMiddleware);
 
 router.post('/validate', validateBody(wideCreationValidateSchema), WideCreationController.validate);
-router.post('/generate', bulkLimiter, validateBody(wideCreationGenerateSchema), WideCreationController.generate);
-router.post('/bulk-apply', bulkLimiter, validateBody(wideCreationBulkApplySchema), WideCreationController.bulkApplyFields);
-router.post('/tree', validateBody(wideCreationTreeSchema), WideCreationController.getTree);
+router.post('/generate', requireProfile, bulkLimiter, validateBody(wideCreationGenerateSchema), WideCreationController.generate);
+router.post('/bulk-apply', requireProfile, bulkLimiter, validateBody(wideCreationBulkApplySchema), WideCreationController.bulkApplyFields);
+router.post('/tree', requireProfile, validateBody(wideCreationTreeSchema), WideCreationController.getTree);
 
 export default router;

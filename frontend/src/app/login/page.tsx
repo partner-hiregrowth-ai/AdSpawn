@@ -40,18 +40,14 @@ function LoginContent() {
   }, [searchParams]);
 
   useEffect(() => {
-    console.log("[FB] poll started");
     let timer: ReturnType<typeof setTimeout>;
     const deadline = Date.now() + 10_000;
     const poll = () => {
-      console.log("[FB] poll tick — __fbReady:", !!window.__fbReady);
       if (window.__fbReady) {
-        console.log("[FB] SDK ready — enabling button");
         setFbReady(true);
       } else if (Date.now() < deadline) {
         timer = setTimeout(poll, 100);
       } else {
-        console.log("[FB] poll timed out — SDK never initialized");
         toast.error("Facebook SDK failed to load. Disable any ad-blockers and refresh.");
       }
     };
@@ -63,8 +59,6 @@ function LoginContent() {
     const rawAppId = process.env.NEXT_PUBLIC_FB_APP_ID;
     const appId = rawAppId?.replace(/^["']|["']$/g, "")?.trim();
 
-    console.log("[FB] handleFacebookLogin — __fbReady:", !!window.__fbReady, "window.FB:", !!window.FB, "appId:", appId);
-    
     if (!appId || appId === "your_facebook_app_id") {
       toast.error("Facebook App ID is not configured correctly. Please check your environment variables.");
       return;
@@ -77,7 +71,6 @@ function LoginContent() {
     // The SDK replaces window.FB after fbAsyncInit (async module load completes).
     // Re-init if the FB object changed or we aren't marked as ready.
     if (window.FB !== window.__fbLastRef || !window.__fbReady) {
-      console.log("[FB] re-init before login — FB object changed:", window.FB !== window.__fbLastRef, "ready:", window.__fbReady);
       window.FB.init({
         appId,
         cookie: true,
@@ -88,7 +81,6 @@ function LoginContent() {
       window.__fbReady = true;
     }
 
-    console.log("[FB] calling FB.login()");
     setIsLoggingIn(true);
     try {
     window.FB.login(
@@ -100,7 +92,10 @@ function LoginContent() {
           toast.error(response.status === "not_authorized" ? "Please authorize the app to continue." : "Login cancelled.");
         }
       },
-      { scope: "ads_management,ads_read,business_management,public_profile,email" }
+      // pages_* scopes are required to create ads that post on behalf of a Page
+      // (inline object_story_spec / dynamic creatives). Without them Meta rejects
+      // ad creation with error 10/1341012 or the generic 100/2490433.
+      { scope: "ads_management,ads_read,business_management,public_profile,email,pages_show_list,pages_read_engagement,pages_manage_ads" }
     );
     } catch (err: any) {
       console.error("[FB] FB.login() threw:", err?.message, err?.stack);
@@ -166,7 +161,7 @@ function LoginContent() {
                 </div>
                 <div>
                   <span className="text-sm font-semibold text-gray-200">{f.label}</span>
-                  <span className="text-sm text-gray-600"> — {f.desc}</span>
+                  <span className="text-sm text-gray-400"> — {f.desc}</span>
                 </div>
               </div>
             ))}
@@ -174,7 +169,7 @@ function LoginContent() {
 
           <div className="mt-12 flex items-center gap-3">
             <div className="h-px flex-1 bg-gradient-to-r from-gray-800/80 to-transparent" />
-            <span className="text-[10px] font-medium text-gray-700 uppercase tracking-[0.15em] whitespace-nowrap">
+            <span className="text-[10px] font-medium text-gray-500 uppercase tracking-[0.15em] whitespace-nowrap">
               Meta Marketing API v22.0
             </span>
             <div className="h-px flex-1 bg-gradient-to-l from-gray-800/80 to-transparent" />
@@ -216,16 +211,16 @@ function LoginContent() {
               </Button>
 
               <div className="mt-4 flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05]">
-                <Shield className="w-3.5 h-3.5 text-gray-600 shrink-0 mt-0.5" />
-                <p className="text-[11px] text-gray-600 leading-relaxed">
+                <Shield className="w-3.5 h-3.5 text-gray-500 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-gray-400 leading-relaxed">
                   All new campaigns are created{" "}
-                  <span className="text-gray-400 font-semibold">PAUSED</span>.
+                  <span className="text-gray-200 font-semibold">PAUSED</span>.
                   Nothing goes live without your approval.
                 </p>
               </div>
 
-              <p className="mt-5 text-[11px] text-gray-700 leading-relaxed text-center">
-                By continuing, you agree to our <a href="#" className="hover:text-gray-500 underline underline-offset-2 transition-colors">Terms of Service</a> and <Link href="/privacy" className="hover:text-gray-500 underline underline-offset-2 transition-colors">Privacy Policy</Link>.
+              <p className="mt-5 text-[11px] text-gray-400 leading-relaxed text-center">
+                By continuing, you agree to our <Link href="/terms" className="hover:text-gray-200 underline underline-offset-2 transition-colors">Terms of Service</Link> and <Link href="/privacy" className="hover:text-gray-200 underline underline-offset-2 transition-colors">Privacy Policy</Link>.
               </p>
             </div>
           </div>

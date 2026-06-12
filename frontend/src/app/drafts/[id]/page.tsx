@@ -19,24 +19,7 @@ import { useRouter } from "next/navigation";
 import { cn, extractApiError } from "@/lib/utils";
 import Link from "next/link";
 import { MetaForm } from "@/components/meta/MetaForm";
-import { AwarenessCampaignForm } from "@/components/campaign/AwarenessCampaignForm";
-import { AwarenessAdSetForm } from "@/components/campaign/AwarenessAdSetForm";
-import { AwarenessAdForm } from "@/components/campaign/AwarenessAdForm";
-import { TrafficCampaignForm } from "@/components/campaign/TrafficCampaignForm";
-import { TrafficAdSetForm } from "@/components/campaign/TrafficAdSetForm";
-import { TrafficAdForm } from "@/components/campaign/TrafficAdForm";
-import { EngagementCampaignForm } from "@/components/campaign/EngagementCampaignForm";
-import { EngagementAdSetForm } from "@/components/campaign/EngagementAdSetForm";
-import { EngagementAdForm } from "@/components/campaign/EngagementAdForm";
-import { LeadsCampaignForm } from "@/components/campaign/LeadsCampaignForm";
-import { LeadsAdSetForm } from "@/components/campaign/LeadsAdSetForm";
-import { LeadsAdForm } from "@/components/campaign/LeadsAdForm";
-import { AppPromotionCampaignForm } from "@/components/campaign/AppPromotionCampaignForm";
-import { AppPromotionAdSetForm } from "@/components/campaign/AppPromotionAdSetForm";
-import { AppPromotionAdForm } from "@/components/campaign/AppPromotionAdForm";
-import { SalesCampaignForm } from "@/components/campaign/SalesCampaignForm";
-import { SalesAdSetForm } from "@/components/campaign/SalesAdSetForm";
-import { SalesAdForm } from "@/components/campaign/SalesAdForm";
+import { OBJECTIVE_FORMS } from "@/components/campaign/objectiveForms";
 import { OBJECTIVE_LABELS } from "@/lib/meta-schema";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -335,23 +318,44 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
     setEditData(cached ?? item);
   };
 
+  const editDataRef = useRef(editData);
+  editDataRef.current = editData;
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+
+  // Locate an entity in the loaded draft tree by its explicit type + id.
+  const findEntity = (type: "CAMPAIGN" | "ADSET" | "AD", id: string) => {
+    const d = draftRef.current;
+    if (!d) return null;
+    if (type === "CAMPAIGN") return d.id === id ? d : null;
+    if (type === "ADSET") return d.adSets?.find((s: any) => s.id === id) ?? null;
+    for (const s of d.adSets || []) {
+      const a = s.ads?.find((x: any) => x.id === id);
+      if (a) return a;
+    }
+    return null;
+  };
+
   // Single helper: update local view AND stash in cache so it survives node switches.
-  const commitEdit = (values: any) => {
-    setEditData((prev: any) => {
-      if (!prev) return prev;
-      const next = { ...prev, data: values };
-      // Use the key derived from the entity we are actually editing
-      const key = nodeKey(
-        next.adSets ? "CAMPAIGN" : (next.ads ? "ADSET" : "AD"),
-        next.id
-      );
-      setEditCache((prevCache) => {
-        const m = new Map(prevCache);
-        m.set(key, next);
-        return m;
-      });
-      return next;
+  // The target is identified explicitly (not inferred from whatever is currently
+  // displayed) so a trailing onChange from a previous node — e.g. an async upload
+  // finishing after the user clicked another entity — can never write one
+  // entity's values into another.
+  const commitEdit = (type: "CAMPAIGN" | "ADSET" | "AD", id: string, values: any) => {
+    const key = nodeKey(type, id);
+    const current = editDataRef.current;
+    const base =
+      (current && current.id === id ? current : null)
+      ?? editCacheRef.current.get(key)
+      ?? findEntity(type, id);
+    if (!base) return; // unknown target — drop rather than corrupt another entity
+    const next = { ...base, data: values };
+    setEditCache((prevCache) => {
+      const m = new Map(prevCache);
+      m.set(key, next);
+      return m;
     });
+    if (current && current.id === id) setEditData(next);
   };
 
   const handleSave = async () => {
@@ -830,145 +834,29 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
                   </TabsList>
 
                   <TabsContent value="form" keepMounted className="mt-4">
-                    {selectedNode?.type === "CAMPAIGN" && campaignObjective === "OUTCOME_AWARENESS" ? (
-                      <AwarenessCampaignForm
-                        key={selectedNode?.id}
-                        initialValues={editData.data || {}}
-                        onChange={(values) => commitEdit(values)}
-                      />
-                    ) : selectedNode?.type === "ADSET" && campaignObjective === "OUTCOME_AWARENESS" ? (
-                      <AwarenessAdSetForm
-                        key={selectedNode?.id}
-                        initialValues={editData.data || {}}
-                        campaignBudget={
-                          isCBO
-                            ? (draft?.data?.daily_budget ?? draft?.data?.lifetime_budget)
-                            : undefined
-                        }
-                        onChange={(values) => commitEdit(values)}
-                      />
-                    ) : selectedNode?.type === "AD" && campaignObjective === "OUTCOME_AWARENESS" ? (
-                      <AwarenessAdForm
-                        key={selectedNode?.id}
-                        initialValues={editData.data || {}}
-                        onChange={(values) => commitEdit(values)}
-                      />
-                    ) : selectedNode?.type === "CAMPAIGN" && campaignObjective === "OUTCOME_TRAFFIC" ? (
-                      <TrafficCampaignForm
-                        key={selectedNode?.id}
-                        initialValues={editData.data || {}}
-                        onChange={(values) => commitEdit(values)}
-                      />
-                    ) : selectedNode?.type === "ADSET" && campaignObjective === "OUTCOME_TRAFFIC" ? (
-                      <TrafficAdSetForm
-                        key={selectedNode?.id}
-                        initialValues={editData.data || {}}
-                        campaignBudget={
-                          isCBO
-                            ? (draft?.data?.daily_budget ?? draft?.data?.lifetime_budget)
-                            : undefined
-                        }
-                        onChange={(values) => commitEdit(values)}
-                      />
-                    ) : selectedNode?.type === "AD" && campaignObjective === "OUTCOME_TRAFFIC" ? (
-                      <TrafficAdForm
-                        key={selectedNode?.id}
-                        initialValues={editData.data || {}}
-                        onChange={(values) => commitEdit(values)}
-                      />
-                    ) : selectedNode?.type === "CAMPAIGN" && campaignObjective === "OUTCOME_ENGAGEMENT" ? (
-                      <EngagementCampaignForm
-                        key={selectedNode?.id}
-                        initialValues={editData.data || {}}
-                        onChange={(values) => commitEdit(values)}
-                      />
-                    ) : selectedNode?.type === "ADSET" && campaignObjective === "OUTCOME_ENGAGEMENT" ? (
-                      <EngagementAdSetForm
-                        key={selectedNode?.id}
-                        initialValues={editData.data || {}}
-                        campaignBudget={
-                          isCBO
-                            ? (draft?.data?.daily_budget ?? draft?.data?.lifetime_budget)
-                            : undefined
-                        }
-                        onChange={(values) => commitEdit(values)}
-                      />
-                    ) : selectedNode?.type === "AD" && campaignObjective === "OUTCOME_ENGAGEMENT" ? (
-                      <EngagementAdForm
-                        key={selectedNode?.id}
-                        initialValues={editData.data || {}}
-                        onChange={(values) => commitEdit(values)}
-                      />
-                    ) : selectedNode?.type === "CAMPAIGN" && campaignObjective === "OUTCOME_LEADS" ? (
-                      <LeadsCampaignForm
-                        key={selectedNode?.id}
-                        initialValues={editData.data || {}}
-                        onChange={(values) => commitEdit(values)}
-                      />
-                    ) : selectedNode?.type === "ADSET" && campaignObjective === "OUTCOME_LEADS" ? (
-                      <LeadsAdSetForm
-                        key={selectedNode?.id}
-                        initialValues={editData.data || {}}
-                        campaignBudget={
-                          isCBO
-                            ? (draft?.data?.daily_budget ?? draft?.data?.lifetime_budget)
-                            : undefined
-                        }
-                        onChange={(values) => commitEdit(values)}
-                      />
-                    ) : selectedNode?.type === "AD" && campaignObjective === "OUTCOME_LEADS" ? (
-                      <LeadsAdForm
-                        key={selectedNode?.id}
-                        initialValues={editData.data || {}}
-                        onChange={(values) => commitEdit(values)}
-                      />
-                    ) : selectedNode?.type === "CAMPAIGN" && campaignObjective === "OUTCOME_APP_PROMOTION" ? (
-                      <AppPromotionCampaignForm
-                        key={selectedNode?.id}
-                        initialValues={editData.data || {}}
-                        onChange={(values) => commitEdit(values)}
-                      />
-                    ) : selectedNode?.type === "ADSET" && campaignObjective === "OUTCOME_APP_PROMOTION" ? (
-                      <AppPromotionAdSetForm
-                        key={selectedNode?.id}
-                        initialValues={editData.data || {}}
-                        campaignBudget={
-                          isCBO
-                            ? (draft?.data?.daily_budget ?? draft?.data?.lifetime_budget)
-                            : undefined
-                        }
-                        onChange={(values) => commitEdit(values)}
-                      />
-                    ) : selectedNode?.type === "AD" && campaignObjective === "OUTCOME_APP_PROMOTION" ? (
-                      <AppPromotionAdForm
-                        key={selectedNode?.id}
-                        initialValues={editData.data || {}}
-                        onChange={(values) => commitEdit(values)}
-                      />
-                    ) : selectedNode?.type === "CAMPAIGN" && campaignObjective === "OUTCOME_SALES" ? (
-                      <SalesCampaignForm
-                        key={selectedNode?.id}
-                        initialValues={editData.data || {}}
-                        onChange={(values) => commitEdit(values)}
-                      />
-                    ) : selectedNode?.type === "ADSET" && campaignObjective === "OUTCOME_SALES" ? (
-                      <SalesAdSetForm
-                        key={selectedNode?.id}
-                        initialValues={editData.data || {}}
-                        campaignBudget={
-                          isCBO
-                            ? (draft?.data?.daily_budget ?? draft?.data?.lifetime_budget)
-                            : undefined
-                        }
-                        onChange={(values) => commitEdit(values)}
-                      />
-                    ) : selectedNode?.type === "AD" && campaignObjective === "OUTCOME_SALES" ? (
-                      <SalesAdForm
-                        key={selectedNode?.id}
-                        initialValues={editData.data || {}}
-                        onChange={(values) => commitEdit(values)}
-                      />
-                    ) : (
+                    {(() => {
+                      const ObjectiveForm =
+                        selectedNode && campaignObjective
+                          ? OBJECTIVE_FORMS[`${campaignObjective}:${selectedNode.type}`]
+                          : undefined;
+                      if (ObjectiveForm) {
+                        return (
+                          <ObjectiveForm
+                            key={selectedNode!.id}
+                            initialValues={editData.data || {}}
+                            onChange={(values: Record<string, any>) => commitEdit(selectedNode!.type, selectedNode!.id, values)}
+                            {...(selectedNode!.type === "ADSET"
+                              ? {
+                                  campaignBudget: isCBO
+                                    ? (draft?.data?.daily_budget ?? draft?.data?.lifetime_budget)
+                                    : undefined,
+                                }
+                              : {})}
+                          />
+                        );
+                      }
+                      return null;
+                    })() ?? (
                       <MetaForm
                         key={selectedNode?.id}
                         entityType={
@@ -983,7 +871,7 @@ export default function DraftEditorPage({ params: paramsPromise }: { params: Pro
                           hasMetaId: !!editData.metaId,
                         }}
                         adAccountId={adAccountId}
-                        onChange={(values) => commitEdit(values)}
+                        onChange={(values) => commitEdit(selectedNode!.type, selectedNode!.id, values)}
                       />
                     )}
                   </TabsContent>

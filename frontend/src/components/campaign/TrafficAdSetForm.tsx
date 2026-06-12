@@ -666,11 +666,17 @@ export function TrafficAdSetForm({
   const [conversionLocation, setConversionLocation] = useState<TrafficConversionLocationValue>(
     (initialValues.destination_type as TrafficConversionLocationValue) ?? "WEBSITE"
   );
-  const [performanceGoal, setPerformanceGoal] = useState("LINK_CLICKS");
-  const [billingEvent, setBillingEvent] = useState("IMPRESSIONS");
+  const [performanceGoal, setPerformanceGoal] = useState(
+    initialValues.optimization_goal ?? "LINK_CLICKS"
+  );
+  const [billingEvent, setBillingEvent] = useState(
+    initialValues.billing_event ?? "IMPRESSIONS"
+  );
 
   // Section 3: Dynamic creative
-  const [dynamicCreative, setDynamicCreative] = useState(false);
+  const [dynamicCreative, setDynamicCreative] = useState(!!initialValues.is_dynamic_creative);
+  const dynamicCreativeRef = useRef(dynamicCreative);
+  dynamicCreativeRef.current = dynamicCreative;
 
   // Section 4: Budget & schedule
   const [hasEndDate, setHasEndDate] = useState(!!(initialValues.end_time));
@@ -726,6 +732,16 @@ export function TrafficAdSetForm({
         delete values.end_time;
       }
 
+      // Dynamic Creative is a real ad set flag on Meta — publish requires it on
+      // both the ad set and its ads, so it must round-trip through draft data.
+      const effDynamicCreative =
+        "dynamicCreative" in overrides ? overrides.dynamicCreative : dynamicCreativeRef.current;
+      if (effDynamicCreative) {
+        values.is_dynamic_creative = true;
+      } else {
+        delete values.is_dynamic_creative;
+      }
+
       onChangeRef.current(values);
     },
     [initialValues, name, conversionLocation, performanceGoal, billingEvent, startDate, startTime, hasEndDate, endDate, endTime]
@@ -745,6 +761,9 @@ export function TrafficAdSetForm({
     if (initialValues.destination_type) {
       setConversionLocation((initialValues.destination_type as TrafficConversionLocationValue) ?? "WEBSITE");
     }
+    if (initialValues.optimization_goal) setPerformanceGoal(initialValues.optimization_goal);
+    setDynamicCreative(!!initialValues.is_dynamic_creative);
+    if (initialValues.billing_event) setBillingEvent(initialValues.billing_event);
     if (initialValues.start_time) {
       setStartDate(initialValues.start_time.slice(0, 10));
       setStartTime(initialValues.start_time.slice(11, 16));
@@ -825,7 +844,14 @@ export function TrafficAdSetForm({
               onValueChange={(v) => {
                 if (!v) return;
                 setPerformanceGoal(v);
-                emit({ performanceGoal: v });
+                // Meta only accepts a non-IMPRESSIONS billing event when it
+                // matches the optimization goal — reset it if it no longer does.
+                if (billingEvent !== "IMPRESSIONS" && billingEvent !== v) {
+                  setBillingEvent("IMPRESSIONS");
+                  emit({ performanceGoal: v, billingEvent: "IMPRESSIONS" });
+                } else {
+                  emit({ performanceGoal: v });
+                }
               }}
             >
               <SelectTrigger className="w-full bg-gray-800/30 border-gray-700/40 text-sm text-gray-200 focus:border-blue-500/50">
@@ -862,7 +888,9 @@ export function TrafficAdSetForm({
                 </span>
               </SelectTrigger>
               <SelectContent className="bg-gray-900 border-gray-800">
-                {TRAFFIC_BILLING_EVENTS.map((b) => (
+                {TRAFFIC_BILLING_EVENTS.filter(
+                  (b) => b.value === "IMPRESSIONS" || b.value === performanceGoal
+                ).map((b) => (
                   <SelectItem key={b.value} value={b.value} className="text-xs text-gray-300">
                     {b.label}
                     {b.value === "IMPRESSIONS" && (
@@ -882,7 +910,10 @@ export function TrafficAdSetForm({
           title="Dynamic creative"
           hasToggle
           toggled={dynamicCreative}
-          onToggle={setDynamicCreative}
+          onToggle={(v) => {
+            setDynamicCreative(v);
+            emit({ dynamicCreative: v });
+          }}
         />
         <SectionBody className="!py-3">
           <p className="text-[11px] text-gray-500 leading-relaxed">

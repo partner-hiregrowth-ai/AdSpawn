@@ -113,6 +113,7 @@ export interface WideCreationState {
 
   // Objective defaults ("All" mode)
   setObjectiveDefault: (objective: string, level: 'campaign' | 'adSet' | 'ad', field: string, value: any) => void;
+  setObjectiveLevelDefaults: (objective: string, level: 'campaign' | 'adSet' | 'ad', fields: Record<string, any>) => void;
   getObjectiveDefaults: (objective: string) => ObjectiveLevelDefaults;
   getMergedFields: (objective: string, level: 'campaign' | 'adSet' | 'ad', entityFields: Record<string, any>) => Record<string, any>;
   clearEntityOverride: (entityId: string, level: 'campaign' | 'adSet' | 'ad', field: string) => void;
@@ -425,6 +426,14 @@ const storeCreator: StateCreator<WideCreationState, [['zustand/persist', unknown
     const prev = state.objectiveDefaults[objective] || { campaign: {}, adSet: {}, ad: {} };
     const updated = { ...prev, [level]: { ...prev[level], [field]: value } };
     return { objectiveDefaults: { ...state.objectiveDefaults, [objective]: updated } };
+  }),
+
+  // Replaces the whole level object. Used by the objective draft forms, which
+  // emit complete value objects where an absent key means "removed" — merging
+  // would resurrect deleted fields (e.g. daily_budget after turning CBO off).
+  setObjectiveLevelDefaults: (objective, level, fields) => set((state) => {
+    const prev = state.objectiveDefaults[objective] || { campaign: {}, adSet: {}, ad: {} };
+    return { objectiveDefaults: { ...state.objectiveDefaults, [objective]: { ...prev, [level]: fields } } };
   }),
 
   getObjectiveDefaults: (objective) => {

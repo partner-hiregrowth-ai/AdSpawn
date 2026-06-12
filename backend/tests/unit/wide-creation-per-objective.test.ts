@@ -269,9 +269,11 @@ describe('Mixed-Objective Template Validation (per-objective rules)', () => {
       ],
     };
     const result = await WideCreationService.validateTemplate(template);
-    expect(result.valid).toBe(false);
-    expect(result.errors.some(e => e.path.includes('campaigns[1]') && e.message.toLowerCase().includes('promoted object'))).toBe(true);
-    expect(result.errors.some(e => e.path.includes('campaigns[0]') && e.message.toLowerCase().includes('promoted object'))).toBe(false);
+    // Missing promoted_object no longer blocks template validation — drafts are
+    // created anyway and the requirement is enforced at publish time. Neither
+    // campaign should produce a promoted_object error here.
+    expect(result.errors.some(e => e.message.toLowerCase().includes('promoted object'))).toBe(false);
+    expect(result.errors.some(e => e.field === 'promoted_object' || e.field?.startsWith('promoted_object.'))).toBe(false);
   });
 
   it('each objective enforces its own destination_type rules', async () => {

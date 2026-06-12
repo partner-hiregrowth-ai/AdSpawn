@@ -676,7 +676,9 @@ export function AppPromotionAdSetForm({
   const [storeUrlTouched, setStoreUrlTouched] = useState(false);
 
   // Section 3: Dynamic creative
-  const [dynamicCreative, setDynamicCreative] = useState(false);
+  const [dynamicCreative, setDynamicCreative] = useState(!!initialValues.is_dynamic_creative);
+  const dynamicCreativeRef = useRef(dynamicCreative);
+  dynamicCreativeRef.current = dynamicCreative;
 
   // Section 4: Budget & schedule
   const [hasEndDate, setHasEndDate] = useState(!!(initialValues.end_time));
@@ -744,6 +746,16 @@ export function AppPromotionAdSetForm({
         delete values.end_time;
       }
 
+      // Dynamic Creative is a real ad set flag on Meta — publish requires it on
+      // both the ad set and its ads, so it must round-trip through draft data.
+      const effDynamicCreative =
+        "dynamicCreative" in overrides ? overrides.dynamicCreative : dynamicCreativeRef.current;
+      if (effDynamicCreative) {
+        values.is_dynamic_creative = true;
+      } else {
+        delete values.is_dynamic_creative;
+      }
+
       onChangeRef.current(values);
     },
     [initialValues, name, conversionLocation, performanceGoal, billingEvent, appId, storeUrl, startDate, startTime, hasEndDate, endDate, endTime]
@@ -766,6 +778,7 @@ export function AppPromotionAdSetForm({
       setConversionLocation("APP");
     }
     if (initialValues.optimization_goal) setPerformanceGoal(initialValues.optimization_goal);
+    setDynamicCreative(!!initialValues.is_dynamic_creative);
     if (initialValues.billing_event) setBillingEvent(initialValues.billing_event);
     setAppId(initialValues.promoted_object?.application_id ?? "");
     setStoreUrl(initialValues.promoted_object?.object_store_url ?? "");
@@ -841,7 +854,14 @@ export function AppPromotionAdSetForm({
               onValueChange={(v) => {
                 if (!v) return;
                 setPerformanceGoal(v);
-                emit({ performanceGoal: v });
+                // Meta only accepts a non-IMPRESSIONS billing event when it
+                // matches the optimization goal — reset it if it no longer does.
+                if (billingEvent !== "IMPRESSIONS" && billingEvent !== v) {
+                  setBillingEvent("IMPRESSIONS");
+                  emit({ performanceGoal: v, billingEvent: "IMPRESSIONS" });
+                } else {
+                  emit({ performanceGoal: v });
+                }
               }}
             >
               <SelectTrigger className="w-full bg-gray-800/30 border-gray-700/40 text-sm text-gray-200 focus:border-blue-500/50">
@@ -878,7 +898,9 @@ export function AppPromotionAdSetForm({
                 </span>
               </SelectTrigger>
               <SelectContent className="bg-gray-900 border-gray-800">
-                {APP_BILLING_EVENTS.map((b) => (
+                {APP_BILLING_EVENTS.filter(
+                  (b) => b.value === "IMPRESSIONS" || b.value === performanceGoal
+                ).map((b) => (
                   <SelectItem key={b.value} value={b.value} className="text-xs text-gray-300">
                     {b.label}
                   </SelectItem>
@@ -949,7 +971,10 @@ export function AppPromotionAdSetForm({
           title="Dynamic creative"
           hasToggle
           toggled={dynamicCreative}
-          onToggle={setDynamicCreative}
+          onToggle={(v) => {
+            setDynamicCreative(v);
+            emit({ dynamicCreative: v });
+          }}
         />
         <SectionBody className="!py-3">
           <p className="text-[11px] text-gray-500 leading-relaxed">

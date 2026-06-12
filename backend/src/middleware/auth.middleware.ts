@@ -84,3 +84,16 @@ export const authMiddleware = async (req: AuthRequest, res: Response, next: Next
     res.status(401).json({ message: 'Invalid token' });
   }
 };
+
+// For routes whose data is scoped to a profile (drafts, wide creation).
+// Without this, a missing X-Profile-Id header surfaces as a confusing 500
+// deep inside a service instead of an actionable 400.
+export const requireProfile = (req: AuthRequest, res: Response, next: NextFunction) => {
+  if (!req.profileId) {
+    return res.status(400).json({
+      message: 'No profile selected. Choose a profile and try again.',
+      code: 'PROFILE_REQUIRED',
+    });
+  }
+  next();
+};

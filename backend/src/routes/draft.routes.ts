@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { DraftController } from '../controllers/draft.controller';
-import { authMiddleware } from '../middleware/auth.middleware';
+import { authMiddleware, requireProfile } from '../middleware/auth.middleware';
 import { validateBody } from '../middleware/validate.middleware';
 import { bulkLimiter } from '../middleware/rateLimit.middleware';
 import {
@@ -18,6 +18,12 @@ const router = Router();
 
 router.use(authMiddleware);
 
+// Pure schema generation — the only draft endpoint that doesn't touch profile data.
+router.post('/form-schema', validateBody(getFormSchemaBodySchema), DraftController.getFormSchema);
+
+// Everything below operates on profile-scoped drafts.
+router.use(requireProfile);
+
 router.post('/duplicate', validateBody(duplicateToDraftSchema), DraftController.duplicateToDraft);
 router.get('/campaigns', DraftController.listCampaigns);
 router.get('/campaigns/:id', DraftController.getCampaign);
@@ -34,7 +40,6 @@ router.post('/campaigns/bulk-delete', bulkLimiter, validateBody(bulkDeleteSchema
 router.post('/bulk-edit/schema', DraftController.bulkEditSchema);
 router.post('/bulk-edit/validate', DraftController.bulkEditValidate);
 router.post('/bulk-edit/apply', bulkLimiter, validateBody(bulkEditApplySchema), DraftController.bulkEditApply);
-router.post('/form-schema', validateBody(getFormSchemaBodySchema), DraftController.getFormSchema);
 router.get('/campaigns/:id/export', DraftController.exportCampaign);
 router.post('/import', validateBody(importCampaignSchema), DraftController.importCampaign);
 router.post('/campaigns/:id/validate', DraftController.validateDraft);

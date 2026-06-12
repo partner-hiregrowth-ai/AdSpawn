@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
-import { GoogleGenerativeAI, Part } from '@google/generative-ai';
+import { GoogleGenerativeAI, Part, FunctionCallingMode } from '@google/generative-ai';
 import { WideCreationService, WideCreationTemplate } from './draft/WideCreationService';
 
 // ─── Provider config ──────────────────────────────────────────────────────────
@@ -144,7 +144,20 @@ const TOOL_PARAMS: any = {
                         optimization_goal: { type: 'string' },
                         billing_event: { type: 'string' },
                         destination_type: { type: 'string' },
-                        targeting: { type: 'object' },
+                        targeting: {
+                          type: 'object',
+                          description: 'Meta targeting spec. Default: Thailand, age 20+.',
+                          properties: {
+                            geo_locations: {
+                              type: 'object',
+                              properties: {
+                                countries: { type: 'array', items: { type: 'string' } },
+                              },
+                            },
+                            age_min: { type: 'number' },
+                            age_max: { type: 'number' },
+                          },
+                        },
                       },
                       required: ['name', 'optimization_goal', 'billing_event', 'destination_type', 'targeting'],
                     },
@@ -164,7 +177,7 @@ const TOOL_PARAMS: any = {
                                   video_id: { type: 'string', description: 'USE THE (Uploaded Video ID: ...) VALUE FROM THE MESSAGE.' },
                                   primary_text: { type: 'string', description: 'Ad caption' },
                                   headline: { type: 'string' },
-                                  link_url: { type: 'string', default: 'https://example.com' },
+                                  link_url: { type: 'string', description: 'Defaults to https://example.com if the user gave no URL.' },
                                 },
                               },
                             },
@@ -444,50 +457,69 @@ async function callNativeGemini(
   modelName: string,
 ): Promise<ProviderResult> {
   const client = getNativeGemini();
-  const model = client.getGenerativeModel({
-    model: modelName,
-    systemInstruction: SYSTEM_PROMPT,
-    tools: [{
-      functionDeclarations: [{
-        name: 'generate_draft_template',
-        description: 'Generates Meta ad campaign drafts. Call this once you have all required fields.',
-        parameters: TOOL_PARAMS,
-      }],
-    }],
-  });
 
-  // Gemini requires alternating roles. 
+  // Gemini requires alternating roles.
   // We merge contextContent into the first message if it's from the user.
   const processedHistory = [...history];
   if (processedHistory.length > 0 && processedHistory[0].role === 'user') {
-    processedHistory[0] = { 
-      ...processedHistory[0], 
-      content: `${contextContent}\n\n${processedHistory[0].content}` 
+    processedHistory[0] = {
+      ...processedHistory[0],
+      content: `${contextContent}\n\n${processedHistory[0].content}`
     };
   } else {
     processedHistory.unshift({ role: 'user', content: contextContent });
   }
 
-  const chat = model.startChat({
-    history: processedHistory.slice(0, -1).map(m => ({
-      role: m.role === 'user' ? 'user' : 'model',
-      parts: [{ text: m.content }],
-    })),
-  });
-
+  const geminiHistory = processedHistory.slice(0, -1).map(m => ({
+    role: m.role === 'user' ? ('user' as const) : ('model' as const),
+    parts: [{ text: m.content }],
+  }));
   const lastMsg = processedHistory[processedHistory.length - 1]?.content || 'Hello';
-  const result = await chat.sendMessage(lastMsg);
-  const response = result.response;
-  
-  // Robust response check
-  const candidate = response.candidates?.[0];
+
+  const attempt = async (forceToolCall: boolean) => {
+    const model = client.getGenerativeModel({
+      model: modelName,
+      systemInstruction: SYSTEM_PROMPT,
+      tools: [{
+        functionDeclarations: [{
+          name: 'generate_draft_template',
+          description: 'Generates Meta ad campaign drafts. Call this once you have all required fields.',
+          parameters: TOOL_PARAMS,
+        }],
+      }],
+      ...(forceToolCall ? {
+        toolConfig: {
+          functionCallingConfig: {
+            mode: FunctionCallingMode.ANY,
+            allowedFunctionNames: ['generate_draft_template'],
+          },
+        },
+      } : {}),
+    });
+    const chat = model.startChat({ history: geminiHistory });
+    return (await chat.sendMessage(lastMsg)).response;
+  };
+
+  let response = await attempt(false);
+  let candidate = response.candidates?.[0];
+
+  // Gemini sometimes emits the tool call as code instead of structured JSON
+  // (finishReason MALFORMED_FUNCTION_CALL, no content). Retrying with
+  // FunctionCallingMode.ANY constrains decoding to a parseable call.
+  if (String(candidate?.finishReason) === 'MALFORMED_FUNCTION_CALL') {
+    console.warn('[AiCreate] Gemini returned MALFORMED_FUNCTION_CALL — retrying with forced tool call');
+    response = await attempt(true);
+    candidate = response.candidates?.[0];
+  }
   if (!candidate?.content?.parts) {
     let text = "I received an unexpected response from Gemini. Please try again.";
     try {
-      text = response.text();
+      const t = response.text();
+      if (t?.trim()) text = t;
     } catch (e) {
       console.warn("[AiCreate] Gemini response.text() failed:", e);
     }
+    console.warn(`[AiCreate] Gemini returned no usable parts (finishReason: ${candidate?.finishReason})`);
     return { text };
   }
 
@@ -674,7 +706,7 @@ export class AiCampaignService {
         return { reply, generationResult: { totalCreated, warnings, campaignIds }, adAccountId: req.adAccountId };
       }
 
-      return { reply: result.text ?? 'I had trouble generating a response. Please try again.' };
+      return { reply: result.text?.trim() ? result.text : 'I had trouble generating a response. Please try again.' };
 
     } catch (err: any) {
       const provider = getProvider();

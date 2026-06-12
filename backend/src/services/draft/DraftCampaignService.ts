@@ -64,6 +64,7 @@ export class DraftCampaignService {
         take: pageSize,
         include: {
           _count: { select: { adSets: true } },
+          adSets: { select: { _count: { select: { ads: true } } } },
         },
       }),
       prisma.draftCampaign.count({ where }),
